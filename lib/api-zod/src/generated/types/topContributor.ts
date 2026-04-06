@@ -6,6 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface HealthStatus {
-  status: string;
+export interface TopContributor {
+  userId: number;
+  /** @nullable */
+  userName?: string | null;
+  totalPap: number;
+  fleetCount: number;
 }

@@ -3,20 +3,36 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: EVE Online PAP Tracking System API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication operations
+  - name: users
+    description: User management
+  - name: characters
+    description: EVE character management
+  - name: fleets
+    description: Fleet management
+  - name: pap
+    description: PAP records management
+  - name: rewards
+    description: Reward management
+  - name: redemptions
+    description: Redemption management
+  - name: dashboard
+    description: Dashboard summary endpoints
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +40,505 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current authenticated user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentUser"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Log out current user
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List all users (admin only)
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+
+  /users/{id}:
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: Get a user by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /users/{id}/role:
+    patch:
+      operationId: updateUserRole
+      tags: [users]
+      summary: Update user role (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRoleBody"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/{id}/pap:
+    patch:
+      operationId: adjustUserPap
+      tags: [users]
+      summary: Manually adjust user PAP (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdjustPapBody"
+      responses:
+        "200":
+          description: Adjustment result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /characters:
+    get:
+      operationId: listCharacters
+      tags: [characters]
+      summary: List characters for the current user
+      responses:
+        "200":
+          description: List of characters
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Character"
+
+  /characters/all:
+    get:
+      operationId: listAllCharacters
+      tags: [characters]
+      summary: List all characters (admin only)
+      responses:
+        "200":
+          description: List of all characters
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Character"
+
+  /fleets:
+    get:
+      operationId: listFleets
+      tags: [fleets]
+      summary: List all fleets
+      responses:
+        "200":
+          description: List of fleets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Fleet"
+    post:
+      operationId: createFleet
+      tags: [fleets]
+      summary: Register a new fleet (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFleetBody"
+      responses:
+        "201":
+          description: Created fleet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fleet"
+
+  /fleets/{id}:
+    get:
+      operationId: getFleet
+      tags: [fleets]
+      summary: Get a fleet by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Fleet details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fleet"
+        "404":
+          description: Fleet not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateFleet
+      tags: [fleets]
+      summary: Update a fleet (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateFleetBody"
+      responses:
+        "200":
+          description: Updated fleet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fleet"
+    delete:
+      operationId: deleteFleet
+      tags: [fleets]
+      summary: Delete a fleet (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Fleet deleted
+
+  /fleets/{id}/participants:
+    post:
+      operationId: addFleetParticipant
+      tags: [fleets]
+      summary: Add a character to a fleet and award PAP
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddParticipantBody"
+      responses:
+        "201":
+          description: Participant added and PAP awarded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PapRecord"
+
+  /pap:
+    get:
+      operationId: listPapRecords
+      tags: [pap]
+      summary: List PAP records for current user
+      responses:
+        "200":
+          description: List of PAP records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PapRecord"
+
+  /pap/all:
+    get:
+      operationId: listAllPapRecords
+      tags: [pap]
+      summary: List all PAP records (admin only)
+      responses:
+        "200":
+          description: All PAP records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PapRecord"
+
+  /pap/manual:
+    post:
+      operationId: createManualPap
+      tags: [pap]
+      summary: Manually create a PAP adjustment (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateManualPapBody"
+      responses:
+        "201":
+          description: Manual PAP record created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PapRecord"
+
+  /rewards:
+    get:
+      operationId: listRewards
+      tags: [rewards]
+      summary: List all available rewards
+      responses:
+        "200":
+          description: List of rewards
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Reward"
+    post:
+      operationId: createReward
+      tags: [rewards]
+      summary: Create a new reward (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRewardBody"
+      responses:
+        "201":
+          description: Created reward
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reward"
+
+  /rewards/{id}:
+    patch:
+      operationId: updateReward
+      tags: [rewards]
+      summary: Update a reward (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRewardBody"
+      responses:
+        "200":
+          description: Updated reward
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reward"
+    delete:
+      operationId: deleteReward
+      tags: [rewards]
+      summary: Delete a reward (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Reward deleted
+
+  /redemptions:
+    get:
+      operationId: listRedemptions
+      tags: [redemptions]
+      summary: List redemption history for current user
+      responses:
+        "200":
+          description: List of redemptions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Redemption"
+    post:
+      operationId: createRedemption
+      tags: [redemptions]
+      summary: Redeem a reward using PAP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRedemptionBody"
+      responses:
+        "201":
+          description: Redemption successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Redemption"
+        "400":
+          description: Insufficient PAP balance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /redemptions/all:
+    get:
+      operationId: listAllRedemptions
+      tags: [redemptions]
+      summary: List all redemptions (admin only)
+      responses:
+        "200":
+          description: All redemptions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Redemption"
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get summary stats for current user dashboard
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/admin-summary:
+    get:
+      operationId: getAdminSummary
+      tags: [dashboard]
+      summary: Get admin-level summary stats (admin only)
+      responses:
+        "200":
+          description: Admin summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSummary"
+
+  /dashboard/top-contributors:
+    get:
+      operationId: getTopContributors
+      tags: [dashboard]
+      summary: Get top PAP contributors
+      responses:
+        "200":
+          description: Top contributors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TopContributor"
+
+  /dashboard/recent-fleets:
+    get:
+      operationId: getRecentFleets
+      tags: [dashboard]
+      summary: Get recent fleet activity
+      responses:
+        "200":
+          description: Recent fleets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Fleet"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +549,400 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+      required:
+        - success
+
+    CurrentUser:
+      type: object
+      properties:
+        id:
+          type: integer
+        eveCharacterId:
+          type: ["integer", "null"]
+        eveCharacterName:
+          type: ["string", "null"]
+        corporationId:
+          type: ["integer", "null"]
+        corporationName:
+          type: ["string", "null"]
+        role:
+          type: string
+          enum: [member, admin]
+        totalPap:
+          type: number
+        redeemablePap:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - role
+        - totalPap
+        - redeemablePap
+        - createdAt
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        eveCharacterId:
+          type: ["integer", "null"]
+        eveCharacterName:
+          type: ["string", "null"]
+        corporationId:
+          type: ["integer", "null"]
+        corporationName:
+          type: ["string", "null"]
+        role:
+          type: string
+          enum: [member, admin]
+        totalPap:
+          type: number
+        redeemablePap:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - role
+        - totalPap
+        - redeemablePap
+        - createdAt
+
+    UpdateUserRoleBody:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [member, admin]
+      required:
+        - role
+
+    AdjustPapBody:
+      type: object
+      properties:
+        amount:
+          type: number
+        reason:
+          type: string
+      required:
+        - amount
+        - reason
+
+    Character:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        eveCharacterId:
+          type: integer
+        eveCharacterName:
+          type: string
+        corporationId:
+          type: ["integer", "null"]
+        corporationName:
+          type: ["string", "null"]
+        isMain:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - eveCharacterId
+        - eveCharacterName
+        - isMain
+        - createdAt
+
+    Fleet:
+      type: object
+      properties:
+        id:
+          type: integer
+        eveFleetId:
+          type: ["string", "null"]
+        name:
+          type: string
+        fleetCommander:
+          type: string
+        papValue:
+          type: number
+        isActive:
+          type: boolean
+        startedAt:
+          type: ["string", "null"]
+          format: date-time
+        endedAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        participantCount:
+          type: ["integer", "null"]
+      required:
+        - id
+        - name
+        - fleetCommander
+        - papValue
+        - isActive
+        - createdAt
+
+    CreateFleetBody:
+      type: object
+      properties:
+        eveFleetId:
+          type: ["string", "null"]
+        name:
+          type: string
+        fleetCommander:
+          type: string
+        papValue:
+          type: number
+        startedAt:
+          type: ["string", "null"]
+      required:
+        - name
+        - fleetCommander
+        - papValue
+
+    UpdateFleetBody:
+      type: object
+      properties:
+        name:
+          type: string
+        fleetCommander:
+          type: string
+        papValue:
+          type: number
+        isActive:
+          type: boolean
+        endedAt:
+          type: ["string", "null"]
+
+    AddParticipantBody:
+      type: object
+      properties:
+        characterId:
+          type: integer
+      required:
+        - characterId
+
+    PapRecord:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        characterId:
+          type: ["integer", "null"]
+        fleetId:
+          type: ["integer", "null"]
+        amount:
+          type: number
+        type:
+          type: string
+          enum: [fleet, manual, adjustment]
+        reason:
+          type: ["string", "null"]
+        fleetName:
+          type: ["string", "null"]
+        characterName:
+          type: ["string", "null"]
+        userName:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - amount
+        - type
+        - createdAt
+
+    CreateManualPapBody:
+      type: object
+      properties:
+        userId:
+          type: integer
+        amount:
+          type: number
+        reason:
+          type: string
+      required:
+        - userId
+        - amount
+        - reason
+
+    Reward:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        papCost:
+          type: number
+        stock:
+          type: ["integer", "null"]
+        isAvailable:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - papCost
+        - isAvailable
+        - createdAt
+
+    CreateRewardBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        papCost:
+          type: number
+        stock:
+          type: ["integer", "null"]
+      required:
+        - name
+        - papCost
+
+    UpdateRewardBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        papCost:
+          type: number
+        stock:
+          type: ["integer", "null"]
+        isAvailable:
+          type: boolean
+
+    Redemption:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        rewardId:
+          type: integer
+        papCost:
+          type: number
+        status:
+          type: string
+          enum: [pending, fulfilled, cancelled]
+        rewardName:
+          type: ["string", "null"]
+        userName:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - rewardId
+        - papCost
+        - status
+        - createdAt
+
+    CreateRedemptionBody:
+      type: object
+      properties:
+        rewardId:
+          type: integer
+      required:
+        - rewardId
+
+    DashboardSummary:
+      type: object
+      properties:
+        totalPap:
+          type: number
+        redeemablePap:
+          type: number
+        fleetCount:
+          type: integer
+        redemptionCount:
+          type: integer
+        recentPapEarned:
+          type: number
+      required:
+        - totalPap
+        - redeemablePap
+        - fleetCount
+        - redemptionCount
+        - recentPapEarned
+
+    AdminSummary:
+      type: object
+      properties:
+        totalUsers:
+          type: integer
+        totalFleets:
+          type: integer
+        totalPapAwarded:
+          type: number
+        totalRedemptions:
+          type: integer
+        activeFleets:
+          type: integer
+        pendingRedemptions:
+          type: integer
+      required:
+        - totalUsers
+        - totalFleets
+        - totalPapAwarded
+        - totalRedemptions
+        - activeFleets
+        - pendingRedemptions
+
+    TopContributor:
+      type: object
+      properties:
+        userId:
+          type: integer
+        userName:
+          type: ["string", "null"]
+        totalPap:
+          type: number
+        fleetCount:
+          type: integer
+      required:
+        - userId
+        - totalPap
+        - fleetCount

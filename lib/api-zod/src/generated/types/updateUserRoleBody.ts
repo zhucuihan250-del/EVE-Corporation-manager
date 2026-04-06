@@ -5,7 +5,8 @@
  * EVE Online PAP Tracking System API
  * OpenAPI spec version: 0.1.0
  */
+import type { UpdateUserRoleBodyRole } from "./updateUserRoleBodyRole";
 
-export interface HealthStatus {
-  status: string;
+export interface UpdateUserRoleBody {
+  role: UpdateUserRoleBodyRole;
 }

@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "EVE PAP Tracker"
+version = "1.0.0"
+id = "artifacts/pap-tracker"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18188
+
+[services.development]
+run = "pnpm --filter @workspace/pap-tracker run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/pap-tracker", "run", "build" ]
+publicDir = "artifacts/pap-tracker/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18188"
+BASE_PATH = "/"

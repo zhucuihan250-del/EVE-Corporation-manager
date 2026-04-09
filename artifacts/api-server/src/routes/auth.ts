@@ -8,13 +8,10 @@ import { logger } from "../lib/logger";
 const router: IRouter = Router();
 
 function getCallbackUrl(req: Request): string {
-  const domain = process.env.REPLIT_DOMAINS?.split(",")[0];
-  if (domain) {
-    return `https://${domain}/api/auth/eve/callback`;
-  }
-  // fallback for local dev
-  const host = req.get("host") ?? "localhost";
-  const proto = req.get("x-forwarded-proto") ?? req.protocol;
+  // Use the forwarded host so the callback URL always matches the domain
+  // the user is actually visiting (dev preview or published app).
+  const host = req.get("x-forwarded-host") ?? req.get("host") ?? "localhost";
+  const proto = req.get("x-forwarded-proto") ?? req.protocol ?? "https";
   return `${proto}://${host}/api/auth/eve/callback`;
 }
 

@@ -381,6 +381,28 @@ export const ListAllRedemptionsResponse = zod.array(
 );
 
 /**
+ * @summary Update a redemption status (admin only)
+ */
+export const UpdateRedemptionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateRedemptionBody = zod.object({
+  status: zod.enum(["pending", "fulfilled", "cancelled"]),
+});
+
+export const UpdateRedemptionResponse = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  rewardId: zod.number(),
+  papCost: zod.number(),
+  status: zod.enum(["pending", "fulfilled", "cancelled"]),
+  rewardName: zod.string().nullish(),
+  userName: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+});
+
+/**
  * @summary Get summary stats for current user dashboard
  */
 export const GetDashboardSummaryResponse = zod.object({

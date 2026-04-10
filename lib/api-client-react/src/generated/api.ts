@@ -36,6 +36,7 @@ import type {
   SuccessResponse,
   TopContributor,
   UpdateFleetBody,
+  UpdateRedemptionBody,
   UpdateRewardBody,
   UpdateUserRoleBody,
   User,
@@ -2038,6 +2039,93 @@ export function useListAllRedemptions<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Update a redemption status (admin only)
+ */
+export const getUpdateRedemptionUrl = (id: number) => {
+  return `/api/redemptions/${id}`;
+};
+
+export const updateRedemption = async (
+  id: number,
+  updateRedemptionBody: UpdateRedemptionBody,
+  options?: RequestInit,
+): Promise<Redemption> => {
+  return customFetch<Redemption>(getUpdateRedemptionUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateRedemptionBody),
+  });
+};
+
+export const getUpdateRedemptionMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateRedemption>>,
+    TError,
+    { id: number; data: BodyType<UpdateRedemptionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateRedemption>>,
+  TError,
+  { id: number; data: BodyType<UpdateRedemptionBody> },
+  TContext
+> => {
+  const mutationKey = ["updateRedemption"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateRedemption>>,
+    { id: number; data: BodyType<UpdateRedemptionBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateRedemption(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateRedemptionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateRedemption>>
+>;
+export type UpdateRedemptionMutationBody = BodyType<UpdateRedemptionBody>;
+export type UpdateRedemptionMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Update a redemption status (admin only)
+ */
+export const useUpdateRedemption = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateRedemption>>,
+    TError,
+    { id: number; data: BodyType<UpdateRedemptionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateRedemption>>,
+  TError,
+  { id: number; data: BodyType<UpdateRedemptionBody> },
+  TContext
+> => {
+  return useMutation(getUpdateRedemptionMutationOptions(options));
+};
 
 /**
  * @summary Get summary stats for current user dashboard

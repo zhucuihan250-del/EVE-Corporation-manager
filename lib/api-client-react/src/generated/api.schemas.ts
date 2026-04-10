@@ -226,6 +226,19 @@ export interface CreateRedemptionBody {
   rewardId: number;
 }
 
+export type UpdateRedemptionBodyStatus =
+  (typeof UpdateRedemptionBodyStatus)[keyof typeof UpdateRedemptionBodyStatus];
+
+export const UpdateRedemptionBodyStatus = {
+  pending: "pending",
+  fulfilled: "fulfilled",
+  cancelled: "cancelled",
+} as const;
+
+export interface UpdateRedemptionBody {
+  status: UpdateRedemptionBodyStatus;
+}
+
 export interface DashboardSummary {
   totalPap: number;
   redeemablePap: number;

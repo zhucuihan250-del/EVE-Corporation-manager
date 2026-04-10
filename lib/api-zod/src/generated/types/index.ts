@@ -28,6 +28,8 @@ export * from "./reward";
 export * from "./successResponse";
 export * from "./topContributor";
 export * from "./updateFleetBody";
+export * from "./updateRedemptionBody";
+export * from "./updateRedemptionBodyStatus";
 export * from "./updateRewardBody";
 export * from "./updateUserRoleBody";
 export * from "./updateUserRoleBodyRole";

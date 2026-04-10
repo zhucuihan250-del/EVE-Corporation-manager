@@ -483,6 +483,37 @@ paths:
                 items:
                   $ref: "#/components/schemas/Redemption"
 
+  /redemptions/{id}:
+    patch:
+      operationId: updateRedemption
+      tags: [redemptions]
+      summary: Update a redemption status (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRedemptionBody"
+      responses:
+        "200":
+          description: Updated redemption
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Redemption"
+        "404":
+          description: Redemption not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /dashboard/summary:
     get:
       operationId: getDashboardSummary
@@ -887,6 +918,15 @@ components:
           type: integer
       required:
         - rewardId
+
+    UpdateRedemptionBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [pending, fulfilled, cancelled]
+      required:
+        - status
 
     DashboardSummary:
       type: object

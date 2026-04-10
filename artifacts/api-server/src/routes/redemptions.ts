@@ -123,6 +123,48 @@ router.post("/redemptions", requireAuth, async (req: Request, res: Response): Pr
   });
 });
 
+// PATCH /api/redemptions/:id - admin only (fulfill/cancel)
+router.patch("/redemptions/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
+  if (!currentUser || currentUser.role !== "admin") {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const id = parseInt(req.params.id);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid redemption ID" });
+    return;
+  }
+
+  const { status } = req.body;
+  if (!status || !["pending", "fulfilled", "cancelled"].includes(status)) {
+    res.status(400).json({ error: "Invalid status" });
+    return;
+  }
+
+  const [existing] = await db.select().from(redemptionsTable).where(eq(redemptionsTable.id, id));
+  if (!existing) {
+    res.status(404).json({ error: "Redemption not found" });
+    return;
+  }
+
+  const [updated] = await db
+    .update(redemptionsTable)
+    .set({ status })
+    .where(eq(redemptionsTable.id, id))
+    .returning();
+
+  const [reward] = await db.select().from(rewardsTable).where(eq(rewardsTable.id, updated.rewardId));
+  const [member] = await db.select().from(usersTable).where(eq(usersTable.id, updated.userId));
+
+  res.json(formatRedemption({
+    ...updated,
+    rewardName: reward?.name ?? null,
+    userName: member?.eveCharacterName ?? null,
+  }));
+});
+
 // GET /api/redemptions/all - admin only
 router.get("/redemptions/all", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));

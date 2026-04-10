@@ -9,7 +9,10 @@ import {
   ShieldAlert,
   Users,
   Swords,
-  Database
+  Database,
+  ClipboardList,
+  BookOpen,
+  Inbox
 } from "lucide-react";
 import {
   Sidebar,
@@ -81,6 +84,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={location === "/redemptions"}>
+                      <Link href="/redemptions" className="font-mono flex items-center gap-3">
+                        <ClipboardList className="w-4 h-4" />
+                        <span>Requisitions</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
@@ -111,6 +122,30 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         <Link href="/admin/fleets" className="font-mono flex items-center gap-3">
                           <Swords className="w-4 h-4" />
                           <span>Fleets</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild isActive={location.startsWith("/admin/rewards")}>
+                        <Link href="/admin/rewards" className="font-mono flex items-center gap-3">
+                          <Gift className="w-4 h-4" />
+                          <span>Rewards</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild isActive={location.startsWith("/admin/redemptions")}>
+                        <Link href="/admin/redemptions" className="font-mono flex items-center gap-3">
+                          <Inbox className="w-4 h-4" />
+                          <span>Requisitions</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild isActive={location.startsWith("/admin/pap")}>
+                        <Link href="/admin/pap" className="font-mono flex items-center gap-3">
+                          <BookOpen className="w-4 h-4" />
+                          <span>PAP Ledger</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>

@@ -1,9 +1,12 @@
-import { useListAllRedemptions } from "@workspace/api-client-react";
+import { useListAllRedemptions, useUpdateRedemption, getListAllRedemptionsQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
-import { Loader2 } from "lucide-react";
+import { Loader2, CheckCircle, XCircle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 export function AdminRedemptions() {
   const { data: redemptions, isLoading } = useListAllRedemptions({
@@ -11,6 +14,27 @@ export function AdminRedemptions() {
       queryKey: ["adminRedemptions"]
     }
   });
+  const updateRedemption = useUpdateRedemption();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const handleUpdateStatus = (id: number, status: "fulfilled" | "cancelled", pilotName: string | null) => {
+    updateRedemption.mutate(
+      { id, data: { status } },
+      {
+        onSuccess: () => {
+          toast({
+            title: status === "fulfilled" ? "Requisition Fulfilled" : "Requisition Cancelled",
+            description: `${pilotName ?? "Pilot"}'s request has been ${status}.`,
+          });
+          queryClient.invalidateQueries({ queryKey: getListAllRedemptionsQueryKey() });
+        },
+        onError: () => {
+          toast({ title: "Error", description: "Failed to update requisition status.", variant: "destructive" });
+        }
+      }
+    );
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -41,6 +65,7 @@ export function AdminRedemptions() {
                   <TableHead className="font-mono text-xs text-muted-foreground">ASSET REQUESTED</TableHead>
                   <TableHead className="font-mono text-xs text-muted-foreground text-right">COST</TableHead>
                   <TableHead className="font-mono text-xs text-muted-foreground text-right">STATUS</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground text-right">ACTIONS</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -59,9 +84,35 @@ export function AdminRedemptions() {
                       {redemption.papCost}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Badge variant={redemption.status === 'fulfilled' ? 'default' : redemption.status === 'cancelled' ? 'destructive' : 'secondary'} className="font-mono text-[10px] rounded-sm">
+                      <Badge
+                        variant={redemption.status === 'fulfilled' ? 'default' : redemption.status === 'cancelled' ? 'destructive' : 'secondary'}
+                        className="font-mono text-[10px] rounded-sm"
+                      >
                         {redemption.status.toUpperCase()}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {redemption.status === 'pending' && (
+                        <div className="flex gap-2 justify-end">
+                          <Button
+                            size="sm"
+                            className="h-7 rounded-sm font-mono text-[10px] bg-emerald-600 hover:bg-emerald-700"
+                            onClick={() => handleUpdateStatus(redemption.id, "fulfilled", redemption.userName)}
+                            disabled={updateRedemption.isPending}
+                          >
+                            <CheckCircle className="w-3 h-3 mr-1" /> FULFILL
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="h-7 rounded-sm font-mono text-[10px]"
+                            onClick={() => handleUpdateStatus(redemption.id, "cancelled", redemption.userName)}
+                            disabled={updateRedemption.isPending}
+                          >
+                            <XCircle className="w-3 h-3 mr-1" /> CANCEL
+                          </Button>
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

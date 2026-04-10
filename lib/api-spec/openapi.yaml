@@ -286,6 +286,87 @@ paths:
         "204":
           description: Fleet deleted
 
+  /discord/ping:
+    post:
+      operationId: discordFleetPing
+      tags: [fleets]
+      summary: Receive a fleet ping from Discord bot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DiscordPingBody"
+      responses:
+        "201":
+          description: Fleet ping registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fleet"
+        "403":
+          description: Invalid secret
+
+  /discord/start/{id}:
+    post:
+      operationId: discordFleetStart
+      tags: [fleets]
+      summary: Mark a fleet as started from Discord
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                secret:
+                  type: string
+              required:
+                - secret
+      responses:
+        "200":
+          description: Fleet started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fleet"
+
+  /discord/end/{id}:
+    post:
+      operationId: discordFleetEnd
+      tags: [fleets]
+      summary: Mark a fleet as finished from Discord
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                secret:
+                  type: string
+              required:
+                - secret
+      responses:
+        "200":
+          description: Fleet ended
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fleet"
+
   /fleets/{id}/participants:
     post:
       operationId: addFleetParticipant
@@ -721,6 +802,14 @@ components:
           type: number
         isActive:
           type: boolean
+        pingType:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [pending, active, finished]
+        scheduledAt:
+          type: ["string", "null"]
+          format: date-time
         startedAt:
           type: ["string", "null"]
           format: date-time
@@ -738,6 +827,7 @@ components:
         - fleetCommander
         - papValue
         - isActive
+        - status
         - createdAt
 
     CreateFleetBody:
@@ -751,6 +841,12 @@ components:
           type: string
         papValue:
           type: number
+        pingType:
+          type: ["string", "null"]
+        status:
+          type: ["string", "null"]
+        scheduledAt:
+          type: ["string", "null"]
         startedAt:
           type: ["string", "null"]
       required:
@@ -769,8 +865,33 @@ components:
           type: number
         isActive:
           type: boolean
+        status:
+          type: string
         endedAt:
           type: ["string", "null"]
+
+    DiscordPingBody:
+      type: object
+      properties:
+        secret:
+          type: string
+        name:
+          type: string
+        fleetCommander:
+          type: string
+        pingType:
+          type: string
+        papValue:
+          type: number
+        scheduledAt:
+          type: ["string", "null"]
+        discordMessageId:
+          type: ["string", "null"]
+      required:
+        - secret
+        - name
+        - fleetCommander
+        - pingType
 
     AddParticipantBody:
       type: object

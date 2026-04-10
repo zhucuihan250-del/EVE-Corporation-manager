@@ -9,6 +9,10 @@ import { logger } from "./lib/logger";
 
 const app: Express = express();
 
+// Trust the Replit reverse proxy so req.secure and req.ip are accurate.
+// This is required for secure session cookies to work in the deployed environment.
+app.set("trust proxy", 1);
+
 const PgStore = connectPgSimple(session);
 
 app.use(
@@ -53,8 +57,11 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === "production",
+      // "auto" sets secure=true when the request arrives over HTTPS (respecting
+      // the x-forwarded-proto header once trust proxy is enabled above).
+      secure: "auto",
       httpOnly: true,
+      sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     },
   }),

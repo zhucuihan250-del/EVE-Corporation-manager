@@ -11,8 +11,10 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useTranslation } from "react-i18next";
 
 export function AdminFleets() {
+  const { t } = useTranslation();
   const { data: fleets, isLoading } = useListFleets({ query: { queryKey: ["adminFleets"] } });
   const createFleet = useCreateFleet();
   const updateFleet = useUpdateFleet();
@@ -30,7 +32,7 @@ export function AdminFleets() {
       { data: { name: fleetName, fleetCommander, papValue: Number(papValue) } },
       {
         onSuccess: () => {
-          toast({ title: "Fleet Created", description: "New operation registered." });
+          toast({ title: t("fleets.fleetCreated"), description: t("fleets.newOperationRegistered") });
           queryClient.invalidateQueries({ queryKey: getListFleetsQueryKey() });
           setCreateModalOpen(false);
           setFleetName("");
@@ -46,7 +48,7 @@ export function AdminFleets() {
       { id: fleetId, data: { isActive: false, endedAt: new Date().toISOString() } },
       {
         onSuccess: () => {
-          toast({ title: "Fleet Ended", description: "Operation marked as complete." });
+          toast({ title: t("fleets.fleetEnded"), description: t("fleets.operationComplete") });
           queryClient.invalidateQueries({ queryKey: getListFleetsQueryKey() });
         }
       }
@@ -57,17 +59,17 @@ export function AdminFleets() {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-2xl font-bold font-mono tracking-wider text-foreground mb-1 uppercase">Fleet Operations</h1>
-          <p className="text-muted-foreground font-mono text-sm">Command active fleets and manage participation</p>
+          <h1 className="text-2xl font-bold font-mono tracking-wider text-foreground mb-1 uppercase">{t("fleets.title")}</h1>
+          <p className="text-muted-foreground font-mono text-sm">{t("fleets.subtitle")}</p>
         </div>
         <Button onClick={() => setCreateModalOpen(true)} className="font-mono rounded-sm text-xs tracking-wider">
-          <Plus className="w-4 h-4 mr-2" /> NEW OPERATION
+          <Plus className="w-4 h-4 mr-2" /> {t("fleets.newOperation")}
         </Button>
       </div>
 
       <Card className="bg-card/40 backdrop-blur border-border/50 rounded-sm">
         <CardHeader className="border-b border-border/30 pb-4">
-          <CardTitle className="text-sm font-mono tracking-wider uppercase">Combat Registry</CardTitle>
+          <CardTitle className="text-sm font-mono tracking-wider uppercase">{t("fleets.combatRegistry")}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
@@ -76,18 +78,18 @@ export function AdminFleets() {
             </div>
           ) : !fleets?.length ? (
             <div className="p-8 text-center text-muted-foreground font-mono text-sm">
-              No registered fleets.
+              {t("fleets.noFleets")}
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow className="border-border/30 hover:bg-transparent">
-                  <TableHead className="font-mono text-xs text-muted-foreground">OPERATION</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground">COMMANDER</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground">STATUS</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground text-right">VALUE</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground text-right">PILOTS</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground text-right">ACTIONS</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground">{t("fleets.operation")}</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground">{t("fleets.commander")}</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground">{t("fleets.status")}</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground text-right">{t("fleets.value")}</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground text-right">{t("fleets.pilots")}</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground text-right">{t("fleets.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -104,7 +106,7 @@ export function AdminFleets() {
                     </TableCell>
                     <TableCell>
                       <Badge variant={fleet.isActive ? 'default' : 'secondary'} className="font-mono text-[10px] rounded-sm">
-                        {fleet.isActive ? 'ACTIVE' : 'CONCLUDED'}
+                        {fleet.isActive ? t("fleets.active") : t("fleets.concluded")}
                       </Badge>
                     </TableCell>
                     <TableCell className="font-mono font-bold text-right text-primary">
@@ -122,7 +124,7 @@ export function AdminFleets() {
                           onClick={() => handleEndFleet(fleet.id)}
                           disabled={updateFleet.isPending}
                         >
-                          STAND DOWN
+                          {t("fleets.standDown")}
                         </Button>
                       )}
                     </TableCell>
@@ -138,40 +140,40 @@ export function AdminFleets() {
         <DialogContent className="sm:max-w-[425px] bg-card border-primary/20 rounded-sm font-mono">
           <DialogHeader>
             <DialogTitle className="tracking-wider uppercase text-primary flex items-center gap-2">
-              <Swords className="w-5 h-5" /> Initialize Operation
+              <Swords className="w-5 h-5" /> {t("fleets.initializeOperation")}
             </DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              Register a new fleet to begin tracking participant activity.
+              {t("fleets.initializeDesc")}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="fleetName" className="text-right text-xs tracking-widest">
-                OP NAME
+                {t("fleets.opName")}
               </Label>
               <Input
                 id="fleetName"
                 value={fleetName}
                 onChange={(e) => setFleetName(e.target.value)}
                 className="col-span-3 bg-background/50 border-border/50 rounded-sm"
-                placeholder="e.g. CTA - Jita Defense"
+                placeholder={t("fleets.opNamePlaceholder")}
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="fc" className="text-right text-xs tracking-widest">
-                COMMANDER
+                {t("fleets.commanderLabel")}
               </Label>
               <Input
                 id="fc"
                 value={fleetCommander}
                 onChange={(e) => setFleetCommander(e.target.value)}
                 className="col-span-3 bg-background/50 border-border/50 rounded-sm"
-                placeholder="FC Name"
+                placeholder={t("fleets.commanderPlaceholder")}
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="pap" className="text-right text-xs tracking-widest">
-                PAP VALUE
+                {t("fleets.papValue")}
               </Label>
               <Input
                 id="pap"
@@ -184,9 +186,9 @@ export function AdminFleets() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateModalOpen(false)} className="rounded-sm">ABORT</Button>
+            <Button variant="outline" onClick={() => setCreateModalOpen(false)} className="rounded-sm">{t("fleets.abort")}</Button>
             <Button onClick={handleCreateFleet} disabled={createFleet.isPending || !fleetName || !fleetCommander || !papValue} className="rounded-sm">
-              {createFleet.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "INITIALIZE"}
+              {createFleet.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : t("fleets.initialize")}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -4,8 +4,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export function AdminPap() {
+  const { t } = useTranslation();
   const { data: records, isLoading } = useListAllPapRecords({
     query: {
       queryKey: ["adminPapRecords"]
@@ -15,13 +17,13 @@ export function AdminPap() {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div>
-        <h1 className="text-2xl font-bold font-mono tracking-wider text-foreground mb-1 uppercase">Global Ledger</h1>
-        <p className="text-muted-foreground font-mono text-sm">Alliance-wide activity point transactions</p>
+        <h1 className="text-2xl font-bold font-mono tracking-wider text-foreground mb-1 uppercase">{t("papLedger.title")}</h1>
+        <p className="text-muted-foreground font-mono text-sm">{t("papLedger.subtitle")}</p>
       </div>
 
       <Card className="bg-card/40 backdrop-blur border-border/50 rounded-sm">
         <CardHeader className="border-b border-border/30 pb-4">
-          <CardTitle className="text-sm font-mono tracking-wider uppercase">Master Record</CardTitle>
+          <CardTitle className="text-sm font-mono tracking-wider uppercase">{t("papLedger.masterRecord")}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
@@ -30,17 +32,17 @@ export function AdminPap() {
             </div>
           ) : !records?.length ? (
             <div className="p-8 text-center text-muted-foreground font-mono text-sm">
-              No transactions recorded.
+              {t("papLedger.noTransactions")}
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow className="border-border/30 hover:bg-transparent">
-                  <TableHead className="font-mono text-xs text-muted-foreground">TIMESTAMP</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground">PILOT</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground">TYPE</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground">CONTEXT</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground text-right">DELTA</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground">{t("papLedger.timestamp")}</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground">{t("papLedger.pilot")}</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground">{t("papLedger.type")}</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground">{t("papLedger.context")}</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground text-right">{t("papLedger.delta")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

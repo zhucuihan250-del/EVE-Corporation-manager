@@ -12,8 +12,10 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useTranslation } from "react-i18next";
 
 export function AdminUsers() {
+  const { t } = useTranslation();
   const { data: users, isLoading } = useListUsers({ query: { queryKey: ["adminUsers"] } });
   const updateUserRole = useUpdateUserRole();
   const adjustPap = useAdjustUserPap();
@@ -31,7 +33,7 @@ export function AdminUsers() {
       { id: userId, data: { role: newRole } },
       {
         onSuccess: () => {
-          toast({ title: "Role Updated", description: "User permissions have been updated." });
+          toast({ title: t("personnel.roleUpdated"), description: t("personnel.roleUpdatedDesc") });
           queryClient.invalidateQueries({ queryKey: getListUsersQueryKey() });
         }
       }
@@ -44,7 +46,7 @@ export function AdminUsers() {
       { id: selectedUser, data: { amount: Number(adjustAmount), reason: adjustReason } },
       {
         onSuccess: () => {
-          toast({ title: "PAP Adjusted", description: "Manual points adjustment applied." });
+          toast({ title: t("personnel.papAdjusted"), description: t("personnel.papAdjustedDesc") });
           queryClient.invalidateQueries({ queryKey: getListUsersQueryKey() });
           setAdjustModalOpen(false);
           setAdjustAmount("");
@@ -57,13 +59,13 @@ export function AdminUsers() {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div>
-        <h1 className="text-2xl font-bold font-mono tracking-wider text-foreground mb-1 uppercase">Personnel Roster</h1>
-        <p className="text-muted-foreground font-mono text-sm">Manage user access and manual point adjustments</p>
+        <h1 className="text-2xl font-bold font-mono tracking-wider text-foreground mb-1 uppercase">{t("personnel.title")}</h1>
+        <p className="text-muted-foreground font-mono text-sm">{t("personnel.subtitle")}</p>
       </div>
 
       <Card className="bg-card/40 backdrop-blur border-border/50 rounded-sm">
         <CardHeader className="border-b border-border/30 pb-4">
-          <CardTitle className="text-sm font-mono tracking-wider uppercase">Active Members</CardTitle>
+          <CardTitle className="text-sm font-mono tracking-wider uppercase">{t("personnel.activeMembers")}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
@@ -72,17 +74,17 @@ export function AdminUsers() {
             </div>
           ) : !users?.length ? (
             <div className="p-8 text-center text-muted-foreground font-mono text-sm">
-              No personnel records found.
+              {t("personnel.noPersonnel")}
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow className="border-border/30 hover:bg-transparent">
-                  <TableHead className="font-mono text-xs text-muted-foreground">PILOT NAME</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground">ROLE</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground text-right">TOTAL PAP</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground text-right">REDEEMABLE</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground text-right">ACTIONS</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground">{t("personnel.pilotName")}</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground">{t("personnel.role")}</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground text-right">{t("personnel.totalPap")}</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground text-right">{t("personnel.redeemable")}</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground text-right">{t("personnel.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -111,7 +113,7 @@ export function AdminUsers() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="bg-card border-border/50 rounded-sm font-mono">
-                          <DropdownMenuLabel className="text-xs tracking-widest text-muted-foreground">Commands</DropdownMenuLabel>
+                          <DropdownMenuLabel className="text-xs tracking-widest text-muted-foreground">{t("personnel.commands")}</DropdownMenuLabel>
                           <DropdownMenuSeparator className="bg-border/50" />
                           <DropdownMenuItem 
                             onClick={() => {
@@ -121,14 +123,14 @@ export function AdminUsers() {
                             className="text-xs cursor-pointer focus:bg-primary/20"
                           >
                             <Activity className="mr-2 h-4 w-4" />
-                            <span>Adjust PAP</span>
+                            <span>{t("personnel.adjustPap")}</span>
                           </DropdownMenuItem>
                           <DropdownMenuItem 
                             onClick={() => handleRoleToggle(user.id, user.role)}
                             className="text-xs cursor-pointer focus:bg-primary/20"
                           >
                             <Shield className="mr-2 h-4 w-4" />
-                            <span>Toggle Admin</span>
+                            <span>{t("personnel.toggleAdmin")}</span>
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -144,15 +146,15 @@ export function AdminUsers() {
       <Dialog open={adjustModalOpen} onOpenChange={setAdjustModalOpen}>
         <DialogContent className="sm:max-w-[425px] bg-card border-primary/20 rounded-sm font-mono">
           <DialogHeader>
-            <DialogTitle className="tracking-wider uppercase text-primary">Manual PAP Adjustment</DialogTitle>
+            <DialogTitle className="tracking-wider uppercase text-primary">{t("personnel.manualPapAdjustment")}</DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              Add or subtract PAP directly from the selected pilot's balance. Use negative numbers to deduct.
+              {t("personnel.manualPapDesc")}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="amount" className="text-right text-xs tracking-widest">
-                AMOUNT
+                {t("personnel.amount")}
               </Label>
               <Input
                 id="amount"
@@ -160,26 +162,26 @@ export function AdminUsers() {
                 value={adjustAmount}
                 onChange={(e) => setAdjustAmount(e.target.value)}
                 className="col-span-3 bg-background/50 border-border/50 rounded-sm"
-                placeholder="e.g. 5 or -10"
+                placeholder={t("personnel.amountPlaceholder")}
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="reason" className="text-right text-xs tracking-widest">
-                REASON
+                {t("personnel.reason")}
               </Label>
               <Input
                 id="reason"
                 value={adjustReason}
                 onChange={(e) => setAdjustReason(e.target.value)}
                 className="col-span-3 bg-background/50 border-border/50 rounded-sm"
-                placeholder="Brief justification"
+                placeholder={t("personnel.reasonPlaceholder")}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAdjustModalOpen(false)} className="rounded-sm">CANCEL</Button>
+            <Button variant="outline" onClick={() => setAdjustModalOpen(false)} className="rounded-sm">{t("personnel.cancel")}</Button>
             <Button onClick={handleAdjustPap} disabled={adjustPap.isPending || !adjustAmount || !adjustReason} className="rounded-sm">
-              {adjustPap.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "EXECUTE"}
+              {adjustPap.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : t("personnel.execute")}
             </Button>
           </DialogFooter>
         </DialogContent>

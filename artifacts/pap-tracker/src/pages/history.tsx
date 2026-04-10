@@ -4,8 +4,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export function History() {
+  const { t } = useTranslation();
   const { data: records, isLoading } = useListPapRecords({
     query: {
       queryKey: ["papRecords"]
@@ -15,13 +17,13 @@ export function History() {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div>
-        <h1 className="text-2xl font-bold font-mono tracking-wider text-foreground mb-1 uppercase">Participation History</h1>
-        <p className="text-muted-foreground font-mono text-sm">Chronological record of earned Activity Points</p>
+        <h1 className="text-2xl font-bold font-mono tracking-wider text-foreground mb-1 uppercase">{t("history.title")}</h1>
+        <p className="text-muted-foreground font-mono text-sm">{t("history.subtitle")}</p>
       </div>
 
       <Card className="bg-card/40 backdrop-blur border-border/50 rounded-sm">
         <CardHeader className="border-b border-border/30 pb-4">
-          <CardTitle className="text-sm font-mono tracking-wider uppercase">PAP Ledger</CardTitle>
+          <CardTitle className="text-sm font-mono tracking-wider uppercase">{t("history.papLedger")}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
@@ -30,16 +32,16 @@ export function History() {
             </div>
           ) : !records?.length ? (
             <div className="p-8 text-center text-muted-foreground font-mono text-sm">
-              No participation records found.
+              {t("history.noRecords")}
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow className="border-border/30 hover:bg-transparent">
-                  <TableHead className="font-mono text-xs text-muted-foreground">DATE</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground">TYPE</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground">DETAILS</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground text-right">AMOUNT</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground">{t("history.date")}</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground">{t("history.type")}</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground">{t("history.details")}</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground text-right">{t("history.amount")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

@@ -3,8 +3,10 @@ import { ShieldAlert } from "lucide-react";
 import { useGetMe } from "@workspace/api-client-react";
 import { useLocation } from "wouter";
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 
 export function Login() {
+  const { t } = useTranslation();
   const { data: user, isLoading } = useGetMe();
   const [, setLocation] = useLocation();
 
@@ -25,15 +27,15 @@ export function Login() {
           <ShieldAlert className="w-8 h-8 text-primary" />
         </div>
         
-        <h1 className="text-2xl font-mono text-foreground font-bold tracking-widest mb-2 text-center uppercase">Secure Login</h1>
-        <p className="text-sm font-mono text-muted-foreground mb-8 text-center">Authentication required to access Alliance Tactical Network</p>
+        <h1 className="text-2xl font-mono text-foreground font-bold tracking-widest mb-2 text-center uppercase">{t("login.title")}</h1>
+        <p className="text-sm font-mono text-muted-foreground mb-8 text-center">{t("login.subtitle")}</p>
         
         <Button 
           asChild 
           className="w-full h-12 font-mono text-sm tracking-widest bg-primary hover:bg-primary/90 text-primary-foreground rounded-none shadow-[0_0_10px_rgba(250,204,21,0.3)] hover:shadow-[0_0_20px_rgba(250,204,21,0.5)] transition-all duration-300"
         >
           <a href="/api/auth/eve/login">
-            AUTHORIZE VIA EVE SSO
+            {t("login.button")}
           </a>
         </Button>
       </div>

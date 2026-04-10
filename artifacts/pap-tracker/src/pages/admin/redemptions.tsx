@@ -7,8 +7,10 @@ import { format } from "date-fns";
 import { Loader2, CheckCircle, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 export function AdminRedemptions() {
+  const { t } = useTranslation();
   const { data: redemptions, isLoading } = useListAllRedemptions({
     query: {
       queryKey: ["adminRedemptions"]
@@ -24,13 +26,13 @@ export function AdminRedemptions() {
       {
         onSuccess: () => {
           toast({
-            title: status === "fulfilled" ? "Requisition Fulfilled" : "Requisition Cancelled",
+            title: status === "fulfilled" ? t("adminRedemptions.requisitionFulfilled") : t("adminRedemptions.requisitionCancelled"),
             description: `${pilotName ?? "Pilot"}'s request has been ${status}.`,
           });
           queryClient.invalidateQueries({ queryKey: getListAllRedemptionsQueryKey() });
         },
         onError: () => {
-          toast({ title: "Error", description: "Failed to update requisition status.", variant: "destructive" });
+          toast({ title: t("adminRedemptions.error"), description: t("adminRedemptions.updateFailed"), variant: "destructive" });
         }
       }
     );
@@ -39,13 +41,13 @@ export function AdminRedemptions() {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div>
-        <h1 className="text-2xl font-bold font-mono tracking-wider text-foreground mb-1 uppercase">Requisition Processing</h1>
-        <p className="text-muted-foreground font-mono text-sm">Monitor and fulfill pilot asset requests</p>
+        <h1 className="text-2xl font-bold font-mono tracking-wider text-foreground mb-1 uppercase">{t("adminRedemptions.title")}</h1>
+        <p className="text-muted-foreground font-mono text-sm">{t("adminRedemptions.subtitle")}</p>
       </div>
 
       <Card className="bg-card/40 backdrop-blur border-border/50 rounded-sm">
         <CardHeader className="border-b border-border/30 pb-4">
-          <CardTitle className="text-sm font-mono tracking-wider uppercase">Global Queue</CardTitle>
+          <CardTitle className="text-sm font-mono tracking-wider uppercase">{t("adminRedemptions.globalQueue")}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
@@ -54,18 +56,18 @@ export function AdminRedemptions() {
             </div>
           ) : !redemptions?.length ? (
             <div className="p-8 text-center text-muted-foreground font-mono text-sm">
-              No requisitions in queue.
+              {t("adminRedemptions.noRequisitions")}
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow className="border-border/30 hover:bg-transparent">
-                  <TableHead className="font-mono text-xs text-muted-foreground">DATE</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground">PILOT</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground">ASSET REQUESTED</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground text-right">COST</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground text-right">STATUS</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground text-right">ACTIONS</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground">{t("adminRedemptions.date")}</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground">{t("adminRedemptions.pilot")}</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground">{t("adminRedemptions.assetRequested")}</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground text-right">{t("adminRedemptions.cost")}</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground text-right">{t("adminRedemptions.status")}</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground text-right">{t("adminRedemptions.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -100,7 +102,7 @@ export function AdminRedemptions() {
                             onClick={() => handleUpdateStatus(redemption.id, "fulfilled", redemption.userName)}
                             disabled={updateRedemption.isPending}
                           >
-                            <CheckCircle className="w-3 h-3 mr-1" /> FULFILL
+                            <CheckCircle className="w-3 h-3 mr-1" /> {t("adminRedemptions.fulfill")}
                           </Button>
                           <Button
                             size="sm"
@@ -109,7 +111,7 @@ export function AdminRedemptions() {
                             onClick={() => handleUpdateStatus(redemption.id, "cancelled", redemption.userName)}
                             disabled={updateRedemption.isPending}
                           >
-                            <XCircle className="w-3 h-3 mr-1" /> CANCEL
+                            <XCircle className="w-3 h-3 mr-1" /> {t("adminRedemptions.cancel")}
                           </Button>
                         </div>
                       )}

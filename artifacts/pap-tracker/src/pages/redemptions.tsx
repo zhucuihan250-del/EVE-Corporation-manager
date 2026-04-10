@@ -4,8 +4,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export function Redemptions() {
+  const { t } = useTranslation();
   const { data: redemptions, isLoading } = useListRedemptions({
     query: {
       queryKey: ["redemptions"]
@@ -15,13 +17,13 @@ export function Redemptions() {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div>
-        <h1 className="text-2xl font-bold font-mono tracking-wider text-foreground mb-1 uppercase">Requisition Status</h1>
-        <p className="text-muted-foreground font-mono text-sm">Track your pending and fulfilled assets</p>
+        <h1 className="text-2xl font-bold font-mono tracking-wider text-foreground mb-1 uppercase">{t("redemptions.title")}</h1>
+        <p className="text-muted-foreground font-mono text-sm">{t("redemptions.subtitle")}</p>
       </div>
 
       <Card className="bg-card/40 backdrop-blur border-border/50 rounded-sm">
         <CardHeader className="border-b border-border/30 pb-4">
-          <CardTitle className="text-sm font-mono tracking-wider uppercase">Requisition Log</CardTitle>
+          <CardTitle className="text-sm font-mono tracking-wider uppercase">{t("redemptions.log")}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
@@ -30,16 +32,16 @@ export function Redemptions() {
             </div>
           ) : !redemptions?.length ? (
             <div className="p-8 text-center text-muted-foreground font-mono text-sm">
-              No requisition history found.
+              {t("redemptions.noHistory")}
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow className="border-border/30 hover:bg-transparent">
-                  <TableHead className="font-mono text-xs text-muted-foreground">DATE</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground">ITEM</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground text-right">COST</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground text-right">STATUS</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground">{t("redemptions.date")}</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground">{t("redemptions.item")}</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground text-right">{t("redemptions.cost")}</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground text-right">{t("redemptions.status")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

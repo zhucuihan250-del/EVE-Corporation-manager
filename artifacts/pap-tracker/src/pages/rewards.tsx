@@ -5,8 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, ShoppingCart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 export function Rewards() {
+  const { t } = useTranslation();
   const { data: rewards, isLoading } = useListRewards({ query: { queryKey: ["rewards"] } });
   const createRedemption = useCreateRedemption();
   const { toast } = useToast();
@@ -18,15 +20,15 @@ export function Rewards() {
       {
         onSuccess: () => {
           toast({
-            title: "Redemption Requested",
-            description: `Your request for ${name} has been submitted to command.`,
+            title: t("rewards.redemptionRequested"),
+            description: t("rewards.redemptionRequestedDesc", { name }),
           });
           queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
         },
         onError: (err: any) => {
           toast({
-            title: "Redemption Failed",
-            description: err.error || "Insufficient PAP or item unavailable.",
+            title: t("rewards.redemptionFailed"),
+            description: err.error || t("rewards.insufficientPap"),
             variant: "destructive",
           });
         }
@@ -37,8 +39,8 @@ export function Rewards() {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div>
-        <h1 className="text-2xl font-bold font-mono tracking-wider text-foreground mb-1 uppercase">Requisition Center</h1>
-        <p className="text-muted-foreground font-mono text-sm">Exchange accumulated Activity Points for assets</p>
+        <h1 className="text-2xl font-bold font-mono tracking-wider text-foreground mb-1 uppercase">{t("rewards.title")}</h1>
+        <p className="text-muted-foreground font-mono text-sm">{t("rewards.subtitle")}</p>
       </div>
 
       {isLoading ? (
@@ -48,7 +50,7 @@ export function Rewards() {
       ) : !rewards?.length ? (
         <Card className="bg-card/40 backdrop-blur border-border/50 rounded-sm">
           <CardContent className="p-12 text-center text-muted-foreground font-mono">
-            No requisition items currently available.
+            {t("rewards.noItems")}
           </CardContent>
         </Card>
       ) : (
@@ -66,9 +68,9 @@ export function Rewards() {
               <CardContent className="flex-1">
                 <p className="text-sm text-muted-foreground font-mono mb-4">{reward.description || "Standard issue item."}</p>
                 <div className="flex items-center gap-2 text-xs font-mono">
-                  <span className="text-muted-foreground">STOCK:</span>
+                  <span className="text-muted-foreground">{t("rewards.stock")}:</span>
                   <span className={reward.stock === 0 ? "text-destructive" : "text-foreground"}>
-                    {reward.stock === null ? "UNLIMITED" : reward.stock}
+                    {reward.stock === null ? t("rewards.unlimited") : reward.stock}
                   </span>
                 </div>
               </CardContent>
@@ -78,7 +80,7 @@ export function Rewards() {
                   disabled={!reward.isAvailable || reward.stock === 0 || createRedemption.isPending}
                   onClick={() => handleRedeem(reward.id, reward.name)}
                 >
-                  {createRedemption.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><ShoppingCart className="w-4 h-4 mr-2" /> REQUISITION</>}
+                  {createRedemption.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><ShoppingCart className="w-4 h-4 mr-2" /> {t("rewards.requisition")}</>}
                 </Button>
               </CardFooter>
             </Card>

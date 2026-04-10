@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { useGetMe, useLogout } from "@workspace/api-client-react";
 import { Link, useLocation } from "wouter";
+import { useTranslation } from "react-i18next";
 import { 
   LayoutDashboard, 
   History, 
@@ -12,7 +13,8 @@ import {
   Database,
   ClipboardList,
   BookOpen,
-  Inbox
+  Inbox,
+  Languages,
 } from "lucide-react";
 import {
   Sidebar,
@@ -28,8 +30,10 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import i18n from "@/i18n";
 
 export function Layout({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation();
   const { data: user } = useGetMe();
   const logoutMutation = useLogout();
   const [, setLocation] = useLocation();
@@ -41,6 +45,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
         setLocation("/");
       }
     });
+  };
+
+  const toggleLanguage = () => {
+    const next = i18n.language === "en" ? "zh" : "en";
+    i18n.changeLanguage(next);
+    localStorage.setItem("pap-lang", next);
   };
 
   const isAdmin = user?.role === 'admin';
@@ -57,14 +67,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </SidebarHeader>
           <SidebarContent>
             <SidebarGroup>
-              <SidebarGroupLabel className="text-xs uppercase tracking-widest text-muted-foreground font-mono">Member</SidebarGroupLabel>
+              <SidebarGroupLabel className="text-xs uppercase tracking-widest text-muted-foreground font-mono">{t("nav.member")}</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={location === "/dashboard"}>
                       <Link href="/dashboard" className="font-mono flex items-center gap-3">
                         <LayoutDashboard className="w-4 h-4" />
-                        <span>Dashboard</span>
+                        <span>{t("nav.dashboard")}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -72,7 +82,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     <SidebarMenuButton asChild isActive={location === "/history"}>
                       <Link href="/history" className="font-mono flex items-center gap-3">
                         <History className="w-4 h-4" />
-                        <span>History</span>
+                        <span>{t("nav.history")}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -80,7 +90,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     <SidebarMenuButton asChild isActive={location === "/rewards"}>
                       <Link href="/rewards" className="font-mono flex items-center gap-3">
                         <Gift className="w-4 h-4" />
-                        <span>Rewards</span>
+                        <span>{t("nav.rewards")}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -88,7 +98,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     <SidebarMenuButton asChild isActive={location === "/redemptions"}>
                       <Link href="/redemptions" className="font-mono flex items-center gap-3">
                         <ClipboardList className="w-4 h-4" />
-                        <span>Requisitions</span>
+                        <span>{t("nav.requisitions")}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -98,14 +108,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
             {isAdmin && (
               <SidebarGroup>
-                <SidebarGroupLabel className="text-xs uppercase tracking-widest text-primary font-mono">Command</SidebarGroupLabel>
+                <SidebarGroupLabel className="text-xs uppercase tracking-widest text-primary font-mono">{t("nav.command")}</SidebarGroupLabel>
                 <SidebarGroupContent>
                   <SidebarMenu>
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild isActive={location === "/admin"}>
                         <Link href="/admin" className="font-mono flex items-center gap-3">
                           <Database className="w-4 h-4" />
-                          <span>Overview</span>
+                          <span>{t("nav.overview")}</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -113,7 +123,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       <SidebarMenuButton asChild isActive={location.startsWith("/admin/users")}>
                         <Link href="/admin/users" className="font-mono flex items-center gap-3">
                           <Users className="w-4 h-4" />
-                          <span>Personnel</span>
+                          <span>{t("nav.personnel")}</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -121,7 +131,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       <SidebarMenuButton asChild isActive={location.startsWith("/admin/fleets")}>
                         <Link href="/admin/fleets" className="font-mono flex items-center gap-3">
                           <Swords className="w-4 h-4" />
-                          <span>Fleets</span>
+                          <span>{t("nav.fleets")}</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -129,7 +139,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       <SidebarMenuButton asChild isActive={location.startsWith("/admin/rewards")}>
                         <Link href="/admin/rewards" className="font-mono flex items-center gap-3">
                           <Gift className="w-4 h-4" />
-                          <span>Rewards</span>
+                          <span>{t("nav.rewards")}</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -137,7 +147,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       <SidebarMenuButton asChild isActive={location.startsWith("/admin/redemptions")}>
                         <Link href="/admin/redemptions" className="font-mono flex items-center gap-3">
                           <Inbox className="w-4 h-4" />
-                          <span>Requisitions</span>
+                          <span>{t("nav.requisitions")}</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -145,7 +155,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       <SidebarMenuButton asChild isActive={location.startsWith("/admin/pap")}>
                         <Link href="/admin/pap" className="font-mono flex items-center gap-3">
                           <BookOpen className="w-4 h-4" />
-                          <span>PAP Ledger</span>
+                          <span>{t("nav.papLedger")}</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -157,17 +167,25 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <SidebarFooter className="border-t border-border/50 p-4">
             <div className="flex flex-col gap-4">
               <div className="text-xs font-mono text-muted-foreground flex flex-col gap-1">
-                <span className="text-foreground">{user?.eveCharacterName || user?.eveCharacterId || 'Unknown Pilot'}</span>
+                <span className="text-foreground">{user?.eveCharacterName || user?.eveCharacterId || t("nav.unknownPilot")}</span>
                 <span>{user?.corporationName}</span>
                 <span className="text-primary">{user?.totalPap} PAP</span>
               </div>
+              <Button
+                variant="outline"
+                className="w-full justify-start text-muted-foreground hover:text-primary hover:bg-primary/10 font-mono text-xs border-border/50"
+                onClick={toggleLanguage}
+              >
+                <Languages className="w-4 h-4 mr-2" />
+                {i18n.language === "en" ? "中文" : "English"}
+              </Button>
               <Button 
                 variant="outline" 
                 className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 font-mono text-xs border-border/50"
                 onClick={handleLogout}
               >
                 <LogOut className="w-4 h-4 mr-2" />
-                DISCONNECT
+                {t("nav.disconnect")}
               </Button>
             </div>
           </SidebarFooter>

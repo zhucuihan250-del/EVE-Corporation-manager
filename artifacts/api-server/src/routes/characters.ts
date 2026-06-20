@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { db, charactersTable, usersTable } from "@workspace/db";
-import { eq, count } from "drizzle-orm";
+import { db, charactersTable, usersTable, papRecordsTable } from "@workspace/db";
+import { eq, count, sum, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth";
 
 const router: IRouter = Router();
@@ -96,10 +96,29 @@ router.delete("/characters/:id", requireAuth, async (req: Request, res: Response
     return;
   }
 
-  await db.delete(charactersTable).where(eq(charactersTable.id, charId));
-  req.log.info({ charId, eveCharacterId: char.eveCharacterId, userId: char.userId }, "Admin deleted character record");
+  // Sum PAP earned by this character before deleting
+  const [papSum] = await db
+    .select({ total: sum(papRecordsTable.amount) })
+    .from(papRecordsTable)
+    .where(eq(papRecordsTable.characterId, charId));
+  const papToDeduct = Number(papSum?.total ?? 0);
 
-  // If the user now has no characters left and is an orphan (no accessToken), remove them from the roster
+  // Delete all PAP records for this character
+  await db.delete(papRecordsTable).where(eq(papRecordsTable.characterId, charId));
+
+  // Subtract from user's PAP balance (clamp both values to 0)
+  if (papToDeduct > 0) {
+    await db.update(usersTable).set({
+      totalPap: sql`GREATEST(0, total_pap - ${papToDeduct})`,
+      redeemablePap: sql`GREATEST(0, redeemable_pap - ${papToDeduct})`,
+    }).where(eq(usersTable.id, char.userId));
+  }
+
+  // Delete the character record
+  await db.delete(charactersTable).where(eq(charactersTable.id, charId));
+  req.log.info({ charId, eveCharacterId: char.eveCharacterId, userId: char.userId, papDeducted: papToDeduct }, "Admin hard-deleted character and all its PAP records");
+
+  // If user has no characters left and is an orphan (no accessToken), remove from roster
   const [remaining] = await db.select({ total: count() }).from(charactersTable).where(eq(charactersTable.userId, char.userId));
   if ((remaining?.total ?? 0) === 0) {
     const [owner] = await db.select().from(usersTable).where(eq(usersTable.id, char.userId));

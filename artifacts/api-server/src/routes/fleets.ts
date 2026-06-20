@@ -67,6 +67,75 @@ router.post("/fleets", requireAuth, async (req: Request, res: Response): Promise
   res.status(201).json({ ...fleet, participantCount: 0 });
 });
 
+// GET /api/fleets/esi-my-fleet - fetch the current user's in-game fleet ID from ESI
+// IMPORTANT: must be declared before /fleets/:id so Express doesn't treat "esi-my-fleet" as an id
+router.get("/fleets/esi-my-fleet", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
+  if (!currentUser) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  if (!currentUser.eveCharacterId) {
+    res.status(400).json({ error: "No EVE character linked" });
+    return;
+  }
+
+  let accessToken = currentUser.accessToken;
+  if (!accessToken) {
+    res.status(400).json({ error: "No ESI access token. Please log in again." });
+    return;
+  }
+
+  // Refresh token if needed
+  const tokenExpiry = currentUser.tokenExpiry;
+  if (!tokenExpiry || new Date(tokenExpiry.getTime() - 60_000) <= new Date()) {
+    if (!currentUser.refreshToken) {
+      res.status(400).json({ error: "ESI token expired. Please log in again." });
+      return;
+    }
+    try {
+      const refreshed = await refreshAccessToken(currentUser.refreshToken);
+      accessToken = refreshed.accessToken;
+      await db.update(usersTable).set({
+        accessToken: refreshed.accessToken,
+        refreshToken: refreshed.refreshToken,
+        tokenExpiry: new Date(Date.now() + refreshed.expiresIn * 1000),
+      }).where(eq(usersTable.id, currentUser.id));
+    } catch (err) {
+      req.log.error({ err }, "Failed to refresh token for esi-my-fleet");
+      res.status(400).json({ error: "Token refresh failed. Please log in again." });
+      return;
+    }
+  }
+
+  const esiResp = await fetch(
+    `https://esi.evetech.net/latest/characters/${currentUser.eveCharacterId}/fleet/?datasource=tranquility`,
+    { headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" } },
+  );
+
+  if (!esiResp.ok) {
+    if (esiResp.status === 404) {
+      res.status(404).json({ error: "You are not currently in a fleet in-game." });
+    } else {
+      const text = await esiResp.text();
+      req.log.error({ status: esiResp.status, body: text }, "ESI character fleet fetch failed");
+      res.status(502).json({ error: "ESI error: " + text });
+    }
+    return;
+  }
+
+  const data = (await esiResp.json()) as {
+    fleet_id: number;
+    role: string;
+    squad_id: number;
+    wing_id: number;
+  };
+
+  req.log.info({ fleetId: data.fleet_id, role: data.role }, "ESI fleet ID fetched for character");
+  res.json({ fleetId: String(data.fleet_id), role: data.role });
+});
+
 // GET /api/fleets/:id
 router.get("/fleets/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const params = GetFleetParams.safeParse(req.params);
@@ -214,7 +283,13 @@ router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response)
   if (!esiResp.ok) {
     const text = await esiResp.text();
     req.log.error({ status: esiResp.status, body: text }, "ESI fleet members fetch failed");
-    res.status(502).json({ error: "Failed to fetch fleet members from ESI" });
+    let message = "Failed to fetch fleet members from ESI.";
+    if (esiResp.status === 404) {
+      message = "Fleet not found on ESI. Make sure the EVE Fleet ID is correct and you are the fleet boss in-game.";
+    } else if (esiResp.status === 403) {
+      message = "ESI access denied. You must be the fleet boss to scan members.";
+    }
+    res.status(502).json({ error: message });
     return;
   }
 

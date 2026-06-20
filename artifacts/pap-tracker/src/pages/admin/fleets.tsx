@@ -313,7 +313,9 @@ export function AdminFleets() {
                       {fleet.papValue}
                     </TableCell>
                     <TableCell className="font-mono text-sm text-right text-muted-foreground">
-                      {fleet.participantCount || 0}
+                      {fleet.isActive
+                        ? (liveCounts[fleet.id] ?? <span className="text-muted-foreground/40">—</span>)
+                        : (fleet.participantCount || 0)}
                     </TableCell>
                     <TableCell className="text-right">
                       {fleet.isActive && (

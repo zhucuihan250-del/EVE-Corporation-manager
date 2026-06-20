@@ -1,11 +1,35 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { db, usersTable, charactersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, usersTable, charactersTable, papRecordsTable } from "@workspace/db";
+import { eq, sql } from "drizzle-orm";
 import { getAuthorizationUrl, getLinkAltAuthorizationUrl, exchangeCode, getCharacterInfo, getCorporationName } from "../lib/eve-sso";
 import { requireAuth } from "../middlewares/auth";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
+
+/** Transfer all PAP + character records from an orphan user into a main account, then delete the orphan. */
+async function mergeOrphanUser(
+  orphan: typeof usersTable.$inferSelect | null,
+  mainUserId: number,
+  log: { info: (obj: object, msg: string) => void },
+): Promise<void> {
+  if (!orphan) return;
+  // Move all PAP records to main user
+  await db.execute(sql`UPDATE pap_records SET user_id = ${mainUserId} WHERE user_id = ${orphan.id}`);
+  // Add orphan's accumulated PAP totals to main user
+  if (orphan.totalPap > 0 || orphan.redeemablePap > 0) {
+    await db.update(usersTable).set({
+      totalPap: sql`total_pap + ${orphan.totalPap}`,
+      redeemablePap: sql`redeemable_pap + ${orphan.redeemablePap}`,
+    }).where(eq(usersTable.id, mainUserId));
+  }
+  // Reassign all of orphan's character records to main user (all as alts)
+  await db.update(charactersTable).set({ userId: mainUserId, isMain: false })
+    .where(eq(charactersTable.userId, orphan.id));
+  // Delete orphan user row
+  await db.delete(usersTable).where(eq(usersTable.id, orphan.id));
+  log.info({ orphanId: orphan.id, mainUserId, orphanPap: orphan.totalPap }, "Orphan user merged into main account");
+}
 
 function getCallbackUrl(req: Request): string {
   // Use the forwarded host so the callback URL always matches the domain
@@ -65,17 +89,65 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
       const mainUserId = req.session.linkingUserId;
       req.session.linkingUserId = undefined;
 
+      // Check if this character is already in the characters table
       const [existingChar] = await db
         .select()
         .from(charactersTable)
         .where(eq(charactersTable.eveCharacterId, characterId));
 
       if (existingChar) {
+        if (existingChar.userId === mainUserId) {
+          // Already linked to this exact account
+          req.session.save(() => {});
+          res.redirect("/characters?error=already_linked");
+          return;
+        }
+        // Belongs to a different user — check if it is an orphan (auto-registered, no access token)
+        const [charOwner] = await db.select().from(usersTable).where(eq(usersTable.id, existingChar.userId));
+        if (charOwner?.accessToken) {
+          // Another real authenticated user owns this character — cannot steal it
+          req.session.save(() => {});
+          res.redirect("/characters?error=already_linked");
+          return;
+        }
+        // Orphan account: merge its PAP into the main account then delete it
+        await mergeOrphanUser(charOwner ?? null, mainUserId, req.log);
+        req.log.info({ orphanId: existingChar.userId, mainUserId, charId: characterId }, "Merged orphan (from chars table) into main account on alt link");
         req.session.save(() => {});
-        res.redirect("/characters?error=already_linked");
+        res.redirect("/characters?linked=true");
         return;
       }
 
+      // No characters record — also check if there is an orphan user in usersTable
+      // (auto-registered by fleet scan before a characters record was written)
+      const [orphanByMain] = await db
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.eveCharacterId, characterId));
+
+      if (orphanByMain && orphanByMain.id !== mainUserId) {
+        if (orphanByMain.accessToken) {
+          req.session.save(() => {});
+          res.redirect("/characters?error=already_linked");
+          return;
+        }
+        // Orphan in usersTable — create the characters record first, then merge
+        await db.insert(charactersTable).values({
+          userId: orphanByMain.id,
+          eveCharacterId: characterId,
+          eveCharacterName: characterName,
+          corporationId,
+          corporationName,
+          isMain: true,
+        });
+        await mergeOrphanUser(orphanByMain, mainUserId, req.log);
+        req.log.info({ orphanId: orphanByMain.id, mainUserId, charId: characterId }, "Merged orphan (from users table) into main account on alt link");
+        req.session.save(() => {});
+        res.redirect("/characters?linked=true");
+        return;
+      }
+
+      // Clean case: no orphan, just insert the characters record
       await db.insert(charactersTable).values({
         userId: mainUserId,
         eveCharacterId: characterId,

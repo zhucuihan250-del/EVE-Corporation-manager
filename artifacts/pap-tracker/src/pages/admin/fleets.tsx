@@ -60,20 +60,42 @@ export function AdminFleets() {
   const handleUpdateFleetIdFromEsi = async (fleet: { id: number }) => {
     setUpdatingFleetId(fleet.id);
     try {
+      // Step 1: fetch fleet ID from ESI
       const data = await fetchEsiFleetId();
+
+      // Step 2: save fleet ID to DB
       await new Promise<void>((resolve, reject) => {
         updateFleet.mutate(
           { id: fleet.id, data: { eveFleetId: data.fleetId } },
-          {
-            onSuccess: () => {
-              toast({ title: t("fleets.fleetIdUpdated"), description: t("fleets.fleetIdUpdatedDesc") });
-              queryClient.invalidateQueries({ queryKey: getListFleetsQueryKey() });
-              resolve();
-            },
-            onError: reject,
-          },
+          { onSuccess: () => resolve(), onError: reject },
         );
       });
+
+      // Step 3: immediately scan now that the ID is correct
+      setScanningId(fleet.id);
+      setUpdatingFleetId(null);
+      scanFleet.mutate(
+        { id: fleet.id },
+        {
+          onSuccess: (scanData) => {
+            toast({
+              title: t("fleets.scanComplete"),
+              description: t("fleets.scanCompleteDesc", {
+                esiMemberCount: scanData.esiMemberCount ?? 0,
+                awarded: scanData.awarded,
+                skipped: scanData.skipped,
+                notFound: scanData.notFound,
+                autoRegistered: (scanData as { autoRegistered?: number }).autoRegistered ?? 0,
+              }),
+            });
+            queryClient.invalidateQueries({ queryKey: getListFleetsQueryKey() });
+          },
+          onError: () => {
+            toast({ title: t("fleets.scanFailed"), description: t("fleets.scanFailedDesc"), variant: "destructive" });
+          },
+          onSettled: () => setScanningId(null),
+        },
+      );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : t("fleets.scanFailedDesc");
       const isNotInFleet = msg.includes("not currently in a fleet");
@@ -82,7 +104,6 @@ export function AdminFleets() {
         description: isNotInFleet ? t("fleets.notInFleetDesc") : msg,
         variant: "destructive",
       });
-    } finally {
       setUpdatingFleetId(null);
     }
   };

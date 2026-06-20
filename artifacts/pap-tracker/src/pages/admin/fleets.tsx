@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
-import { Loader2, Swords, Plus, Shield, ScanSearch } from "lucide-react";
+import { Loader2, Swords, Plus, Shield, ScanSearch, Crosshair } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
@@ -12,6 +12,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useTranslation } from "react-i18next";
+
+async function fetchEsiFleetId(): Promise<{ fleetId: string; role: string }> {
+  const resp = await fetch("/api/fleets/esi-my-fleet", { credentials: "include" });
+  const data = await resp.json();
+  if (!resp.ok) throw new Error(data.error || "ESI error");
+  return data;
+}
 
 export function AdminFleets() {
   const { t } = useTranslation();
@@ -28,6 +35,57 @@ export function AdminFleets() {
   const [papValue, setPapValue] = useState("");
   const [eveFleetId, setEveFleetId] = useState("");
   const [scanningId, setScanningId] = useState<number | null>(null);
+  const [fetchingCreateId, setFetchingCreateId] = useState(false);
+  const [updatingFleetId, setUpdatingFleetId] = useState<number | null>(null);
+
+  const handleFetchFleetIdForCreate = async () => {
+    setFetchingCreateId(true);
+    try {
+      const data = await fetchEsiFleetId();
+      setEveFleetId(data.fleetId);
+      toast({ title: t("fleets.fleetIdFetched"), description: t("fleets.fleetIdFetchedDesc") });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : t("fleets.scanFailedDesc");
+      const isNotInFleet = msg.includes("not currently in a fleet");
+      toast({
+        title: isNotInFleet ? t("fleets.notInFleet") : t("fleets.scanFailed"),
+        description: isNotInFleet ? t("fleets.notInFleetDesc") : msg,
+        variant: "destructive",
+      });
+    } finally {
+      setFetchingCreateId(false);
+    }
+  };
+
+  const handleUpdateFleetIdFromEsi = async (fleet: { id: number }) => {
+    setUpdatingFleetId(fleet.id);
+    try {
+      const data = await fetchEsiFleetId();
+      await new Promise<void>((resolve, reject) => {
+        updateFleet.mutate(
+          { id: fleet.id, data: { eveFleetId: data.fleetId } },
+          {
+            onSuccess: () => {
+              toast({ title: t("fleets.fleetIdUpdated"), description: t("fleets.fleetIdUpdatedDesc") });
+              queryClient.invalidateQueries({ queryKey: getListFleetsQueryKey() });
+              resolve();
+            },
+            onError: reject,
+          },
+        );
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : t("fleets.scanFailedDesc");
+      const isNotInFleet = msg.includes("not currently in a fleet");
+      toast({
+        title: isNotInFleet ? t("fleets.notInFleet") : t("fleets.scanFailed"),
+        description: isNotInFleet ? t("fleets.notInFleetDesc") : msg,
+        variant: "destructive",
+      });
+    } finally {
+      setUpdatingFleetId(null);
+    }
+  };
 
   const handleCreateFleet = () => {
     if (!fleetName || !fleetCommander || !papValue) return;
@@ -72,6 +130,7 @@ export function AdminFleets() {
           toast({
             title: t("fleets.scanComplete"),
             description: t("fleets.scanCompleteDesc", {
+              esiMemberCount: data.esiMemberCount ?? 0,
               awarded: data.awarded,
               skipped: data.skipped,
               notFound: data.notFound,
@@ -80,7 +139,11 @@ export function AdminFleets() {
           queryClient.invalidateQueries({ queryKey: getListFleetsQueryKey() });
         },
         onError: () => {
-          toast({ title: t("fleets.scanFailed"), description: t("fleets.scanFailedDesc"), variant: "destructive" });
+          toast({
+            title: t("fleets.scanFailed"),
+            description: t("fleets.scanFailedDesc") + " " + t("fleets.fleetIdFetchedDesc").replace("auto-filled from ESI", "").trim(),
+            variant: "destructive",
+          });
         },
         onSettled: () => setScanningId(null),
       }
@@ -131,8 +194,10 @@ export function AdminFleets() {
                       <div className="flex flex-col">
                         <span>{fleet.name}</span>
                         <span className="text-xs text-muted-foreground">{format(new Date(fleet.createdAt), "MMM dd, HH:mm")}</span>
-                        {fleet.eveFleetId && (
+                        {fleet.eveFleetId ? (
                           <span className="text-[10px] text-muted-foreground/60 font-mono mt-0.5">ID: {fleet.eveFleetId}</span>
+                        ) : (
+                          <span className="text-[10px] text-amber-500/70 font-mono mt-0.5">NO FLEET ID</span>
                         )}
                       </div>
                     </TableCell>
@@ -154,7 +219,21 @@ export function AdminFleets() {
                     </TableCell>
                     <TableCell className="text-right">
                       {fleet.isActive && (
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-2 flex-wrap">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 rounded-sm font-mono text-[10px] border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                            onClick={() => handleUpdateFleetIdFromEsi(fleet)}
+                            disabled={updatingFleetId === fleet.id}
+                          >
+                            {updatingFleetId === fleet.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <Crosshair className="w-3 h-3 mr-1" />
+                            )}
+                            {updatingFleetId === fleet.id ? t("fleets.updatingFleetId") : t("fleets.updateFleetId")}
+                          </Button>
                           <Button
                             variant="outline"
                             size="sm"
@@ -241,14 +320,34 @@ export function AdminFleets() {
               <Label htmlFor="eveFleetId" className="text-right text-xs tracking-widest leading-tight">
                 {t("fleets.eveFleetId")}
               </Label>
-              <Input
-                id="eveFleetId"
-                value={eveFleetId}
-                onChange={(e) => setEveFleetId(e.target.value)}
-                className="col-span-3 bg-background/50 border-border/50 rounded-sm"
-                placeholder={t("fleets.eveFleetIdPlaceholder")}
-              />
+              <div className="col-span-3 flex gap-2">
+                <Input
+                  id="eveFleetId"
+                  value={eveFleetId}
+                  onChange={(e) => setEveFleetId(e.target.value)}
+                  className="flex-1 bg-background/50 border-border/50 rounded-sm"
+                  placeholder={t("fleets.eveFleetIdPlaceholder")}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 rounded-sm font-mono text-[10px] border-amber-500/30 text-amber-400 hover:bg-amber-500/10 px-2"
+                  onClick={handleFetchFleetIdForCreate}
+                  disabled={fetchingCreateId}
+                  title={t("fleets.fetchFleetId")}
+                >
+                  {fetchingCreateId ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Crosshair className="w-3 h-3" />
+                  )}
+                </Button>
+              </div>
             </div>
+            <p className="col-span-4 text-[10px] text-amber-400/70 font-mono text-right -mt-2 pr-0">
+              {fetchingCreateId ? t("fleets.fetchingFleetId") : t("fleets.fetchFleetId")} — join fleet in-game first
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateModalOpen(false)} className="rounded-sm">{t("fleets.abort")}</Button>

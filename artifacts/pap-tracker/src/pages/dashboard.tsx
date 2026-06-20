@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useGetDashboardSummary, useGetRecentFleets, useListAnnouncements, useListFleets } from "@workspace/api-client-react";
+import { useLiveFleetCounts } from "@/hooks/use-live-fleet-counts";
 import { Target, Activity, Award, Trophy, Swords, Radio, CalendarClock, Shield, Users } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
@@ -34,6 +35,7 @@ export function Dashboard() {
 
   const activeFleets = allFleets?.filter((f) => f.isActive) ?? [];
   const pastFleets = recentFleets?.filter((f) => !f.isActive) ?? [];
+  const liveCounts = useLiveFleetCounts(activeFleets);
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -124,7 +126,7 @@ export function Dashboard() {
                             <Shield className="w-3 h-3 text-primary/60" /> {fleet.fleetCommander}
                           </span>
                           <span className="flex items-center gap-1">
-                            <Users className="w-3 h-3 text-primary/60" /> {fleet.participantCount || 0} {t("dashboard.pilots")}
+                            <Users className="w-3 h-3 text-primary/60" /> {liveCounts[fleet.id] ?? fleet.participantCount ?? 0} {t("dashboard.pilots")}
                           </span>
                         </div>
                       </div>

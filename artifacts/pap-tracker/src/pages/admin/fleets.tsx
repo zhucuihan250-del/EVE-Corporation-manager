@@ -11,7 +11,9 @@ import { format } from "date-fns";
 import { Loader2, Swords, Plus, Shield, ScanSearch, Crosshair, Radio } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
+import { useLiveFleetCounts } from "@/hooks/use-live-fleet-counts";
+
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,8 +45,7 @@ export function AdminFleets() {
   const [updatingFleetId, setUpdatingFleetId] = useState<number | null>(null);
   const [standingDownId, setStandingDownId] = useState<number | null>(null);
 
-  const fleetsRef = useRef(fleets);
-  fleetsRef.current = fleets;
+  const liveCounts = useLiveFleetCounts(fleets);
 
   const invalidateAfterScan = () => {
     queryClient.invalidateQueries({ queryKey: getListFleetsQueryKey() });
@@ -55,31 +56,6 @@ export function AdminFleets() {
     queryClient.invalidateQueries({ queryKey: getListAllPapRecordsQueryKey() });
   };
 
-  const [liveCounts, setLiveCounts] = useState<Record<number, number>>({});
-
-  useEffect(() => {
-    const autoScan = async () => {
-      const activeFleets = (fleetsRef.current ?? []).filter(f => f.isActive && f.eveFleetId);
-      for (const fleet of activeFleets) {
-        try {
-          const resp = await fetch(`/api/fleets/${fleet.id}/scan?dryRun=true`, {
-            method: "POST",
-            credentials: "include",
-          });
-          if (!resp.ok) continue;
-          const data = await resp.json() as { esiMemberCount?: number };
-          if (data.esiMemberCount !== undefined) {
-            setLiveCounts(prev => ({ ...prev, [fleet.id]: data.esiMemberCount! }));
-          }
-        } catch {
-        }
-      }
-    };
-
-    autoScan();
-    const interval = setInterval(autoScan, 60 * 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   const activeScannableFleets = (fleets ?? []).filter(f => f.isActive && f.eveFleetId);
 

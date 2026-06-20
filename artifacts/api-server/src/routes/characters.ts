@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, charactersTable, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, count } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth";
 
 const router: IRouter = Router();
@@ -98,6 +98,17 @@ router.delete("/characters/:id", requireAuth, async (req: Request, res: Response
 
   await db.delete(charactersTable).where(eq(charactersTable.id, charId));
   req.log.info({ charId, eveCharacterId: char.eveCharacterId, userId: char.userId }, "Admin deleted character record");
+
+  // If the user now has no characters left and is an orphan (no accessToken), remove them from the roster
+  const [remaining] = await db.select({ total: count() }).from(charactersTable).where(eq(charactersTable.userId, char.userId));
+  if ((remaining?.total ?? 0) === 0) {
+    const [owner] = await db.select().from(usersTable).where(eq(usersTable.id, char.userId));
+    if (owner && !owner.accessToken) {
+      await db.delete(usersTable).where(eq(usersTable.id, char.userId));
+      req.log.info({ userId: char.userId }, "Removed orphan user after last character was deleted");
+    }
+  }
+
   res.json({ success: true });
 });
 

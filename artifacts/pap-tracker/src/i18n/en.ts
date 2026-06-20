@@ -152,7 +152,7 @@ const en = {
       scanEsi: "ESI SCAN",
       scanning: "SCANNING...",
       scanComplete: "ESI Scan Complete",
-      scanCompleteDesc: "ESI found {{esiMemberCount}} members. Awarded PAP to {{awarded}}. {{skipped}} already had PAP. {{notFound}} not registered in system.",
+      scanCompleteDesc: "ESI found {{esiMemberCount}} members. Awarded PAP to {{awarded}} ({{autoRegistered}} auto-registered). {{skipped}} already had PAP. {{notFound}} unresolvable.",
       scanFailed: "Scan Failed",
       scanFailedDesc: "Could not fetch fleet members from ESI.",
       noEveFleetId: "No EVE Fleet ID set on this fleet.",

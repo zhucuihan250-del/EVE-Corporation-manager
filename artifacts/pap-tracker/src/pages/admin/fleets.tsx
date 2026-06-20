@@ -134,6 +134,7 @@ export function AdminFleets() {
               awarded: data.awarded,
               skipped: data.skipped,
               notFound: data.notFound,
+              autoRegistered: (data as { autoRegistered?: number }).autoRegistered ?? 0,
             }),
           });
           queryClient.invalidateQueries({ queryKey: getListFleetsQueryKey() });

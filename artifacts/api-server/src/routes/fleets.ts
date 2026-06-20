@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, fleetsTable, usersTable, papRecordsTable, charactersTable } from "@workspace/db";
-import { eq, desc, sql, inArray } from "drizzle-orm";
+import { eq, desc, sql, inArray, and } from "drizzle-orm";
 import { refreshAccessToken } from "../lib/eve-sso";
 import { requireAuth } from "../middlewares/auth";
 import {
@@ -324,11 +324,92 @@ router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response)
 
   req.log.info({ found: characters.length, total: memberCharIds.length }, "Characters found in DB");
 
+  // Auto-register ESI members who haven't logged in yet
+  const foundCharIds = new Set(characters.map((c) => c.eveCharacterId));
+  const unregisteredCharIds = memberCharIds.filter((id) => !foundCharIds.has(id));
+  const autoRegisteredChars: (typeof charactersTable.$inferSelect)[] = [];
+
+  for (const charId of unregisteredCharIds) {
+    try {
+      // Check if user already exists (handles race conditions)
+      const [existingUser] = await db
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.eveCharacterId, charId));
+      if (existingUser) {
+        const [existingChar] = await db
+          .select()
+          .from(charactersTable)
+          .where(and(eq(charactersTable.userId, existingUser.id), eq(charactersTable.eveCharacterId, charId)));
+        if (existingChar) autoRegisteredChars.push(existingChar);
+        continue;
+      }
+
+      // Fetch public character info from ESI (no auth required)
+      const esiCharResp = await fetch(
+        `https://esi.evetech.net/latest/characters/${charId}/?datasource=tranquility`,
+        { headers: { Accept: "application/json" } },
+      );
+      if (!esiCharResp.ok) {
+        req.log.warn({ charId, status: esiCharResp.status }, "ESI public character fetch failed, skipping");
+        continue;
+      }
+      const charInfo = (await esiCharResp.json()) as { name: string; corporation_id?: number };
+
+      // Fetch corporation name
+      let corpName: string | null = null;
+      if (charInfo.corporation_id) {
+        const corpResp = await fetch(
+          `https://esi.evetech.net/latest/corporations/${charInfo.corporation_id}/?datasource=tranquility`,
+          { headers: { Accept: "application/json" } },
+        );
+        if (corpResp.ok) {
+          const corpInfo = (await corpResp.json()) as { name: string };
+          corpName = corpInfo.name;
+        }
+      }
+
+      // Create user record (no tokens — they can log in later to claim their account)
+      const [newUser] = await db
+        .insert(usersTable)
+        .values({
+          eveCharacterId: charId,
+          eveCharacterName: charInfo.name,
+          corporationId: charInfo.corporation_id ?? null,
+          corporationName: corpName,
+          role: "member",
+          totalPap: 0,
+          redeemablePap: 0,
+        })
+        .returning();
+
+      // Create character record
+      const [newChar] = await db
+        .insert(charactersTable)
+        .values({
+          userId: newUser.id,
+          eveCharacterId: charId,
+          eveCharacterName: charInfo.name,
+          corporationId: charInfo.corporation_id ?? null,
+          corporationName: corpName,
+          isMain: true,
+        })
+        .returning();
+
+      autoRegisteredChars.push(newChar);
+      req.log.info({ charId, name: charInfo.name }, "Auto-registered ESI character for PAP");
+    } catch (err) {
+      req.log.error({ err, charId }, "Failed to auto-register ESI character");
+    }
+  }
+
+  const allCharacters = [...characters, ...autoRegisteredChars];
+
   let awarded = 0;
   let skipped = 0;
-  const notFound = memberCharIds.length - characters.length;
+  const notFound = memberCharIds.length - allCharacters.length;
 
-  for (const character of characters) {
+  for (const character of allCharacters) {
     if (alreadyAwardedCharIds.has(character.id)) {
       skipped++;
       continue;
@@ -351,7 +432,7 @@ router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response)
     awarded++;
   }
 
-  res.json({ awarded, skipped, notFound, esiMemberCount: members.length });
+  res.json({ awarded, skipped, notFound, esiMemberCount: members.length, autoRegistered: autoRegisteredChars.length });
 });
 
 // DELETE /api/fleets/:id - admin only

@@ -152,7 +152,7 @@ const zh = {
       scanEsi: "ESI 扫描",
       scanning: "扫描中...",
       scanComplete: "ESI 扫描完成",
-      scanCompleteDesc: "ESI 找到 {{esiMemberCount}} 名成员。已发放 PAP 给 {{awarded}} 名。{{skipped}} 名已有 PAP。{{notFound}} 名未注册系统。",
+      scanCompleteDesc: "ESI 找到 {{esiMemberCount}} 名成员。已发放 PAP 给 {{awarded}} 名（其中 {{autoRegistered}} 名自动建档）。{{skipped}} 名已有 PAP。{{notFound}} 名无法解析。",
       scanFailed: "扫描失败",
       scanFailedDesc: "无法从 ESI 获取舰队成员。",
       noEveFleetId: "此舰队未设置 EVE 舰队 ID。",

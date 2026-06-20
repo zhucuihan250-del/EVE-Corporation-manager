@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, usersTable, fleetsTable, papRecordsTable, redemptionsTable } from "@workspace/db";
-import { eq, desc, sum, count, sql, and } from "drizzle-orm";
+import { eq, desc, count, sql, and } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth";
 
 const router: IRouter = Router();
@@ -107,14 +107,13 @@ router.get("/dashboard/recent-fleets", requireAuth, async (req: Request, res: Re
       startedAt: fleetsTable.startedAt,
       endedAt: fleetsTable.endedAt,
       createdAt: fleetsTable.createdAt,
-      participantCount: sql<number>`COALESCE(COUNT(${papRecordsTable.id}), 0)::int`,
+      participantCount: sql<number>`(
+        SELECT COUNT(*)::int FROM "pap_records"
+        WHERE "pap_records"."fleet_id" = "fleets"."id"
+        AND "pap_records"."type" = 'fleet'
+      )`,
     })
     .from(fleetsTable)
-    .leftJoin(
-      papRecordsTable,
-      and(eq(papRecordsTable.fleetId, fleetsTable.id), eq(papRecordsTable.type, "fleet")),
-    )
-    .groupBy(fleetsTable.id)
     .orderBy(desc(fleetsTable.createdAt))
     .limit(5);
 

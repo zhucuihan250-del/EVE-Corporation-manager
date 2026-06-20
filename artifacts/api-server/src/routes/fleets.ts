@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, fleetsTable, usersTable, papRecordsTable, charactersTable } from "@workspace/db";
-import { eq, desc, sql, inArray, and } from "drizzle-orm";
+import { eq, desc, sql, inArray, and, count } from "drizzle-orm";
 import { refreshAccessToken } from "../lib/eve-sso";
 import { requireAuth } from "../middlewares/auth";
 import {
@@ -28,16 +28,16 @@ router.get("/fleets", requireAuth, async (req: Request, res: Response): Promise<
       startedAt: fleetsTable.startedAt,
       endedAt: fleetsTable.endedAt,
       createdAt: fleetsTable.createdAt,
-      participantCount: sql<number>`COALESCE(COUNT(${papRecordsTable.id}), 0)::int`,
+      participantCount: sql<number>`(
+        SELECT COUNT(*)::int FROM "pap_records"
+        WHERE "pap_records"."fleet_id" = "fleets"."id"
+        AND "pap_records"."type" = 'fleet'
+      )`,
     })
     .from(fleetsTable)
-    .leftJoin(
-      papRecordsTable,
-      and(eq(papRecordsTable.fleetId, fleetsTable.id), eq(papRecordsTable.type, "fleet")),
-    )
-    .groupBy(fleetsTable.id)
     .orderBy(desc(fleetsTable.createdAt));
 
+  req.log.info({ fleetParticipantCounts: fleets.map(f => ({ id: f.id, name: f.name, participantCount: f.participantCount })) }, "Fleet list with participant counts");
   res.json(fleets);
 });
 
@@ -157,15 +157,14 @@ router.get("/fleets/:id", requireAuth, async (req: Request, res: Response): Prom
       startedAt: fleetsTable.startedAt,
       endedAt: fleetsTable.endedAt,
       createdAt: fleetsTable.createdAt,
-      participantCount: sql<number>`COALESCE(COUNT(${papRecordsTable.id}), 0)::int`,
+      participantCount: sql<number>`(
+        SELECT COUNT(*)::int FROM "pap_records"
+        WHERE "pap_records"."fleet_id" = "fleets"."id"
+        AND "pap_records"."type" = 'fleet'
+      )`,
     })
     .from(fleetsTable)
-    .leftJoin(
-      papRecordsTable,
-      and(eq(papRecordsTable.fleetId, fleetsTable.id), eq(papRecordsTable.type, "fleet")),
-    )
-    .where(eq(fleetsTable.id, params.data.id))
-    .groupBy(fleetsTable.id);
+    .where(eq(fleetsTable.id, params.data.id));
 
   if (!fleet) {
     res.status(404).json({ error: "Fleet not found" });

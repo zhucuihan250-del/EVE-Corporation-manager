@@ -278,33 +278,33 @@ export function AdminFleets() {
               {t("fleets.initializeDesc")}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="fleetName" className="text-right text-xs tracking-widest">
+          <div className="flex flex-col gap-3 py-4">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="fleetName" className="text-xs tracking-widest">
                 {t("fleets.opName")}
               </Label>
               <Input
                 id="fleetName"
                 value={fleetName}
                 onChange={(e) => setFleetName(e.target.value)}
-                className="col-span-3 bg-background/50 border-border/50 rounded-sm"
+                className="bg-background/50 border-border/50 rounded-sm"
                 placeholder={t("fleets.opNamePlaceholder")}
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="fc" className="text-right text-xs tracking-widest">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="fc" className="text-xs tracking-widest">
                 {t("fleets.commanderLabel")}
               </Label>
               <Input
                 id="fc"
                 value={fleetCommander}
                 onChange={(e) => setFleetCommander(e.target.value)}
-                className="col-span-3 bg-background/50 border-border/50 rounded-sm"
+                className="bg-background/50 border-border/50 rounded-sm"
                 placeholder={t("fleets.commanderPlaceholder")}
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="pap" className="text-right text-xs tracking-widest">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="pap" className="text-xs tracking-widest">
                 {t("fleets.papValue")}
               </Label>
               <Input
@@ -312,15 +312,15 @@ export function AdminFleets() {
                 type="number"
                 value={papValue}
                 onChange={(e) => setPapValue(e.target.value)}
-                className="col-span-3 bg-background/50 border-border/50 rounded-sm"
+                className="bg-background/50 border-border/50 rounded-sm"
                 placeholder="1"
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="eveFleetId" className="text-right text-xs tracking-widest leading-tight">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="eveFleetId" className="text-xs tracking-widest">
                 {t("fleets.eveFleetId")}
               </Label>
-              <div className="col-span-3 flex gap-2">
+              <div className="flex gap-2">
                 <Input
                   id="eveFleetId"
                   value={eveFleetId}
@@ -332,22 +332,19 @@ export function AdminFleets() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="shrink-0 rounded-sm font-mono text-[10px] border-amber-500/30 text-amber-400 hover:bg-amber-500/10 px-2"
+                  className="shrink-0 rounded-sm font-mono text-[10px] border-amber-500/30 text-amber-400 hover:bg-amber-500/10 px-3 gap-1.5"
                   onClick={handleFetchFleetIdForCreate}
                   disabled={fetchingCreateId}
-                  title={t("fleets.fetchFleetId")}
                 >
                   {fetchingCreateId ? (
                     <Loader2 className="w-3 h-3 animate-spin" />
                   ) : (
                     <Crosshair className="w-3 h-3" />
                   )}
+                  {fetchingCreateId ? t("fleets.fetchingFleetId") : t("fleets.fetchFleetId")}
                 </Button>
               </div>
             </div>
-            <p className="col-span-4 text-[10px] text-amber-400/70 font-mono text-right -mt-2 pr-0">
-              {fetchingCreateId ? t("fleets.fetchingFleetId") : t("fleets.fetchFleetId")} — join fleet in-game first
-            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateModalOpen(false)} className="rounded-sm">{t("fleets.abort")}</Button>

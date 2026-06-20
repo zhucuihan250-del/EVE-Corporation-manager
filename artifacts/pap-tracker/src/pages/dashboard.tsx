@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useGetDashboardSummary, useGetRecentFleets, useListAnnouncements } from "@workspace/api-client-react";
-import { Target, Activity, Award, Trophy, Swords, Radio, CalendarClock } from "lucide-react";
+import { useGetDashboardSummary, useGetRecentFleets, useListAnnouncements, useListFleets } from "@workspace/api-client-react";
+import { Target, Activity, Award, Trophy, Swords, Radio, CalendarClock, Shield, Users } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -24,10 +24,15 @@ export function Dashboard() {
     query: { queryKey: ["recentFleets"] }
   });
 
+  const { data: allFleets, isLoading: isActiveFleetsLoading } = useListFleets({
+    query: { queryKey: ["dashboardFleets"] }
+  });
+
   const { data: announcements, isLoading: isAnnouncementsLoading } = useListAnnouncements({
     query: { queryKey: ["announcements"] }
   });
 
+  const activeFleets = allFleets?.filter((f) => f.isActive) ?? [];
   const pastFleets = recentFleets?.filter((f) => !f.isActive) ?? [];
 
   return (
@@ -85,6 +90,59 @@ export function Dashboard() {
           </Card>
         </div>
       ) : null}
+
+      {/* Active Operations */}
+      {(isActiveFleetsLoading || activeFleets.length > 0) && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+            </span>
+            <h2 className="text-sm font-mono tracking-wider uppercase text-primary">{t("dashboard.activeOperations")}</h2>
+          </div>
+          {isActiveFleetsLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Skeleton className="h-20 rounded-sm border border-primary/20 bg-card/50" />
+              <Skeleton className="h-20 rounded-sm border border-primary/20 bg-card/50" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {activeFleets.map((fleet) => (
+                <Card key={fleet.id} className="bg-primary/5 border-primary/30 rounded-sm">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <Badge className="font-mono text-[10px] rounded-sm bg-primary/20 text-primary border border-primary/30 px-1.5 py-0 animate-pulse">
+                            ● {t("dashboard.live")}
+                          </Badge>
+                          <span className="font-mono text-sm font-semibold text-foreground truncate">{fleet.name}</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs font-mono text-muted-foreground flex-wrap">
+                          <span className="flex items-center gap-1">
+                            <Shield className="w-3 h-3 text-primary/60" /> {fleet.fleetCommander}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Users className="w-3 h-3 text-primary/60" /> {fleet.participantCount || 0} {t("dashboard.pilots")}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="text-2xl font-bold font-mono text-primary">{fleet.papValue}</div>
+                        <div className="text-[10px] font-mono text-muted-foreground uppercase">PAP</div>
+                      </div>
+                    </div>
+                    <div className="mt-2 text-[10px] font-mono text-muted-foreground/60">
+                      {t("dashboard.startedAt")} {format(new Date(fleet.createdAt), "HH:mm")}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Recent Operations */}

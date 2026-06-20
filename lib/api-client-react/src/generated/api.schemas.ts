@@ -131,6 +131,12 @@ export interface UpdateFleetBody {
   endedAt?: string | null;
 }
 
+export interface ScanFleetResponse {
+  awarded: number;
+  skipped: number;
+  notFound: number;
+}
+
 export interface AddParticipantBody {
   characterId: number;
 }

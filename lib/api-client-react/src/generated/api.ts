@@ -33,6 +33,7 @@ import type {
   PapRecord,
   Redemption,
   Reward,
+  ScanFleetResponse,
   SuccessResponse,
   TopContributor,
   UpdateFleetBody,
@@ -1149,6 +1150,90 @@ export const useDeleteFleet = <
   TContext
 > => {
   return useMutation(getDeleteFleetMutationOptions(options));
+};
+
+/**
+ * @summary Scan ESI fleet members and auto-award PAP (admin only)
+ */
+export const getScanFleetMembersUrl = (id: number) => {
+  return `/api/fleets/${id}/scan`;
+};
+
+export const scanFleetMembers = async (
+  id: number,
+  options?: RequestInit,
+): Promise<ScanFleetResponse> => {
+  return customFetch<ScanFleetResponse>(getScanFleetMembersUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getScanFleetMembersMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof scanFleetMembers>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof scanFleetMembers>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["scanFleetMembers"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof scanFleetMembers>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return scanFleetMembers(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ScanFleetMembersMutationResult = NonNullable<
+  Awaited<ReturnType<typeof scanFleetMembers>>
+>;
+
+export type ScanFleetMembersMutationError = ErrorType<void>;
+
+/**
+ * @summary Scan ESI fleet members and auto-award PAP (admin only)
+ */
+export const useScanFleetMembers = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof scanFleetMembers>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof scanFleetMembers>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getScanFleetMembersMutationOptions(options));
 };
 
 /**

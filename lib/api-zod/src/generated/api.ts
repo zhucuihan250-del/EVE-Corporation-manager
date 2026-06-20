@@ -228,6 +228,19 @@ export const DeleteFleetParams = zod.object({
 });
 
 /**
+ * @summary Scan ESI fleet members and auto-award PAP (admin only)
+ */
+export const ScanFleetMembersParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ScanFleetMembersResponse = zod.object({
+  awarded: zod.number(),
+  skipped: zod.number(),
+  notFound: zod.number(),
+});
+
+/**
  * @summary Add a character to a fleet and award PAP
  */
 export const AddFleetParticipantParams = zod.object({

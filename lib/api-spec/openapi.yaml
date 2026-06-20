@@ -286,6 +286,31 @@ paths:
         "204":
           description: Fleet deleted
 
+  /fleets/{id}/scan:
+    post:
+      operationId: scanFleetMembers
+      tags: [fleets]
+      summary: Scan ESI fleet members and auto-award PAP (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Scan complete
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScanFleetResponse"
+        "400":
+          description: Fleet has no EVE fleet ID or is not active
+        "403":
+          description: Forbidden
+        "502":
+          description: ESI request failed
+
   /fleets/{id}/participants:
     post:
       operationId: addFleetParticipant
@@ -771,6 +796,20 @@ components:
           type: boolean
         endedAt:
           type: ["string", "null"]
+
+    ScanFleetResponse:
+      type: object
+      properties:
+        awarded:
+          type: integer
+        skipped:
+          type: integer
+        notFound:
+          type: integer
+      required:
+        - awarded
+        - skipped
+        - notFound
 
     AddParticipantBody:
       type: object

@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, fleetsTable, usersTable, papRecordsTable, charactersTable } from "@workspace/db";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth";
 import {
   CreateFleetBody,
@@ -140,6 +140,102 @@ router.patch("/fleets/:id", requireAuth, async (req: Request, res: Response): Pr
   }
 
   res.json({ ...fleet, participantCount: null });
+});
+
+// POST /api/fleets/:id/scan - scan ESI fleet members and auto-award PAP
+router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
+  if (!currentUser || currentUser.role !== "admin") {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const params = GetFleetParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [fleet] = await db.select().from(fleetsTable).where(eq(fleetsTable.id, params.data.id));
+  if (!fleet) {
+    res.status(404).json({ error: "Fleet not found" });
+    return;
+  }
+
+  if (!fleet.eveFleetId) {
+    res.status(400).json({ error: "Fleet has no EVE fleet ID set" });
+    return;
+  }
+
+  if (!fleet.isActive) {
+    res.status(400).json({ error: "Fleet is not active" });
+    return;
+  }
+
+  if (!currentUser.accessToken) {
+    res.status(400).json({ error: "No ESI access token available" });
+    return;
+  }
+
+  const esiResp = await fetch(
+    `https://esi.evetech.net/latest/fleets/${fleet.eveFleetId}/members/?datasource=tranquility`,
+    { headers: { Authorization: `Bearer ${currentUser.accessToken}`, Accept: "application/json" } },
+  );
+
+  if (!esiResp.ok) {
+    const text = await esiResp.text();
+    req.log.error({ status: esiResp.status, body: text }, "ESI fleet members fetch failed");
+    res.status(502).json({ error: "Failed to fetch fleet members from ESI" });
+    return;
+  }
+
+  const members = (await esiResp.json()) as { character_id: number }[];
+  if (!members.length) {
+    res.json({ awarded: 0, skipped: 0, notFound: 0 });
+    return;
+  }
+
+  const existingPaps = await db
+    .select({ characterId: papRecordsTable.characterId })
+    .from(papRecordsTable)
+    .where(eq(papRecordsTable.fleetId, fleet.id));
+
+  const alreadyAwardedCharIds = new Set(existingPaps.map((p) => p.characterId));
+  const memberCharIds = members.map((m) => m.character_id);
+
+  const characters = await db
+    .select()
+    .from(charactersTable)
+    .where(inArray(charactersTable.eveCharacterId, memberCharIds));
+
+  let awarded = 0;
+  let skipped = 0;
+  const notFound = memberCharIds.length - characters.length;
+
+  for (const character of characters) {
+    if (alreadyAwardedCharIds.has(character.id)) {
+      skipped++;
+      continue;
+    }
+    await db.insert(papRecordsTable).values({
+      userId: character.userId,
+      characterId: character.id,
+      fleetId: fleet.id,
+      amount: fleet.papValue,
+      type: "fleet",
+      reason: `Fleet: ${fleet.name}`,
+    });
+    await db
+      .update(usersTable)
+      .set({
+        totalPap: sql`total_pap + ${fleet.papValue}`,
+        redeemablePap: sql`redeemable_pap + ${fleet.papValue}`,
+      })
+      .where(eq(usersTable.id, character.userId));
+    awarded++;
+  }
+
+  res.json({ awarded, skipped, notFound });
 });
 
 // DELETE /api/fleets/:id - admin only

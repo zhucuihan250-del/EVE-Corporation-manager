@@ -25,6 +25,7 @@ export * from "./papRecordType";
 export * from "./redemption";
 export * from "./redemptionStatus";
 export * from "./reward";
+export * from "./scanFleetResponse";
 export * from "./successResponse";
 export * from "./topContributor";
 export * from "./updateFleetBody";

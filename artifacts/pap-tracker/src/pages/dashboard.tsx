@@ -1,25 +1,23 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useGetDashboardSummary, useGetRecentFleets } from "@workspace/api-client-react";
-import { Target, Activity, Award, Trophy, Swords } from "lucide-react";
+import { Target, Activity, Award, Trophy, Swords, Radio } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
-import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
 
 export function Dashboard() {
   const { t } = useTranslation();
   const { data: summary, isLoading: isSummaryLoading } = useGetDashboardSummary({
-    query: {
-      queryKey: ["dashboardSummary"]
-    }
+    query: { queryKey: ["dashboardSummary"] }
   });
 
   const { data: recentFleets, isLoading: isFleetsLoading } = useGetRecentFleets({
-    query: {
-      queryKey: ["recentFleets"]
-    }
+    query: { queryKey: ["recentFleets"] }
   });
+
+  const activeFleets = recentFleets?.filter((f) => f.isActive) ?? [];
+  const pastFleets = recentFleets?.filter((f) => !f.isActive) ?? [];
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -84,6 +82,7 @@ export function Dashboard() {
       ) : null}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Recent Operations */}
         <Card className="bg-card/20 border-border/50 rounded-sm col-span-1 flex flex-col">
           <CardHeader className="border-b border-border/30">
             <CardTitle className="text-sm font-mono tracking-wider uppercase flex items-center justify-between">
@@ -98,21 +97,21 @@ export function Dashboard() {
                 <Skeleton className="h-12 w-full bg-card/50" />
                 <Skeleton className="h-12 w-full bg-card/50" />
               </div>
-            ) : !recentFleets?.length ? (
+            ) : !pastFleets.length ? (
               <div className="p-8 flex-1 flex items-center justify-center text-muted-foreground font-mono text-sm">
                 {t("dashboard.noRecentFleets")}
               </div>
             ) : (
-              <div className="divide-y divide-border/30">
-                {recentFleets.map((fleet) => (
+              <div className="divide-y divide-border/30 overflow-auto max-h-80">
+                {pastFleets.slice(0, 10).map((fleet) => (
                   <div key={fleet.id} className="p-4 flex items-center justify-between hover:bg-primary/5 transition-colors group">
                     <div className="flex flex-col">
                       <span className="font-mono text-sm text-foreground font-medium group-hover:text-primary transition-colors">{fleet.name}</span>
                       <span className="font-mono text-xs text-muted-foreground mt-1">{t("dashboard.fc")}: {fleet.fleetCommander}</span>
                     </div>
                     <div className="flex flex-col items-end gap-2">
-                      <Badge variant={fleet.isActive ? 'default' : 'secondary'} className="font-mono text-[10px] rounded-sm">
-                        {fleet.isActive ? t("dashboard.active") : t("dashboard.concluded")}
+                      <Badge variant="secondary" className="font-mono text-[10px] rounded-sm">
+                        {t("dashboard.concluded")}
                       </Badge>
                       <span className="font-mono text-xs text-muted-foreground">
                         {format(new Date(fleet.createdAt), "MMM dd")}
@@ -125,16 +124,53 @@ export function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="bg-card/20 border-border/50 rounded-sm col-span-1">
+        {/* Fleet Notices (舰队预告) */}
+        <Card className="bg-card/20 border-border/50 rounded-sm col-span-1 flex flex-col">
           <CardHeader className="border-b border-border/30">
-            <CardTitle className="text-sm font-mono tracking-wider uppercase">{t("dashboard.systemBroadcasts")}</CardTitle>
+            <CardTitle className="text-sm font-mono tracking-wider uppercase flex items-center justify-between">
+              <span>{t("dashboard.systemBroadcasts")}</span>
+              <Radio className="w-4 h-4 text-primary animate-pulse" />
+            </CardTitle>
           </CardHeader>
-          <CardContent className="h-64 flex flex-col items-center justify-center text-muted-foreground font-mono text-sm">
-            <div className="w-12 h-12 rounded-full border border-dashed border-border flex items-center justify-center mb-4">
-              <Activity className="w-6 h-6 text-muted-foreground/50" />
-            </div>
-            <p>{t("dashboard.noOperations")}</p>
-            <p className="text-xs mt-2 opacity-50">{t("dashboard.monitoringFrequencies")}</p>
+          <CardContent className="p-0 flex-1 flex flex-col">
+            {isFleetsLoading ? (
+              <div className="p-8 flex flex-col gap-4">
+                <Skeleton className="h-16 w-full bg-card/50" />
+                <Skeleton className="h-16 w-full bg-card/50" />
+              </div>
+            ) : !activeFleets.length ? (
+              <div className="flex-1 flex flex-col items-center justify-center p-8 text-muted-foreground font-mono text-sm">
+                <div className="w-12 h-12 rounded-full border border-dashed border-border flex items-center justify-center mb-4">
+                  <Radio className="w-6 h-6 text-muted-foreground/50" />
+                </div>
+                <p>{t("dashboard.noActiveFleets")}</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-border/30">
+                {activeFleets.map((fleet) => (
+                  <div key={fleet.id} className="p-4 hover:bg-primary/5 transition-colors">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-primary animate-pulse flex-shrink-0 mt-1" />
+                        <span className="font-mono text-sm text-foreground font-semibold">{fleet.name}</span>
+                      </div>
+                      <Badge className="font-mono text-[10px] rounded-sm bg-primary/20 text-primary border-primary/30 border">
+                        {t("dashboard.active")}
+                      </Badge>
+                    </div>
+                    <div className="ml-4 flex items-center justify-between">
+                      <span className="font-mono text-xs text-muted-foreground">{t("dashboard.fc")}: {fleet.fleetCommander}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono text-xs text-primary font-bold">+{fleet.papValue} PAP</span>
+                        <span className="font-mono text-xs text-muted-foreground">
+                          {t("dashboard.activeFleetSubtitle")}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

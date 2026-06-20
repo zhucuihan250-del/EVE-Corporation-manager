@@ -1,10 +1,10 @@
-import { useListFleets, useCreateFleet, useUpdateFleet, getListFleetsQueryKey } from "@workspace/api-client-react";
+import { useListFleets, useCreateFleet, useUpdateFleet, useScanFleetMembers, getListFleetsQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
-import { Loader2, Swords, Plus, Shield } from "lucide-react";
+import { Loader2, Swords, Plus, Shield, ScanSearch } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
@@ -18,6 +18,7 @@ export function AdminFleets() {
   const { data: fleets, isLoading } = useListFleets({ query: { queryKey: ["adminFleets"] } });
   const createFleet = useCreateFleet();
   const updateFleet = useUpdateFleet();
+  const scanFleet = useScanFleetMembers();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -25,11 +26,13 @@ export function AdminFleets() {
   const [fleetName, setFleetName] = useState("");
   const [fleetCommander, setFleetCommander] = useState("");
   const [papValue, setPapValue] = useState("");
+  const [eveFleetId, setEveFleetId] = useState("");
+  const [scanningId, setScanningId] = useState<number | null>(null);
 
   const handleCreateFleet = () => {
     if (!fleetName || !fleetCommander || !papValue) return;
     createFleet.mutate(
-      { data: { name: fleetName, fleetCommander, papValue: Number(papValue) } },
+      { data: { name: fleetName, fleetCommander, papValue: Number(papValue), eveFleetId: eveFleetId || null } },
       {
         onSuccess: () => {
           toast({ title: t("fleets.fleetCreated"), description: t("fleets.newOperationRegistered") });
@@ -38,6 +41,7 @@ export function AdminFleets() {
           setFleetName("");
           setFleetCommander("");
           setPapValue("");
+          setEveFleetId("");
         }
       }
     );
@@ -51,6 +55,34 @@ export function AdminFleets() {
           toast({ title: t("fleets.fleetEnded"), description: t("fleets.operationComplete") });
           queryClient.invalidateQueries({ queryKey: getListFleetsQueryKey() });
         }
+      }
+    );
+  };
+
+  const handleScanFleet = (fleetId: number, hasEveId: boolean) => {
+    if (!hasEveId) {
+      toast({ title: t("fleets.scanFailed"), description: t("fleets.noEveFleetId"), variant: "destructive" });
+      return;
+    }
+    setScanningId(fleetId);
+    scanFleet.mutate(
+      { id: fleetId },
+      {
+        onSuccess: (data) => {
+          toast({
+            title: t("fleets.scanComplete"),
+            description: t("fleets.scanCompleteDesc", {
+              awarded: data.awarded,
+              skipped: data.skipped,
+              notFound: data.notFound,
+            }),
+          });
+          queryClient.invalidateQueries({ queryKey: getListFleetsQueryKey() });
+        },
+        onError: () => {
+          toast({ title: t("fleets.scanFailed"), description: t("fleets.scanFailedDesc"), variant: "destructive" });
+        },
+        onSettled: () => setScanningId(null),
       }
     );
   };
@@ -99,10 +131,15 @@ export function AdminFleets() {
                       <div className="flex flex-col">
                         <span>{fleet.name}</span>
                         <span className="text-xs text-muted-foreground">{format(new Date(fleet.createdAt), "MMM dd, HH:mm")}</span>
+                        {fleet.eveFleetId && (
+                          <span className="text-[10px] text-muted-foreground/60 font-mono mt-0.5">ID: {fleet.eveFleetId}</span>
+                        )}
                       </div>
                     </TableCell>
-                    <TableCell className="font-mono text-sm text-muted-foreground flex items-center gap-2 mt-2">
-                      <Shield className="w-3 h-3 text-primary" /> {fleet.fleetCommander}
+                    <TableCell className="font-mono text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2 mt-2">
+                        <Shield className="w-3 h-3 text-primary" /> {fleet.fleetCommander}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <Badge variant={fleet.isActive ? 'default' : 'secondary'} className="font-mono text-[10px] rounded-sm">
@@ -117,15 +154,31 @@ export function AdminFleets() {
                     </TableCell>
                     <TableCell className="text-right">
                       {fleet.isActive && (
-                        <Button 
-                          variant="destructive" 
-                          size="sm" 
-                          className="h-8 rounded-sm font-mono text-[10px]"
-                          onClick={() => handleEndFleet(fleet.id)}
-                          disabled={updateFleet.isPending}
-                        >
-                          {t("fleets.standDown")}
-                        </Button>
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 rounded-sm font-mono text-[10px] border-primary/30 text-primary hover:bg-primary/10"
+                            onClick={() => handleScanFleet(fleet.id, !!fleet.eveFleetId)}
+                            disabled={scanningId === fleet.id}
+                          >
+                            {scanningId === fleet.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <ScanSearch className="w-3 h-3 mr-1" />
+                            )}
+                            {scanningId === fleet.id ? t("fleets.scanning") : t("fleets.scanEsi")}
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="h-8 rounded-sm font-mono text-[10px]"
+                            onClick={() => handleEndFleet(fleet.id)}
+                            disabled={updateFleet.isPending}
+                          >
+                            {t("fleets.standDown")}
+                          </Button>
+                        </div>
                       )}
                     </TableCell>
                   </TableRow>
@@ -182,6 +235,18 @@ export function AdminFleets() {
                 onChange={(e) => setPapValue(e.target.value)}
                 className="col-span-3 bg-background/50 border-border/50 rounded-sm"
                 placeholder="1"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="eveFleetId" className="text-right text-xs tracking-widest leading-tight">
+                {t("fleets.eveFleetId")}
+              </Label>
+              <Input
+                id="eveFleetId"
+                value={eveFleetId}
+                onChange={(e) => setEveFleetId(e.target.value)}
+                className="col-span-3 bg-background/50 border-border/50 rounded-sm"
+                placeholder={t("fleets.eveFleetIdPlaceholder")}
               />
             </div>
           </div>

@@ -8,7 +8,6 @@ import papRouter from "./pap";
 import rewardsRouter from "./rewards";
 import redemptionsRouter from "./redemptions";
 import dashboardRouter from "./dashboard";
-import discordRouter from "./discord";
 
 const router: IRouter = Router();
 
@@ -21,6 +20,5 @@ router.use(papRouter);
 router.use(rewardsRouter);
 router.use(redemptionsRouter);
 router.use(dashboardRouter);
-router.use(discordRouter);
 
 export default router;

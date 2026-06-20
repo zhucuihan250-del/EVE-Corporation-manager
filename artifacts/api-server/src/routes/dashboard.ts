@@ -104,9 +104,6 @@ router.get("/dashboard/recent-fleets", requireAuth, async (req: Request, res: Re
       fleetCommander: fleetsTable.fleetCommander,
       papValue: fleetsTable.papValue,
       isActive: fleetsTable.isActive,
-      pingType: fleetsTable.pingType,
-      status: fleetsTable.status,
-      scheduledAt: fleetsTable.scheduledAt,
       startedAt: fleetsTable.startedAt,
       endedAt: fleetsTable.endedAt,
       createdAt: fleetsTable.createdAt,
@@ -117,7 +114,7 @@ router.get("/dashboard/recent-fleets", requireAuth, async (req: Request, res: Re
     })
     .from(fleetsTable)
     .orderBy(desc(fleetsTable.createdAt))
-    .limit(100);
+    .limit(5);
 
   res.json(fleets);
 });

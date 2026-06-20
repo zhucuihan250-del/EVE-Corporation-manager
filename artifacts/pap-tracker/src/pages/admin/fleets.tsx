@@ -22,7 +22,7 @@ async function fetchEsiFleetId(): Promise<{ fleetId: string; role: string }> {
 
 export function AdminFleets() {
   const { t } = useTranslation();
-  const { data: fleets, isLoading } = useListFleets({ query: { queryKey: ["adminFleets"] } });
+  const { data: fleets, isLoading } = useListFleets();
   const createFleet = useCreateFleet();
   const updateFleet = useUpdateFleet();
   const scanFleet = useScanFleetMembers();

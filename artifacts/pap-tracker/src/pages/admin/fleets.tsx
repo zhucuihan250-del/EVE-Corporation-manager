@@ -92,28 +92,14 @@ export function AdminFleets() {
 
       setScanningId(fleet.id);
       setUpdatingFleetId(null);
-      scanFleet.mutate(
-        { id: fleet.id },
-        {
-          onSuccess: (scanData) => {
-            toast({
-              title: t("fleets.scanComplete"),
-              description: t("fleets.scanCompleteDesc", {
-                esiMemberCount: scanData.esiMemberCount ?? 0,
-                awarded: scanData.awarded,
-                skipped: scanData.skipped,
-                notFound: scanData.notFound,
-                autoRegistered: (scanData as { autoRegistered?: number }).autoRegistered ?? 0,
-              }),
-            });
-            invalidateAfterScan();
-          },
-          onError: () => {
-            toast({ title: t("fleets.scanFailed"), description: t("fleets.scanFailedDesc"), variant: "destructive" });
-          },
-          onSettled: () => setScanningId(null),
-        },
-      );
+      try {
+        const count = await scanFleetLive(fleet.id);
+        toast({ title: t("fleets.scanComplete"), description: t("fleets.scanCountDesc", { count }) });
+      } catch {
+        toast({ title: t("fleets.scanFailed"), description: t("fleets.scanFailedDesc"), variant: "destructive" });
+      } finally {
+        setScanningId(null);
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : t("fleets.scanFailedDesc");
       const isNotInFleet = msg.includes("not currently in a fleet");

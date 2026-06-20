@@ -219,8 +219,10 @@ router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response)
   }
 
   const members = (await esiResp.json()) as { character_id: number }[];
+  req.log.info({ esiMemberCount: members.length, fleetId: fleet.id }, "ESI fleet members fetched");
+
   if (!members.length) {
-    res.json({ awarded: 0, skipped: 0, notFound: 0 });
+    res.json({ awarded: 0, skipped: 0, notFound: 0, esiMemberCount: 0 });
     return;
   }
 
@@ -232,10 +234,14 @@ router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response)
   const alreadyAwardedCharIds = new Set(existingPaps.map((p) => p.characterId));
   const memberCharIds = members.map((m) => m.character_id);
 
+  req.log.info({ memberCharIds, esiMemberCount: memberCharIds.length }, "Looking up ESI character IDs in DB");
+
   const characters = await db
     .select()
     .from(charactersTable)
     .where(inArray(charactersTable.eveCharacterId, memberCharIds));
+
+  req.log.info({ found: characters.length, total: memberCharIds.length }, "Characters found in DB");
 
   let awarded = 0;
   let skipped = 0;
@@ -264,7 +270,7 @@ router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response)
     awarded++;
   }
 
-  res.json({ awarded, skipped, notFound });
+  res.json({ awarded, skipped, notFound, esiMemberCount: members.length });
 });
 
 // DELETE /api/fleets/:id - admin only

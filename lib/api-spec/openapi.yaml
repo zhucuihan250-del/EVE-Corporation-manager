@@ -595,6 +595,57 @@ paths:
                 items:
                   $ref: "#/components/schemas/Fleet"
 
+  /announcements:
+    get:
+      operationId: listAnnouncements
+      tags: [announcements]
+      summary: List upcoming fleet announcements
+      responses:
+        "200":
+          description: Announcements list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Announcement"
+    post:
+      operationId: createAnnouncement
+      tags: [announcements]
+      summary: Create a fleet announcement (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAnnouncementBody"
+      responses:
+        "201":
+          description: Created announcement
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Announcement"
+        "403":
+          description: Forbidden
+
+  /announcements/{id}:
+    delete:
+      operationId: deleteAnnouncement
+      tags: [announcements]
+      summary: Delete a fleet announcement (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Announcement deleted
+        "403":
+          description: Forbidden
+
 components:
   schemas:
     HealthStatus:
@@ -796,6 +847,52 @@ components:
           type: boolean
         endedAt:
           type: ["string", "null"]
+
+    Announcement:
+      type: object
+      properties:
+        id:
+          type: integer
+        fc:
+          type: string
+        scheduledAt:
+          type: string
+          format: date-time
+        rallyPoint:
+          type: string
+        rallyLevel:
+          type: string
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - fc
+        - scheduledAt
+        - rallyPoint
+        - rallyLevel
+        - createdAt
+
+    CreateAnnouncementBody:
+      type: object
+      properties:
+        fc:
+          type: string
+        scheduledAt:
+          type: string
+        rallyPoint:
+          type: string
+        rallyLevel:
+          type: string
+        notes:
+          type: string
+      required:
+        - fc
+        - scheduledAt
+        - rallyPoint
+        - rallyLevel
 
     ScanFleetResponse:
       type: object

@@ -15,6 +15,8 @@ import {
   BookOpen,
   Inbox,
   Languages,
+  UserSquare2,
+  Radio,
 } from "lucide-react";
 import {
   Sidebar,
@@ -102,6 +104,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={location === "/characters"}>
+                      <Link href="/characters" className="font-mono flex items-center gap-3">
+                        <UserSquare2 className="w-4 h-4" />
+                        <span>{t("nav.characters")}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
@@ -132,6 +142,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         <Link href="/admin/fleets" className="font-mono flex items-center gap-3">
                           <Swords className="w-4 h-4" />
                           <span>{t("nav.fleets")}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild isActive={location.startsWith("/admin/announcements")}>
+                        <Link href="/admin/announcements" className="font-mono flex items-center gap-3">
+                          <Radio className="w-4 h-4" />
+                          <span>{t("nav.announcements")}</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>

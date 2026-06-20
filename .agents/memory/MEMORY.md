@@ -1,0 +1,5 @@
+- [Zod imports in api-server](zod-in-api-server.md) — never import zod directly in api-server routes; use @workspace/api-zod generated schemas instead.
+- [DB push interactive prompt](db-push-interactive.md) — drizzle-kit push requires interactive TTY for new tables; use executeSql directly when non-interactive.
+- [EVE SSO token refresh](eve-sso-token-refresh.md) — refreshAccessToken added to eve-sso.ts; fleet scan auto-refreshes 60s before expiry.
+- [Alt character linking](alt-character-linking.md) — link-alt flow: set req.session.linkingUserId, redirect to SSO, callback detects and creates characters row under main user.
+- [Announcements feature](announcements-feature.md) — rally levels are "MAX CTA", "CTA", "战略", "散打"; stored as plain text in DB; color-coded in UI.

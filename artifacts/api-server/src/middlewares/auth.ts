@@ -3,6 +3,7 @@ import { type Request, type Response, type NextFunction } from "express";
 declare module "express-session" {
   interface SessionData {
     userId: number;
+    linkingUserId?: number;
   }
 }
 

@@ -23,6 +23,22 @@ router.get("/auth/eve/login", (req: Request, res: Response): void => {
   res.redirect(url);
 });
 
+// GET /api/auth/eve/link-alt - start alt character linking (must be logged in)
+router.get("/auth/eve/link-alt", requireAuth, (req: Request, res: Response): void => {
+  req.session.linkingUserId = req.session.userId;
+  req.session.save((err) => {
+    if (err) {
+      req.log.error({ err }, "Session save error for link-alt");
+      res.redirect("/characters?error=session");
+      return;
+    }
+    const callbackUrl = getCallbackUrl(req);
+    req.log.info({ callbackUrl, userId: req.session.linkingUserId }, "Starting alt character link via EVE SSO");
+    const url = getAuthorizationUrl(callbackUrl);
+    res.redirect(url);
+  });
+});
+
 // GET /api/auth/eve/callback - EVE SSO callback
 router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<void> => {
   const { code } = req.query;
@@ -43,6 +59,38 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
     }
 
     const tokenExpiry = new Date(Date.now() + expiresIn * 1000);
+
+    // Alt character linking flow
+    if (req.session.linkingUserId) {
+      const mainUserId = req.session.linkingUserId;
+      req.session.linkingUserId = undefined;
+
+      const [existingChar] = await db
+        .select()
+        .from(charactersTable)
+        .where(eq(charactersTable.eveCharacterId, characterId));
+
+      if (existingChar) {
+        req.session.save(() => {});
+        res.redirect("/characters?error=already_linked");
+        return;
+      }
+
+      await db.insert(charactersTable).values({
+        userId: mainUserId,
+        eveCharacterId: characterId,
+        eveCharacterName: characterName,
+        corporationId,
+        corporationName,
+        isMain: false,
+      });
+
+      req.session.save((saveErr) => {
+        if (saveErr) req.log.error({ err: saveErr }, "Session save error after alt link");
+        res.redirect("/characters?linked=true");
+      });
+      return;
+    }
 
     // Find or create user by EVE character ID
     let [user] = await db

@@ -41,6 +41,7 @@ export function History() {
                   <TableHead className="font-mono text-xs text-muted-foreground">{t("history.date")}</TableHead>
                   <TableHead className="font-mono text-xs text-muted-foreground">{t("history.type")}</TableHead>
                   <TableHead className="font-mono text-xs text-muted-foreground">{t("history.details")}</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground">{t("history.character")}</TableHead>
                   <TableHead className="font-mono text-xs text-muted-foreground text-right">{t("history.amount")}</TableHead>
                 </TableRow>
               </TableHeader>
@@ -57,6 +58,9 @@ export function History() {
                     </TableCell>
                     <TableCell className="font-mono text-sm text-muted-foreground">
                       {record.type === 'fleet' ? record.fleetName : record.reason}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground/70">
+                      {record.characterName ?? "—"}
                     </TableCell>
                     <TableCell className="font-mono font-bold text-right text-primary">
                       +{record.amount}

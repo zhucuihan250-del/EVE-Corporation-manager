@@ -467,3 +467,37 @@ export const GetRecentFleetsResponseItem = zod.object({
   participantCount: zod.number().nullish(),
 });
 export const GetRecentFleetsResponse = zod.array(GetRecentFleetsResponseItem);
+
+/**
+ * @summary List upcoming fleet announcements
+ */
+export const ListAnnouncementsResponseItem = zod.object({
+  id: zod.number(),
+  fc: zod.string(),
+  scheduledAt: zod.coerce.date(),
+  rallyPoint: zod.string(),
+  rallyLevel: zod.string(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+});
+export const ListAnnouncementsResponse = zod.array(
+  ListAnnouncementsResponseItem,
+);
+
+/**
+ * @summary Create a fleet announcement (admin only)
+ */
+export const CreateAnnouncementBody = zod.object({
+  fc: zod.string(),
+  scheduledAt: zod.string(),
+  rallyPoint: zod.string(),
+  rallyLevel: zod.string(),
+  notes: zod.string().optional(),
+});
+
+/**
+ * @summary Delete a fleet announcement (admin only)
+ */
+export const DeleteAnnouncementParams = zod.object({
+  id: zod.coerce.number(),
+});

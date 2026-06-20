@@ -179,6 +179,48 @@ export async function getCharacterInfo(accessToken: string): Promise<{
   };
 }
 
+export async function refreshAccessToken(refreshToken: string): Promise<{
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+}> {
+  const clientId = process.env.EVE_CLIENT_ID;
+  const clientSecret = process.env.EVE_CLIENT_SECRET;
+  if (!clientId || !clientSecret) throw new Error("EVE SSO credentials not set");
+
+  const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+
+  const resp = await fetch(`${EVE_SSO_BASE}/v2/oauth/token`, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${credentials}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+    }),
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text();
+    logger.error({ status: resp.status, body: text }, "EVE SSO token refresh failed");
+    throw new Error("EVE SSO token refresh failed");
+  }
+
+  const data = (await resp.json()) as {
+    access_token: string;
+    refresh_token: string;
+    expires_in: number;
+  };
+
+  return {
+    accessToken: data.access_token,
+    refreshToken: data.refresh_token,
+    expiresIn: data.expires_in,
+  };
+}
+
 export async function getCorporationName(corporationId: number): Promise<string> {
   try {
     const resp = await fetch(

@@ -1,6 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, fleetsTable, usersTable, papRecordsTable, charactersTable } from "@workspace/db";
 import { eq, desc, sql, inArray } from "drizzle-orm";
+import { refreshAccessToken } from "../lib/eve-sso";
 import { requireAuth } from "../middlewares/auth";
 import {
   CreateFleetBody,
@@ -173,13 +174,41 @@ router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response)
   }
 
   if (!currentUser.accessToken) {
-    res.status(400).json({ error: "No ESI access token available" });
+    res.status(400).json({ error: "No ESI access token. Please log in again." });
     return;
+  }
+
+  let accessToken = currentUser.accessToken;
+
+  // Refresh token if expired or expiring within 60 seconds
+  const tokenExpiry = currentUser.tokenExpiry;
+  if (!tokenExpiry || new Date(tokenExpiry.getTime() - 60_000) <= new Date()) {
+    if (!currentUser.refreshToken) {
+      res.status(400).json({ error: "ESI token expired. Please log in again." });
+      return;
+    }
+    try {
+      const refreshed = await refreshAccessToken(currentUser.refreshToken);
+      accessToken = refreshed.accessToken;
+      await db
+        .update(usersTable)
+        .set({
+          accessToken: refreshed.accessToken,
+          refreshToken: refreshed.refreshToken,
+          tokenExpiry: new Date(Date.now() + refreshed.expiresIn * 1000),
+        })
+        .where(eq(usersTable.id, currentUser.id));
+      req.log.info("ESI access token refreshed for fleet scan");
+    } catch (refreshErr) {
+      req.log.error({ err: refreshErr }, "Failed to refresh ESI token");
+      res.status(400).json({ error: "ESI token expired and refresh failed. Please log in again." });
+      return;
+    }
   }
 
   const esiResp = await fetch(
     `https://esi.evetech.net/latest/fleets/${fleet.eveFleetId}/members/?datasource=tranquility`,
-    { headers: { Authorization: `Bearer ${currentUser.accessToken}`, Accept: "application/json" } },
+    { headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" } },
   );
 
   if (!esiResp.ok) {

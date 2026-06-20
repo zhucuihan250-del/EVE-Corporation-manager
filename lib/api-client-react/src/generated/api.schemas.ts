@@ -131,6 +131,25 @@ export interface UpdateFleetBody {
   endedAt?: string | null;
 }
 
+export interface Announcement {
+  id: number;
+  fc: string;
+  scheduledAt: string;
+  rallyPoint: string;
+  rallyLevel: string;
+  /** @nullable */
+  notes?: string | null;
+  createdAt: string;
+}
+
+export interface CreateAnnouncementBody {
+  fc: string;
+  scheduledAt: string;
+  rallyPoint: string;
+  rallyLevel: string;
+  notes?: string;
+}
+
 export interface ScanFleetResponse {
   awarded: number;
   skipped: number;

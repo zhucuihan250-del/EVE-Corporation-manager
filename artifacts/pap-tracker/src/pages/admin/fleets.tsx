@@ -4,10 +4,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
-import { Loader2, Swords, Plus, Shield, ScanSearch, Crosshair } from "lucide-react";
+import { Loader2, Swords, Plus, Shield, ScanSearch, Crosshair, Radio } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,6 +37,47 @@ export function AdminFleets() {
   const [scanningId, setScanningId] = useState<number | null>(null);
   const [fetchingCreateId, setFetchingCreateId] = useState(false);
   const [updatingFleetId, setUpdatingFleetId] = useState<number | null>(null);
+  const [standingDownId, setStandingDownId] = useState<number | null>(null);
+
+  const fleetsRef = useRef(fleets);
+  fleetsRef.current = fleets;
+
+  useEffect(() => {
+    const autoScan = async () => {
+      const activeFleets = (fleetsRef.current ?? []).filter(f => f.isActive && f.eveFleetId);
+      for (const fleet of activeFleets) {
+        try {
+          const resp = await fetch(`/api/fleets/${fleet.id}/scan`, {
+            method: "POST",
+            credentials: "include",
+          });
+          if (!resp.ok) continue;
+          const data = await resp.json() as { awarded: number; skipped: number; notFound: number; esiMemberCount?: number; autoRegistered?: number };
+          if (data.awarded > 0) {
+            toast({
+              title: t("fleets.scanComplete"),
+              description: t("fleets.scanCompleteDesc", {
+                esiMemberCount: data.esiMemberCount ?? 0,
+                awarded: data.awarded,
+                skipped: data.skipped,
+                notFound: data.notFound,
+                autoRegistered: data.autoRegistered ?? 0,
+              }),
+            });
+            queryClient.invalidateQueries({ queryKey: getListFleetsQueryKey() });
+          } else {
+            queryClient.invalidateQueries({ queryKey: getListFleetsQueryKey() });
+          }
+        } catch {
+        }
+      }
+    };
+
+    const interval = setInterval(autoScan, 60 * 1000);
+    return () => clearInterval(interval);
+  }, [queryClient, t, toast]);
+
+  const activeScannableFleets = (fleets ?? []).filter(f => f.isActive && f.eveFleetId);
 
   const handleFetchFleetIdForCreate = async () => {
     setFetchingCreateId(true);
@@ -60,10 +101,8 @@ export function AdminFleets() {
   const handleUpdateFleetIdFromEsi = async (fleet: { id: number }) => {
     setUpdatingFleetId(fleet.id);
     try {
-      // Step 1: fetch fleet ID from ESI
       const data = await fetchEsiFleetId();
 
-      // Step 2: save fleet ID to DB
       await new Promise<void>((resolve, reject) => {
         updateFleet.mutate(
           { id: fleet.id, data: { eveFleetId: data.fleetId } },
@@ -71,7 +110,6 @@ export function AdminFleets() {
         );
       });
 
-      // Step 3: immediately scan now that the ID is correct
       setScanningId(fleet.id);
       setUpdatingFleetId(null);
       scanFleet.mutate(
@@ -126,14 +164,43 @@ export function AdminFleets() {
     );
   };
 
-  const handleEndFleet = (fleetId: number) => {
+  const handleEndFleet = async (fleet: { id: number; eveFleetId?: string | null }) => {
+    setStandingDownId(fleet.id);
+
+    if (fleet.eveFleetId) {
+      await new Promise<void>((resolve) => {
+        scanFleet.mutate(
+          { id: fleet.id },
+          {
+            onSuccess: (data) => {
+              if (data.awarded > 0) {
+                toast({
+                  title: t("fleets.scanComplete"),
+                  description: t("fleets.scanCompleteDesc", {
+                    esiMemberCount: data.esiMemberCount ?? 0,
+                    awarded: data.awarded,
+                    skipped: data.skipped,
+                    notFound: data.notFound,
+                    autoRegistered: (data as { autoRegistered?: number }).autoRegistered ?? 0,
+                  }),
+                });
+              }
+              resolve();
+            },
+            onError: () => resolve(),
+          },
+        );
+      });
+    }
+
     updateFleet.mutate(
-      { id: fleetId, data: { isActive: false, endedAt: new Date().toISOString() } },
+      { id: fleet.id, data: { isActive: false, endedAt: new Date().toISOString() } },
       {
         onSuccess: () => {
           toast({ title: t("fleets.fleetEnded"), description: t("fleets.operationComplete") });
           queryClient.invalidateQueries({ queryKey: getListFleetsQueryKey() });
-        }
+        },
+        onSettled: () => setStandingDownId(null),
       }
     );
   };
@@ -161,11 +228,7 @@ export function AdminFleets() {
           queryClient.invalidateQueries({ queryKey: getListFleetsQueryKey() });
         },
         onError: () => {
-          toast({
-            title: t("fleets.scanFailed"),
-            description: t("fleets.scanFailedDesc") + " " + t("fleets.fleetIdFetchedDesc").replace("auto-filled from ESI", "").trim(),
-            variant: "destructive",
-          });
+          toast({ title: t("fleets.scanFailed"), description: t("fleets.scanFailedDesc"), variant: "destructive" });
         },
         onSettled: () => setScanningId(null),
       }
@@ -183,6 +246,15 @@ export function AdminFleets() {
           <Plus className="w-4 h-4 mr-2" /> {t("fleets.newOperation")}
         </Button>
       </div>
+
+      {activeScannableFleets.length > 0 && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-primary/5 border border-primary/20 rounded-sm">
+          <Radio className="w-3 h-3 text-primary animate-pulse" />
+          <span className="font-mono text-[11px] text-primary tracking-wider">
+            {t("fleets.autoScanActive", { count: activeScannableFleets.length })}
+          </span>
+        </div>
+      )}
 
       <Card className="bg-card/40 backdrop-blur border-border/50 rounded-sm">
         <CardHeader className="border-b border-border/30 pb-4">
@@ -247,7 +319,7 @@ export function AdminFleets() {
                             size="sm"
                             className="h-8 rounded-sm font-mono text-[10px] border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
                             onClick={() => handleUpdateFleetIdFromEsi(fleet)}
-                            disabled={updatingFleetId === fleet.id}
+                            disabled={updatingFleetId === fleet.id || standingDownId === fleet.id}
                           >
                             {updatingFleetId === fleet.id ? (
                               <Loader2 className="w-3 h-3 animate-spin" />
@@ -261,7 +333,7 @@ export function AdminFleets() {
                             size="sm"
                             className="h-8 rounded-sm font-mono text-[10px] border-primary/30 text-primary hover:bg-primary/10"
                             onClick={() => handleScanFleet(fleet.id, !!fleet.eveFleetId)}
-                            disabled={scanningId === fleet.id}
+                            disabled={scanningId === fleet.id || standingDownId === fleet.id}
                           >
                             {scanningId === fleet.id ? (
                               <Loader2 className="w-3 h-3 animate-spin" />
@@ -274,10 +346,13 @@ export function AdminFleets() {
                             variant="destructive"
                             size="sm"
                             className="h-8 rounded-sm font-mono text-[10px]"
-                            onClick={() => handleEndFleet(fleet.id)}
-                            disabled={updateFleet.isPending}
+                            onClick={() => handleEndFleet(fleet)}
+                            disabled={standingDownId === fleet.id || updateFleet.isPending}
                           >
-                            {t("fleets.standDown")}
+                            {standingDownId === fleet.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                            ) : null}
+                            {standingDownId === fleet.id ? t("fleets.standingDown") : t("fleets.standDown")}
                           </Button>
                         </div>
                       )}

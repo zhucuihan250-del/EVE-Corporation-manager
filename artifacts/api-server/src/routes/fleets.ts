@@ -28,12 +28,14 @@ router.get("/fleets", requireAuth, async (req: Request, res: Response): Promise<
       startedAt: fleetsTable.startedAt,
       endedAt: fleetsTable.endedAt,
       createdAt: fleetsTable.createdAt,
-      participantCount: sql<number>`(
-        SELECT COUNT(*) FROM pap_records
-        WHERE fleet_id = ${fleetsTable.id} AND type = 'fleet'
-      )`,
+      participantCount: sql<number>`COALESCE(COUNT(${papRecordsTable.id}), 0)::int`,
     })
     .from(fleetsTable)
+    .leftJoin(
+      papRecordsTable,
+      and(eq(papRecordsTable.fleetId, fleetsTable.id), eq(papRecordsTable.type, "fleet")),
+    )
+    .groupBy(fleetsTable.id)
     .orderBy(desc(fleetsTable.createdAt));
 
   res.json(fleets);
@@ -155,13 +157,15 @@ router.get("/fleets/:id", requireAuth, async (req: Request, res: Response): Prom
       startedAt: fleetsTable.startedAt,
       endedAt: fleetsTable.endedAt,
       createdAt: fleetsTable.createdAt,
-      participantCount: sql<number>`(
-        SELECT COUNT(*) FROM pap_records
-        WHERE fleet_id = ${fleetsTable.id} AND type = 'fleet'
-      )`,
+      participantCount: sql<number>`COALESCE(COUNT(${papRecordsTable.id}), 0)::int`,
     })
     .from(fleetsTable)
-    .where(eq(fleetsTable.id, params.data.id));
+    .leftJoin(
+      papRecordsTable,
+      and(eq(papRecordsTable.fleetId, fleetsTable.id), eq(papRecordsTable.type, "fleet")),
+    )
+    .where(eq(fleetsTable.id, params.data.id))
+    .groupBy(fleetsTable.id);
 
   if (!fleet) {
     res.status(404).json({ error: "Fleet not found" });

@@ -136,6 +136,7 @@ const zh = {
       standDown: "结束行动",
       standingDown: "正在结束...",
       autoScanActive: "自动扫描已启用 · {{count}} 支舰队 · 每 60 秒",
+      inFleet: "在舰",
       fleetCreated: "舰队已创建",
       newOperationRegistered: "新行动已注册。",
       fleetEnded: "舰队已结束",

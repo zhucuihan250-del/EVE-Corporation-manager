@@ -136,6 +136,7 @@ const en = {
       standDown: "STAND DOWN",
       standingDown: "STANDING DOWN...",
       autoScanActive: "AUTO-SCAN ACTIVE · {{count}} fleet(s) · Every 60s",
+      inFleet: "in fleet",
       fleetCreated: "Fleet Created",
       newOperationRegistered: "New operation registered.",
       fleetEnded: "Fleet Ended",

@@ -1,4 +1,8 @@
-import { useListFleets, useCreateFleet, useUpdateFleet, useScanFleetMembers, getListFleetsQueryKey } from "@workspace/api-client-react";
+import {
+  useListFleets, useCreateFleet, useUpdateFleet, useScanFleetMembers,
+  getListFleetsQueryKey, getGetRecentFleetsQueryKey, getGetAdminSummaryQueryKey,
+  getGetDashboardSummaryQueryKey, getListUsersQueryKey, getListAllPapRecordsQueryKey,
+} from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +45,15 @@ export function AdminFleets() {
 
   const fleetsRef = useRef(fleets);
   fleetsRef.current = fleets;
+
+  const invalidateAfterScan = () => {
+    queryClient.invalidateQueries({ queryKey: getListFleetsQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetRecentFleetsQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetAdminSummaryQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getListUsersQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getListAllPapRecordsQueryKey() });
+  };
 
   const [liveCounts, setLiveCounts] = useState<Record<number, number>>({});
 
@@ -117,7 +130,7 @@ export function AdminFleets() {
                 autoRegistered: (scanData as { autoRegistered?: number }).autoRegistered ?? 0,
               }),
             });
-            queryClient.invalidateQueries({ queryKey: getListFleetsQueryKey() });
+            invalidateAfterScan();
           },
           onError: () => {
             toast({ title: t("fleets.scanFailed"), description: t("fleets.scanFailedDesc"), variant: "destructive" });
@@ -144,7 +157,7 @@ export function AdminFleets() {
       {
         onSuccess: () => {
           toast({ title: t("fleets.fleetCreated"), description: t("fleets.newOperationRegistered") });
-          queryClient.invalidateQueries({ queryKey: getListFleetsQueryKey() });
+          invalidateAfterScan();
           setCreateModalOpen(false);
           setFleetName("");
           setFleetCommander("");
@@ -189,7 +202,7 @@ export function AdminFleets() {
       {
         onSuccess: () => {
           toast({ title: t("fleets.fleetEnded"), description: t("fleets.operationComplete") });
-          queryClient.invalidateQueries({ queryKey: getListFleetsQueryKey() });
+          invalidateAfterScan();
         },
         onSettled: () => setStandingDownId(null),
       }
@@ -216,7 +229,7 @@ export function AdminFleets() {
               autoRegistered: (data as { autoRegistered?: number }).autoRegistered ?? 0,
             }),
           });
-          queryClient.invalidateQueries({ queryKey: getListFleetsQueryKey() });
+          invalidateAfterScan();
         },
         onError: () => {
           toast({ title: t("fleets.scanFailed"), description: t("fleets.scanFailedDesc"), variant: "destructive" });
@@ -300,11 +313,14 @@ export function AdminFleets() {
                       {fleet.papValue}
                     </TableCell>
                     <TableCell className="font-mono text-sm text-right text-muted-foreground">
-                      {fleet.isActive && liveCounts[fleet.id] !== undefined ? (
-                        <span className="text-primary font-bold">{liveCounts[fleet.id]}</span>
-                      ) : (
-                        fleet.participantCount || 0
-                      )}
+                      <div className="flex flex-col items-end gap-0.5">
+                        <span>{fleet.participantCount || 0}</span>
+                        {fleet.isActive && liveCounts[fleet.id] !== undefined && (
+                          <span className="text-[10px] text-primary/60">
+                            {liveCounts[fleet.id]} {t("fleets.inFleet")}
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       {fleet.isActive && (

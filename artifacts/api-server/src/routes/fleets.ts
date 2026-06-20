@@ -406,6 +406,13 @@ router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response)
     }
   }
 
+  const dryRun = req.query.dryRun === "true";
+
+  if (dryRun) {
+    res.json({ awarded: 0, skipped: 0, notFound: 0, esiMemberCount: members.length, autoRegistered: 0, dryRun: true });
+    return;
+  }
+
   const allCharacters = [...characters, ...autoRegisteredChars];
 
   let awarded = 0;

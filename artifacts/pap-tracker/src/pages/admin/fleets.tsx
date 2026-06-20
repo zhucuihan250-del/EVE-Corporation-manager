@@ -42,40 +42,31 @@ export function AdminFleets() {
   const fleetsRef = useRef(fleets);
   fleetsRef.current = fleets;
 
+  const [liveCounts, setLiveCounts] = useState<Record<number, number>>({});
+
   useEffect(() => {
     const autoScan = async () => {
       const activeFleets = (fleetsRef.current ?? []).filter(f => f.isActive && f.eveFleetId);
       for (const fleet of activeFleets) {
         try {
-          const resp = await fetch(`/api/fleets/${fleet.id}/scan`, {
+          const resp = await fetch(`/api/fleets/${fleet.id}/scan?dryRun=true`, {
             method: "POST",
             credentials: "include",
           });
           if (!resp.ok) continue;
-          const data = await resp.json() as { awarded: number; skipped: number; notFound: number; esiMemberCount?: number; autoRegistered?: number };
-          if (data.awarded > 0) {
-            toast({
-              title: t("fleets.scanComplete"),
-              description: t("fleets.scanCompleteDesc", {
-                esiMemberCount: data.esiMemberCount ?? 0,
-                awarded: data.awarded,
-                skipped: data.skipped,
-                notFound: data.notFound,
-                autoRegistered: data.autoRegistered ?? 0,
-              }),
-            });
-            queryClient.invalidateQueries({ queryKey: getListFleetsQueryKey() });
-          } else {
-            queryClient.invalidateQueries({ queryKey: getListFleetsQueryKey() });
+          const data = await resp.json() as { esiMemberCount?: number };
+          if (data.esiMemberCount !== undefined) {
+            setLiveCounts(prev => ({ ...prev, [fleet.id]: data.esiMemberCount! }));
           }
         } catch {
         }
       }
     };
 
+    autoScan();
     const interval = setInterval(autoScan, 60 * 1000);
     return () => clearInterval(interval);
-  }, [queryClient, t, toast]);
+  }, []);
 
   const activeScannableFleets = (fleets ?? []).filter(f => f.isActive && f.eveFleetId);
 
@@ -309,7 +300,11 @@ export function AdminFleets() {
                       {fleet.papValue}
                     </TableCell>
                     <TableCell className="font-mono text-sm text-right text-muted-foreground">
-                      {fleet.participantCount || 0}
+                      {fleet.isActive && liveCounts[fleet.id] !== undefined ? (
+                        <span className="text-primary font-bold">{liveCounts[fleet.id]}</span>
+                      ) : (
+                        fleet.participantCount || 0
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       {fleet.isActive && (

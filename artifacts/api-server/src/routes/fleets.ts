@@ -197,6 +197,12 @@ router.patch("/fleets/:id", requireAuth, async (req: Request, res: Response): Pr
   if (body.data.papValue !== undefined) updates.papValue = body.data.papValue;
   if (body.data.isActive !== undefined) updates.isActive = body.data.isActive;
   if (body.data.endedAt !== undefined) updates.endedAt = body.data.endedAt ? new Date(body.data.endedAt) : null;
+  if (body.data.eveFleetId !== undefined) updates.eveFleetId = body.data.eveFleetId ?? null;
+
+  if (Object.keys(updates).length === 0) {
+    res.status(400).json({ error: "No fields to update" });
+    return;
+  }
 
   const [fleet] = await db
     .update(fleetsTable)

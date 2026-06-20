@@ -13,4 +13,6 @@ export interface UpdateFleetBody {
   isActive?: boolean;
   /** @nullable */
   endedAt?: string | null;
+  /** @nullable */
+  eveFleetId?: string | null;
 }

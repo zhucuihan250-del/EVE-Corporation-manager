@@ -205,6 +205,7 @@ export const UpdateFleetBody = zod.object({
   papValue: zod.number().optional(),
   isActive: zod.boolean().optional(),
   endedAt: zod.string().nullish(),
+  eveFleetId: zod.string().nullish(),
 });
 
 export const UpdateFleetResponse = zod.object({

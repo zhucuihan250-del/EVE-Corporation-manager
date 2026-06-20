@@ -334,13 +334,13 @@ export function AdminUsers() {
           </DialogHeader>
           <div className="py-3">
             <Label className="text-xs tracking-widest text-muted-foreground mb-2 block">
-              输入角色名确认删除
+              输入 <span className="text-destructive font-bold">DELETE</span> 确认删除
             </Label>
             <Input
               value={deleteConfirmInput}
               onChange={(e) => setDeleteConfirmInput(e.target.value)}
               className="bg-background/50 border-destructive/40 rounded-sm font-mono text-sm"
-              placeholder={deleteTarget?.name ?? ""}
+              placeholder="DELETE"
             />
           </div>
           <DialogFooter>
@@ -348,7 +348,7 @@ export function AdminUsers() {
             <Button
               variant="destructive"
               onClick={handleDeleteUser}
-              disabled={deleteUser.isPending || deleteConfirmInput !== deleteTarget?.name}
+              disabled={deleteUser.isPending || deleteConfirmInput !== "DELETE"}
               className="rounded-sm text-xs tracking-wider"
             >
               {deleteUser.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : t("personnel.deleteUserConfirm")}

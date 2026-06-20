@@ -163,4 +163,40 @@ router.patch("/users/:id/pap", requireAuth, async (req: Request, res: Response):
   res.json({ success: true, message: "PAP adjusted" });
 });
 
+// DELETE /api/users/:id - completely remove a user and all their data (admin only)
+router.delete("/users/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
+  if (!currentUser || currentUser.role !== "admin") {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const targetId = parseInt(req.params.id, 10);
+  if (isNaN(targetId)) {
+    res.status(400).json({ error: "Invalid user ID" });
+    return;
+  }
+
+  if (targetId === req.session.userId) {
+    res.status(400).json({ error: "Cannot delete your own account" });
+    return;
+  }
+
+  const [target] = await db.select().from(usersTable).where(eq(usersTable.id, targetId));
+  if (!target) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  // Cascade delete: PAP records, redemptions, characters, then user
+  // (FK cascade handles most of this, but we log what's removed)
+  await db.delete(papRecordsTable).where(eq(papRecordsTable.userId, targetId));
+  await db.delete(redemptionsTable).where(eq(redemptionsTable.userId, targetId));
+  await db.delete(charactersTable).where(eq(charactersTable.userId, targetId));
+  await db.delete(usersTable).where(eq(usersTable.id, targetId));
+
+  req.log.info({ deletedUserId: targetId, name: target.eveCharacterName }, "Admin hard-deleted user and all their data");
+  res.json({ success: true });
+});
+
 export default router;

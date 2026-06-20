@@ -1,13 +1,12 @@
 import {
   useListUsers, useUpdateUserRole, useAdjustUserPap, getListUsersQueryKey,
-  useGetUserCharacters, useDeleteCharacter,
+  useGetUserCharacters, useDeleteCharacter, useDeleteUser,
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { format } from "date-fns";
-import { Loader2, ShieldAlert, Shield, MoreHorizontal, Activity, Users, Trash2, Star } from "lucide-react";
+import { Loader2, ShieldAlert, Shield, MoreHorizontal, Activity, Users, Trash2, Star, AlertTriangle } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +22,7 @@ export function AdminUsers() {
   const updateUserRole = useUpdateUserRole();
   const adjustPap = useAdjustUserPap();
   const deleteCharacter = useDeleteCharacter();
+  const deleteUser = useDeleteUser();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -34,6 +34,10 @@ export function AdminUsers() {
   const [charsModalOpen, setCharsModalOpen] = useState(false);
   const [charsUserId, setCharsUserId] = useState<number | null>(null);
   const [charsUserName, setCharsUserName] = useState("");
+
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState("");
 
   const { data: userCharacters, isLoading: charsLoading } = useGetUserCharacters(
     charsUserId ?? 0,
@@ -48,7 +52,7 @@ export function AdminUsers() {
         onSuccess: () => {
           toast({ title: t("personnel.roleUpdated"), description: t("personnel.roleUpdatedDesc") });
           queryClient.invalidateQueries({ queryKey: getListUsersQueryKey() });
-        }
+        },
       }
     );
   };
@@ -64,7 +68,7 @@ export function AdminUsers() {
           setAdjustModalOpen(false);
           setAdjustAmount("");
           setAdjustReason("");
-        }
+        },
       }
     );
   };
@@ -82,9 +86,34 @@ export function AdminUsers() {
         onSuccess: () => {
           toast({ title: t("personnel.charRemoved"), description: t("personnel.charRemovedDesc") });
           queryClient.invalidateQueries({ queryKey: ["userCharacters", charsUserId] });
+          queryClient.invalidateQueries({ queryKey: getListUsersQueryKey() });
         },
         onError: () => {
           toast({ title: t("personnel.charRemoveFailed"), variant: "destructive" });
+        },
+      }
+    );
+  };
+
+  const handleOpenDeleteModal = (userId: number, userName: string) => {
+    setDeleteTarget({ id: userId, name: userName });
+    setDeleteConfirmInput("");
+    setDeleteModalOpen(true);
+  };
+
+  const handleDeleteUser = () => {
+    if (!deleteTarget) return;
+    deleteUser.mutate(
+      { id: deleteTarget.id },
+      {
+        onSuccess: () => {
+          toast({ title: t("personnel.userDeleted"), description: t("personnel.userDeletedDesc") });
+          queryClient.invalidateQueries({ queryKey: getListUsersQueryKey() });
+          setDeleteModalOpen(false);
+          setDeleteTarget(null);
+        },
+        onError: () => {
+          toast({ title: t("personnel.userDeleteFailed"), variant: "destructive" });
         },
       }
     );
@@ -150,10 +179,7 @@ export function AdminUsers() {
                           <DropdownMenuLabel className="text-xs tracking-widest text-muted-foreground">{t("personnel.commands")}</DropdownMenuLabel>
                           <DropdownMenuSeparator className="bg-border/50" />
                           <DropdownMenuItem
-                            onClick={() => {
-                              setSelectedUser(user.id);
-                              setAdjustModalOpen(true);
-                            }}
+                            onClick={() => { setSelectedUser(user.id); setAdjustModalOpen(true); }}
                             className="text-xs cursor-pointer focus:bg-primary/20"
                           >
                             <Activity className="mr-2 h-4 w-4" />
@@ -173,6 +199,14 @@ export function AdminUsers() {
                             <Shield className="mr-2 h-4 w-4" />
                             <span>{t("personnel.toggleAdmin")}</span>
                           </DropdownMenuItem>
+                          <DropdownMenuSeparator className="bg-border/50" />
+                          <DropdownMenuItem
+                            onClick={() => handleOpenDeleteModal(user.id, user.eveCharacterName || String(user.id))}
+                            className="text-xs cursor-pointer text-destructive focus:bg-destructive/20 focus:text-destructive"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            <span>{t("personnel.deleteUser")}</span>
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -189,15 +223,11 @@ export function AdminUsers() {
         <DialogContent className="sm:max-w-[425px] bg-card border-primary/20 rounded-sm font-mono">
           <DialogHeader>
             <DialogTitle className="tracking-wider uppercase text-primary">{t("personnel.manualPapAdjustment")}</DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              {t("personnel.manualPapDesc")}
-            </DialogDescription>
+            <DialogDescription className="text-muted-foreground">{t("personnel.manualPapDesc")}</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="amount" className="text-right text-xs tracking-widest">
-                {t("personnel.amount")}
-              </Label>
+              <Label htmlFor="amount" className="text-right text-xs tracking-widest">{t("personnel.amount")}</Label>
               <Input
                 id="amount"
                 type="number"
@@ -208,9 +238,7 @@ export function AdminUsers() {
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="reason" className="text-right text-xs tracking-widest">
-                {t("personnel.reason")}
-              </Label>
+              <Label htmlFor="reason" className="text-right text-xs tracking-widest">{t("personnel.reason")}</Label>
               <Input
                 id="reason"
                 value={adjustReason}
@@ -236,15 +264,11 @@ export function AdminUsers() {
             <DialogTitle className="tracking-wider uppercase text-primary">
               {t("personnel.charactersTitle")} — {charsUserName}
             </DialogTitle>
-            <DialogDescription className="text-muted-foreground text-xs">
-              {t("personnel.charactersDesc")}
-            </DialogDescription>
+            <DialogDescription className="text-muted-foreground text-xs">{t("personnel.charactersDesc")}</DialogDescription>
           </DialogHeader>
           <div className="py-2">
             {charsLoading ? (
-              <div className="flex justify-center py-6">
-                <Loader2 className="w-5 h-5 animate-spin text-primary" />
-              </div>
+              <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-primary" /></div>
             ) : !userCharacters?.length ? (
               <p className="text-center text-muted-foreground text-sm py-6">{t("personnel.noCharacters")}</p>
             ) : (
@@ -260,18 +284,15 @@ export function AdminUsers() {
                 <TableBody>
                   {userCharacters.map((char) => (
                     <TableRow key={char.id} className="border-border/30 border-b last:border-0 hover:bg-primary/5">
-                      <TableCell className="font-mono text-sm text-foreground flex items-center gap-2">
-                        {char.isMain && <Star className="w-3 h-3 text-yellow-400 shrink-0" />}
-                        {char.eveCharacterName || `ID: ${char.eveCharacterId}`}
+                      <TableCell className="font-mono text-sm text-foreground">
+                        <span className="flex items-center gap-2">
+                          {char.isMain && <Star className="w-3 h-3 text-yellow-400 shrink-0" />}
+                          {char.eveCharacterName || `ID: ${char.eveCharacterId}`}
+                        </span>
                       </TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground">
-                        {char.corporationName || "—"}
-                      </TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">{char.corporationName || "—"}</TableCell>
                       <TableCell>
-                        <Badge
-                          variant={char.isMain ? "default" : "secondary"}
-                          className="font-mono text-[10px] rounded-sm"
-                        >
+                        <Badge variant={char.isMain ? "default" : "secondary"} className="font-mono text-[10px] rounded-sm">
                           {char.isMain ? t("personnel.mainChar") : t("personnel.altChar")}
                         </Badge>
                       </TableCell>
@@ -294,8 +315,43 @@ export function AdminUsers() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCharsModalOpen(false)} className="rounded-sm text-xs">
-              {t("personnel.cancel")}
+            <Button variant="outline" onClick={() => setCharsModalOpen(false)} className="rounded-sm text-xs">{t("personnel.cancel")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete User Confirmation Modal */}
+      <Dialog open={deleteModalOpen} onOpenChange={(open) => { setDeleteModalOpen(open); if (!open) setDeleteConfirmInput(""); }}>
+        <DialogContent className="sm:max-w-[460px] bg-card border-destructive/40 rounded-sm font-mono">
+          <DialogHeader>
+            <DialogTitle className="tracking-wider uppercase text-destructive flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" />
+              {t("personnel.deleteUserConfirmTitle", { name: deleteTarget?.name ?? "" })}
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-xs leading-relaxed">
+              {t("personnel.deleteUserConfirmDesc")}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-3">
+            <Label className="text-xs tracking-widest text-muted-foreground mb-2 block">
+              输入角色名确认删除
+            </Label>
+            <Input
+              value={deleteConfirmInput}
+              onChange={(e) => setDeleteConfirmInput(e.target.value)}
+              className="bg-background/50 border-destructive/40 rounded-sm font-mono text-sm"
+              placeholder={deleteTarget?.name ?? ""}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteModalOpen(false)} className="rounded-sm text-xs">{t("personnel.cancel")}</Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteUser}
+              disabled={deleteUser.isPending || deleteConfirmInput !== deleteTarget?.name}
+              className="rounded-sm text-xs tracking-wider"
+            >
+              {deleteUser.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : t("personnel.deleteUserConfirm")}
             </Button>
           </DialogFooter>
         </DialogContent>

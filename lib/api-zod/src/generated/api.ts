@@ -73,6 +73,18 @@ export const GetUserResponse = zod.object({
 });
 
 /**
+ * @summary Completely delete a user and all their data (admin only)
+ */
+export const DeleteUserParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const DeleteUserResponse = zod.object({
+  success: zod.boolean(),
+  message: zod.string().optional(),
+});
+
+/**
  * @summary Update user role (admin only)
  */
 export const UpdateUserRoleParams = zod.object({

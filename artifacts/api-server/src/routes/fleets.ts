@@ -222,9 +222,17 @@ router.patch("/fleets/:id", requireAuth, async (req: Request, res: Response): Pr
 });
 
 // POST /api/fleets/:id/scan - scan ESI fleet members and auto-award PAP
+// dryRun=true is available to all authenticated users (just returns member count)
+// PAP distribution requires admin role
 router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const dryRun = req.query.dryRun === "true";
+
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || currentUser.role !== "admin") {
+  if (!currentUser) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  if (!dryRun && currentUser.role !== "admin") {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -307,6 +315,12 @@ router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response)
 
   if (!members.length) {
     res.json({ awarded: 0, skipped: 0, notFound: 0, esiMemberCount: 0 });
+    return;
+  }
+
+  // dryRun: only return member count, skip all DB writes
+  if (dryRun) {
+    res.json({ awarded: 0, skipped: 0, notFound: 0, esiMemberCount: members.length, autoRegistered: 0, dryRun: true });
     return;
   }
 
@@ -404,13 +418,6 @@ router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response)
     } catch (err) {
       req.log.error({ err, charId }, "Failed to auto-register ESI character");
     }
-  }
-
-  const dryRun = req.query.dryRun === "true";
-
-  if (dryRun) {
-    res.json({ awarded: 0, skipped: 0, notFound: 0, esiMemberCount: members.length, autoRegistered: 0, dryRun: true });
-    return;
   }
 
   const allCharacters = [...characters, ...autoRegisteredChars];

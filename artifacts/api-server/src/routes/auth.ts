@@ -92,11 +92,42 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    // Find or create user by EVE character ID
+    // Find or create user by EVE character ID.
+    // First check usersTable (main character), then charactersTable (linked alt)
+    // to prevent alts from creating a separate account on direct login.
     let [user] = await db
       .select()
       .from(usersTable)
       .where(eq(usersTable.eveCharacterId, characterId));
+
+    if (!user) {
+      // Character may be a linked alt — look it up in the characters table
+      const [linkedChar] = await db
+        .select()
+        .from(charactersTable)
+        .where(eq(charactersTable.eveCharacterId, characterId));
+
+      if (linkedChar) {
+        // Log in as the owning main account instead of creating a new user
+        const [mainUser] = await db
+          .select()
+          .from(usersTable)
+          .where(eq(usersTable.id, linkedChar.userId));
+        if (mainUser) {
+          req.session.userId = mainUser.id;
+          req.session.save((err) => {
+            if (err) {
+              req.log.error({ err }, "Session save error (alt-as-main login)");
+              res.redirect("/?error=session");
+              return;
+            }
+            req.log.info({ altCharId: characterId, mainUserId: mainUser.id }, "Alt character login resolved to main account");
+            res.redirect("/");
+          });
+          return;
+        }
+      }
+    }
 
     if (!user) {
       // Check if there are any users (first user becomes admin)

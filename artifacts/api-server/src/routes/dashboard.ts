@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, usersTable, fleetsTable, papRecordsTable, redemptionsTable } from "@workspace/db";
-import { eq, desc, count, sql, and } from "drizzle-orm";
+import { eq, desc, count, sql, and, sum } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth";
 
 const router: IRouter = Router();
@@ -118,6 +118,36 @@ router.get("/dashboard/recent-fleets", requireAuth, async (req: Request, res: Re
     .limit(5);
 
   res.json(fleets);
+});
+
+// GET /api/dashboard/pap-history - daily PAP for last 30 days (current user)
+router.get("/dashboard/pap-history", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const userId = req.session.userId!;
+
+  const rows = await db.execute<{ date: string; pap: number }>(
+    sql`SELECT DATE(created_at)::text AS date, SUM(amount)::int AS pap
+        FROM pap_records
+        WHERE user_id = ${userId}
+          AND created_at >= NOW() - INTERVAL '30 days'
+          AND amount > 0
+        GROUP BY DATE(created_at)
+        ORDER BY date ASC`
+  );
+
+  const byDate: Record<string, number> = {};
+  for (const row of rows.rows) {
+    byDate[row.date] = row.pap;
+  }
+
+  const result: { date: string; pap: number }[] = [];
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    result.push({ date: key, pap: byDate[key] ?? 0 });
+  }
+
+  res.json(result);
 });
 
 export default router;

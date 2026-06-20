@@ -44,6 +44,9 @@ const en = {
       systemBroadcasts: "Fleet Notices",
       noActiveFleets: "No active fleet operations.",
       activeFleetSubtitle: "Active · Awaiting pilots",
+      papTrend: "PAP Trend · Last 30 Days",
+      noPapHistory: "No PAP recorded in the last 30 days.",
+      papUnit: "PAP",
     },
     history: {
       title: "Participation History",

@@ -1,11 +1,40 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useGetDashboardSummary, useGetRecentFleets, useListAnnouncements, useListFleets } from "@workspace/api-client-react";
 import { useLiveFleetCounts } from "@/hooks/use-live-fleet-counts";
-import { Target, Activity, Award, Trophy, Swords, Radio, CalendarClock, Shield, Users } from "lucide-react";
+import { Target, Activity, Award, Trophy, Swords, Radio, CalendarClock, Shield, Users, TrendingUp } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { useTranslation } from "react-i18next";
+import { useEffect, useState } from "react";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+
+type PapHistoryEntry = { date: string; pap: number };
+
+function usePapHistory() {
+  const [data, setData] = useState<PapHistoryEntry[] | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/dashboard/pap-history")
+      .then((r) => r.json())
+      .then((d) => { setData(d as PapHistoryEntry[]); })
+      .catch(() => setData([]))
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  return { data, isLoading };
+}
+
+function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: { value: number }[]; label?: string }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-card border border-border/50 rounded-sm px-3 py-2 font-mono text-xs shadow-lg">
+      <p className="text-muted-foreground">{label}</p>
+      <p className="text-primary font-bold">+{payload[0].value} PAP</p>
+    </div>
+  );
+}
 
 type RallyLevel = "MAX CTA" | "CTA" | "战略" | "散打";
 const RALLY_LEVEL_COLORS: Record<RallyLevel, string> = {
@@ -36,6 +65,12 @@ export function Dashboard() {
   const activeFleets = allFleets?.filter((f) => f.isActive) ?? [];
   const pastFleets = recentFleets?.filter((f) => !f.isActive) ?? [];
   const { liveCounts } = useLiveFleetCounts(activeFleets);
+  const { data: papHistory, isLoading: isPapHistoryLoading } = usePapHistory();
+  const hasAnyPap = papHistory?.some((d) => d.pap > 0);
+  const chartData = papHistory?.map((d) => ({
+    date: d.date.slice(5),
+    pap: d.pap,
+  }));
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -92,6 +127,59 @@ export function Dashboard() {
           </Card>
         </div>
       ) : null}
+
+      {/* PAP Trend Chart */}
+      <Card className="bg-card/20 border-border/50 rounded-sm">
+        <CardHeader className="border-b border-border/30 pb-3">
+          <CardTitle className="text-xs font-mono font-medium text-muted-foreground tracking-wider uppercase flex items-center justify-between">
+            <span>{t("dashboard.papTrend")}</span>
+            <TrendingUp className="w-4 h-4 text-primary" />
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-4 pb-2 px-2">
+          {isPapHistoryLoading ? (
+            <Skeleton className="h-32 w-full bg-card/50" />
+          ) : !hasAnyPap ? (
+            <div className="h-32 flex items-center justify-center text-muted-foreground font-mono text-sm">
+              {t("dashboard.noPapHistory")}
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={130}>
+              <AreaChart data={chartData} margin={{ top: 4, right: 8, left: -28, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="papGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontFamily: "monospace", fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  tickLine={false}
+                  axisLine={false}
+                  interval={4}
+                />
+                <YAxis
+                  tick={{ fontFamily: "monospace", fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  tickLine={false}
+                  axisLine={false}
+                  allowDecimals={false}
+                />
+                <Tooltip content={<CustomTooltip />} cursor={{ stroke: "hsl(var(--primary))", strokeWidth: 1, strokeDasharray: "4 2" }} />
+                <Area
+                  type="monotone"
+                  dataKey="pap"
+                  stroke="hsl(var(--primary))"
+                  strokeWidth={1.5}
+                  fill="url(#papGradient)"
+                  dot={false}
+                  activeDot={{ r: 3, fill: "hsl(var(--primary))", strokeWidth: 0 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Active Operations */}
       {(isActiveFleetsLoading || activeFleets.length > 0) && (

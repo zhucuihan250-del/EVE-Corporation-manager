@@ -44,6 +44,9 @@ const zh = {
       systemBroadcasts: "舰队预告",
       noActiveFleets: "暂无活跃舰队行动。",
       activeFleetSubtitle: "进行中 · 等待飞行员",
+      papTrend: "近期 PAP 变化 · 近30天",
+      noPapHistory: "近30天内暂无 PAP 记录。",
+      papUnit: "PAP",
     },
     history: {
       title: "参与历史",

@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, usersTable, charactersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { getAuthorizationUrl, exchangeCode, getCharacterInfo, getCorporationName } from "../lib/eve-sso";
+import { getAuthorizationUrl, getLinkAltAuthorizationUrl, exchangeCode, getCharacterInfo, getCorporationName } from "../lib/eve-sso";
 import { requireAuth } from "../middlewares/auth";
 import { logger } from "../lib/logger";
 
@@ -34,7 +34,7 @@ router.get("/auth/eve/link-alt", requireAuth, (req: Request, res: Response): voi
     }
     const callbackUrl = getCallbackUrl(req);
     req.log.info({ callbackUrl, userId: req.session.linkingUserId }, "Starting alt character link via EVE SSO");
-    const url = getAuthorizationUrl(callbackUrl);
+    const url = getLinkAltAuthorizationUrl(callbackUrl);
     res.redirect(url);
   });
 });

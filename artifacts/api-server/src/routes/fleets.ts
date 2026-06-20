@@ -358,7 +358,25 @@ router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response)
           .select()
           .from(charactersTable)
           .where(and(eq(charactersTable.userId, existingUser.id), eq(charactersTable.eveCharacterId, charId)));
-        if (existingChar) autoRegisteredChars.push(existingChar);
+        if (existingChar) {
+          autoRegisteredChars.push(existingChar);
+        } else {
+          // User exists in users table but is missing a characters record.
+          // Create the missing record so PAP reaches the correct account.
+          const [fixedChar] = await db
+            .insert(charactersTable)
+            .values({
+              userId: existingUser.id,
+              eveCharacterId: charId,
+              eveCharacterName: existingUser.eveCharacterName,
+              corporationId: existingUser.corporationId,
+              corporationName: existingUser.corporationName,
+              isMain: true,
+            })
+            .returning();
+          autoRegisteredChars.push(fixedChar);
+          req.log.info({ charId, userId: existingUser.id }, "Repaired missing characters record for existing user");
+        }
         continue;
       }
 

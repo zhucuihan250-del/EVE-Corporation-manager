@@ -145,6 +145,39 @@ export const ListAllCharactersResponse = zod.array(
 );
 
 /**
+ * @summary Delete a character record (admin only)
+ */
+export const DeleteCharacterParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const DeleteCharacterResponse = zod.object({
+  success: zod.boolean(),
+  message: zod.string().optional(),
+});
+
+/**
+ * @summary Get all characters for a specific user (admin only)
+ */
+export const GetUserCharactersParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetUserCharactersResponseItem = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  eveCharacterId: zod.number(),
+  eveCharacterName: zod.string(),
+  corporationId: zod.number().nullish(),
+  corporationName: zod.string().nullish(),
+  isMain: zod.boolean(),
+  createdAt: zod.coerce.date(),
+});
+export const GetUserCharactersResponse = zod.array(
+  GetUserCharactersResponseItem,
+);
+
+/**
  * @summary List all fleets
  */
 export const ListFleetsResponseItem = zod.object({

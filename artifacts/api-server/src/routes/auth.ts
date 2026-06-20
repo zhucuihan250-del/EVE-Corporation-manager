@@ -97,9 +97,15 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
 
       if (existingChar) {
         if (existingChar.userId === mainUserId) {
-          // Already linked to this exact account
+          // Already linked to this account — overwrite name/corp in case it changed
+          await db.update(charactersTable).set({
+            eveCharacterName: characterName,
+            corporationId,
+            corporationName,
+          }).where(eq(charactersTable.id, existingChar.id));
+          req.log.info({ charId: characterId, mainUserId }, "Re-linked character updated");
           req.session.save(() => {});
-          res.redirect("/characters?error=already_linked");
+          res.redirect("/characters?linked=true");
           return;
         }
         // Belongs to a different user — check if it is an orphan (auto-registered, no access token)

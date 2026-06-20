@@ -193,6 +193,46 @@ paths:
                 items:
                   $ref: "#/components/schemas/Character"
 
+  /characters/{id}:
+    delete:
+      operationId: deleteCharacter
+      tags: [characters]
+      summary: Delete a character record (admin only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Character deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /admin/users/{id}/characters:
+    get:
+      operationId: getUserCharacters
+      tags: [characters]
+      summary: Get all characters for a specific user (admin only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of characters for the user
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Character"
+
   /fleets:
     get:
       operationId: listFleets

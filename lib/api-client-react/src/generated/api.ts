@@ -740,6 +740,177 @@ export function useListAllCharacters<
 }
 
 /**
+ * @summary Delete a character record (admin only)
+ */
+export const getDeleteCharacterUrl = (id: number) => {
+  return `/api/characters/${id}`;
+};
+
+export const deleteCharacter = async (
+  id: number,
+  options?: RequestInit,
+): Promise<SuccessResponse> => {
+  return customFetch<SuccessResponse>(getDeleteCharacterUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteCharacterMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteCharacter>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteCharacter>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteCharacter"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteCharacter>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteCharacter(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteCharacterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteCharacter>>
+>;
+
+export type DeleteCharacterMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete a character record (admin only)
+ */
+export const useDeleteCharacter = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteCharacter>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteCharacter>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteCharacterMutationOptions(options));
+};
+
+/**
+ * @summary Get all characters for a specific user (admin only)
+ */
+export const getGetUserCharactersUrl = (id: number) => {
+  return `/api/admin/users/${id}/characters`;
+};
+
+export const getUserCharacters = async (
+  id: number,
+  options?: RequestInit,
+): Promise<Character[]> => {
+  return customFetch<Character[]>(getGetUserCharactersUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetUserCharactersQueryKey = (id: number) => {
+  return [`/api/admin/users/${id}/characters`] as const;
+};
+
+export const getGetUserCharactersQueryOptions = <
+  TData = Awaited<ReturnType<typeof getUserCharacters>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getUserCharacters>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetUserCharactersQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getUserCharacters>>
+  > = ({ signal }) => getUserCharacters(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getUserCharacters>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetUserCharactersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getUserCharacters>>
+>;
+export type GetUserCharactersQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get all characters for a specific user (admin only)
+ */
+
+export function useGetUserCharacters<
+  TData = Awaited<ReturnType<typeof getUserCharacters>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getUserCharacters>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetUserCharactersQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
  * @summary List all fleets
  */
 export const getListFleetsUrl = () => {

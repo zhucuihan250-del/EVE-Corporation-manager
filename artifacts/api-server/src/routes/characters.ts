@@ -45,4 +45,60 @@ router.get("/characters/all", requireAuth, async (req: Request, res: Response): 
   })));
 });
 
+// GET /api/admin/users/:id/characters - get all characters for a specific user (admin only)
+router.get("/admin/users/:id/characters", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
+  if (!currentUser || currentUser.role !== "admin") {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const targetId = parseInt(req.params.id, 10);
+  if (isNaN(targetId)) {
+    res.status(400).json({ error: "Invalid user ID" });
+    return;
+  }
+
+  const chars = await db
+    .select()
+    .from(charactersTable)
+    .where(eq(charactersTable.userId, targetId));
+
+  res.json(chars.map(c => ({
+    id: c.id,
+    userId: c.userId,
+    eveCharacterId: c.eveCharacterId,
+    eveCharacterName: c.eveCharacterName,
+    corporationId: c.corporationId,
+    corporationName: c.corporationName,
+    isMain: c.isMain,
+    createdAt: c.createdAt,
+  })));
+});
+
+// DELETE /api/characters/:id - admin only, remove a character record
+router.delete("/characters/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
+  if (!currentUser || currentUser.role !== "admin") {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const charId = parseInt(req.params.id, 10);
+  if (isNaN(charId)) {
+    res.status(400).json({ error: "Invalid character ID" });
+    return;
+  }
+
+  const [char] = await db.select().from(charactersTable).where(eq(charactersTable.id, charId));
+  if (!char) {
+    res.status(404).json({ error: "Character not found" });
+    return;
+  }
+
+  await db.delete(charactersTable).where(eq(charactersTable.id, charId));
+  req.log.info({ charId, eveCharacterId: char.eveCharacterId, userId: char.userId }, "Admin deleted character record");
+  res.json({ success: true });
+});
+
 export default router;

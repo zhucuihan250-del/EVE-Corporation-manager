@@ -45,7 +45,7 @@ export function AdminFleets() {
   const [updatingFleetId, setUpdatingFleetId] = useState<number | null>(null);
   const [standingDownId, setStandingDownId] = useState<number | null>(null);
 
-  const liveCounts = useLiveFleetCounts(fleets);
+  const { liveCounts, scanFleet: scanFleetLive } = useLiveFleetCounts(fleets);
 
   const invalidateAfterScan = () => {
     queryClient.invalidateQueries({ queryKey: getListFleetsQueryKey() });
@@ -185,34 +185,20 @@ export function AdminFleets() {
     );
   };
 
-  const handleScanFleet = (fleetId: number, hasEveId: boolean) => {
+  const handleScanFleet = async (fleetId: number, hasEveId: boolean) => {
     if (!hasEveId) {
       toast({ title: t("fleets.scanFailed"), description: t("fleets.noEveFleetId"), variant: "destructive" });
       return;
     }
     setScanningId(fleetId);
-    scanFleet.mutate(
-      { id: fleetId },
-      {
-        onSuccess: (data) => {
-          toast({
-            title: t("fleets.scanComplete"),
-            description: t("fleets.scanCompleteDesc", {
-              esiMemberCount: data.esiMemberCount ?? 0,
-              awarded: data.awarded,
-              skipped: data.skipped,
-              notFound: data.notFound,
-              autoRegistered: (data as { autoRegistered?: number }).autoRegistered ?? 0,
-            }),
-          });
-          invalidateAfterScan();
-        },
-        onError: () => {
-          toast({ title: t("fleets.scanFailed"), description: t("fleets.scanFailedDesc"), variant: "destructive" });
-        },
-        onSettled: () => setScanningId(null),
-      }
-    );
+    try {
+      const count = await scanFleetLive(fleetId);
+      toast({ title: t("fleets.scanComplete"), description: t("fleets.scanCountDesc", { count }) });
+    } catch {
+      toast({ title: t("fleets.scanFailed"), description: t("fleets.scanFailedDesc"), variant: "destructive" });
+    } finally {
+      setScanningId(null);
+    }
   };
 
   return (

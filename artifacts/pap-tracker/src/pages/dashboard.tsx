@@ -35,7 +35,7 @@ export function Dashboard() {
 
   const activeFleets = allFleets?.filter((f) => f.isActive) ?? [];
   const pastFleets = recentFleets?.filter((f) => !f.isActive) ?? [];
-  const liveCounts = useLiveFleetCounts(activeFleets);
+  const { liveCounts } = useLiveFleetCounts(activeFleets);
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">

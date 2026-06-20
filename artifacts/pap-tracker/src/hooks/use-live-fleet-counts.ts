@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 type Fleet = { id: number; isActive: boolean; eveFleetId?: string | null };
 
@@ -7,20 +7,25 @@ export function useLiveFleetCounts(fleets: Fleet[] | undefined) {
   const fleetsRef = useRef(fleets);
   fleetsRef.current = fleets;
 
+  const scanFleet = useCallback(async (fleetId: number) => {
+    const resp = await fetch(`/api/fleets/${fleetId}/scan?dryRun=true`, {
+      method: "POST",
+      credentials: "include",
+    });
+    if (!resp.ok) throw new Error("ESI scan failed");
+    const data = await resp.json() as { esiMemberCount?: number };
+    if (data.esiMemberCount !== undefined) {
+      setLiveCounts(prev => ({ ...prev, [fleetId]: data.esiMemberCount! }));
+    }
+    return data.esiMemberCount ?? 0;
+  }, []);
+
   useEffect(() => {
     const autoScan = async () => {
       const activeFleets = (fleetsRef.current ?? []).filter(f => f.isActive && f.eveFleetId);
       for (const fleet of activeFleets) {
         try {
-          const resp = await fetch(`/api/fleets/${fleet.id}/scan?dryRun=true`, {
-            method: "POST",
-            credentials: "include",
-          });
-          if (!resp.ok) continue;
-          const data = await resp.json() as { esiMemberCount?: number };
-          if (data.esiMemberCount !== undefined) {
-            setLiveCounts(prev => ({ ...prev, [fleet.id]: data.esiMemberCount! }));
-          }
+          await scanFleet(fleet.id);
         } catch {
         }
       }
@@ -29,7 +34,7 @@ export function useLiveFleetCounts(fleets: Fleet[] | undefined) {
     autoScan();
     const interval = setInterval(autoScan, 60 * 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [scanFleet]);
 
-  return liveCounts;
+  return { liveCounts, scanFleet };
 }

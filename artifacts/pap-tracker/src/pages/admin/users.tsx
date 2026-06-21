@@ -1,14 +1,14 @@
 import {
   useListUsers, useUpdateUserRole, useAdjustUserPap, getListUsersQueryKey,
-  useGetUserCharacters, useDeleteCharacter, useDeleteUser,
+  useGetUserCharacters, useDeleteCharacter, useDeleteUser, useGetMe,
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, ShieldAlert, Shield, MoreHorizontal, Activity, Users, Trash2, Star, AlertTriangle } from "lucide-react";
+import { Loader2, ShieldAlert, Shield, MoreHorizontal, Activity, Users, Trash2, Star, AlertTriangle, Crown, Sword } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -16,8 +16,38 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useTranslation } from "react-i18next";
 
+const ROLE_LEVELS = ["member", "fc", "admin", "controller"] as const;
+type Role = typeof ROLE_LEVELS[number];
+
+function hasRole(userRole: string, minRole: Role): boolean {
+  return ROLE_LEVELS.indexOf(userRole as Role) >= ROLE_LEVELS.indexOf(minRole);
+}
+
+const ROLE_CONFIG: Record<Role, { label: string; color: string; icon: React.ReactNode }> = {
+  member:     { label: "MEMBER",     color: "secondary",    icon: <Shield className="w-3 h-3" /> },
+  fc:         { label: "FC",         color: "outline-blue", icon: <Sword className="w-3 h-3" /> },
+  admin:      { label: "ADMIN",      color: "destructive",  icon: <ShieldAlert className="w-3 h-3" /> },
+  controller: { label: "CONTROLLER", color: "controller",   icon: <Crown className="w-3 h-3" /> },
+};
+
+function RoleBadge({ role }: { role: string }) {
+  const cfg = ROLE_CONFIG[role as Role] ?? ROLE_CONFIG.member;
+  const colorClass =
+    role === "controller" ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/40" :
+    role === "admin"      ? "bg-destructive/20 text-destructive border-destructive/40" :
+    role === "fc"         ? "bg-blue-500/20 text-blue-400 border-blue-500/40" :
+                            "bg-secondary/40 text-muted-foreground border-border/40";
+  return (
+    <span className={`inline-flex items-center gap-1 font-mono text-[10px] px-2 py-0.5 rounded-sm border ${colorClass}`}>
+      {cfg.icon}
+      {cfg.label}
+    </span>
+  );
+}
+
 export function AdminUsers() {
   const { t } = useTranslation();
+  const { data: me } = useGetMe();
   const { data: users, isLoading } = useListUsers({ query: { queryKey: ["adminUsers"] } });
   const updateUserRole = useUpdateUserRole();
   const adjustPap = useAdjustUserPap();
@@ -25,6 +55,8 @@ export function AdminUsers() {
   const deleteUser = useDeleteUser();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  const amController = me ? hasRole(me.role, "controller") : false;
 
   const [adjustModalOpen, setAdjustModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<number | null>(null);
@@ -44,14 +76,20 @@ export function AdminUsers() {
     { query: { enabled: !!charsUserId && charsModalOpen, queryKey: ["userCharacters", charsUserId] } },
   );
 
-  const handleRoleToggle = (userId: number, currentRole: 'admin' | 'member') => {
-    const newRole = currentRole === 'admin' ? 'member' : 'admin';
+  const handleRoleChange = (userId: number, newRole: Role) => {
+    if (!amController) {
+      toast({ title: t("personnel.roleChangeControllerOnly"), variant: "destructive" });
+      return;
+    }
     updateUserRole.mutate(
       { id: userId, data: { role: newRole } },
       {
         onSuccess: () => {
           toast({ title: t("personnel.roleUpdated"), description: t("personnel.roleUpdatedDesc") });
           queryClient.invalidateQueries({ queryKey: getListUsersQueryKey() });
+        },
+        onError: () => {
+          toast({ title: t("personnel.roleChangeControllerOnly"), variant: "destructive" });
         },
       }
     );
@@ -157,10 +195,7 @@ export function AdminUsers() {
                       {user.eveCharacterName || `Unknown (ID: ${user.eveCharacterId})`}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={user.role === 'admin' ? 'destructive' : 'secondary'} className="font-mono text-[10px] rounded-sm flex w-fit items-center gap-1">
-                        {user.role === 'admin' ? <ShieldAlert className="w-3 h-3" /> : <Shield className="w-3 h-3" />}
-                        {user.role.toUpperCase()}
-                      </Badge>
+                      <RoleBadge role={user.role} />
                     </TableCell>
                     <TableCell className="font-mono font-bold text-right text-muted-foreground">
                       {user.totalPap}
@@ -192,13 +227,26 @@ export function AdminUsers() {
                             <Users className="mr-2 h-4 w-4" />
                             <span>{t("personnel.manageCharacters")}</span>
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleRoleToggle(user.id, user.role)}
-                            className="text-xs cursor-pointer focus:bg-primary/20"
-                          >
-                            <Shield className="mr-2 h-4 w-4" />
-                            <span>{t("personnel.toggleAdmin")}</span>
-                          </DropdownMenuItem>
+                          {amController && (
+                            <DropdownMenuSub>
+                              <DropdownMenuSubTrigger className="text-xs cursor-pointer focus:bg-primary/20">
+                                <Crown className="mr-2 h-4 w-4 text-yellow-400" />
+                                <span>{t("personnel.toggleAdmin")}</span>
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuSubContent className="bg-card border-border/50 rounded-sm font-mono">
+                                {ROLE_LEVELS.map((r) => (
+                                  <DropdownMenuItem
+                                    key={r}
+                                    onClick={() => handleRoleChange(user.id, r)}
+                                    className={`text-xs cursor-pointer focus:bg-primary/20 ${user.role === r ? "opacity-50 pointer-events-none" : ""}`}
+                                  >
+                                    <RoleBadge role={r} />
+                                    {user.role === r && <span className="ml-2 text-muted-foreground">✓</span>}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuSubContent>
+                            </DropdownMenuSub>
+                          )}
                           <DropdownMenuSeparator className="bg-border/50" />
                           <DropdownMenuItem
                             onClick={() => handleOpenDeleteModal(user.id, user.eveCharacterName || String(user.id))}

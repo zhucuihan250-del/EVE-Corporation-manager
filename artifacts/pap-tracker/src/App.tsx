@@ -32,17 +32,24 @@ const queryClient = new QueryClient({
   },
 });
 
-function ProtectedRoute({ component: Component, adminOnly = false }: { component: any, adminOnly?: boolean }) {
+const ROLE_LEVELS = ["member", "fc", "admin", "controller"] as const;
+type Role = typeof ROLE_LEVELS[number];
+
+function hasRole(userRole: string, minRole: Role): boolean {
+  return ROLE_LEVELS.indexOf(userRole as Role) >= ROLE_LEVELS.indexOf(minRole);
+}
+
+function ProtectedRoute({ component: Component, minRole }: { component: any, minRole?: Role }) {
   const { data: user, isLoading, isError } = useGetMe();
   const [, setLocation] = useLocation();
 
   useEffect(() => {
     if (!isLoading && (isError || !user)) {
       setLocation("/");
-    } else if (!isLoading && user && adminOnly && user.role !== 'admin') {
+    } else if (!isLoading && user && minRole && !hasRole(user.role, minRole)) {
       setLocation("/dashboard");
     }
-  }, [isLoading, isError, user, setLocation, adminOnly]);
+  }, [isLoading, isError, user, setLocation, minRole]);
 
   if (isLoading) {
     return (
@@ -52,7 +59,7 @@ function ProtectedRoute({ component: Component, adminOnly = false }: { component
     );
   }
 
-  if (isError || !user || (adminOnly && user.role !== 'admin')) {
+  if (isError || !user || (minRole && !hasRole(user.role, minRole))) {
     return null;
   }
 
@@ -83,27 +90,28 @@ function Router() {
         {() => <ProtectedRoute component={Characters} />}
       </Route>
       
-      {/* Admin Routes */}
+      {/* Admin Routes - admin & controller only */}
       <Route path="/admin">
-        {() => <ProtectedRoute component={AdminDashboard} adminOnly />}
+        {() => <ProtectedRoute component={AdminDashboard} minRole="admin" />}
       </Route>
       <Route path="/admin/users">
-        {() => <ProtectedRoute component={AdminUsers} adminOnly />}
-      </Route>
-      <Route path="/admin/fleets">
-        {() => <ProtectedRoute component={AdminFleets} adminOnly />}
+        {() => <ProtectedRoute component={AdminUsers} minRole="admin" />}
       </Route>
       <Route path="/admin/rewards">
-        {() => <ProtectedRoute component={AdminRewards} adminOnly />}
+        {() => <ProtectedRoute component={AdminRewards} minRole="admin" />}
       </Route>
       <Route path="/admin/redemptions">
-        {() => <ProtectedRoute component={AdminRedemptions} adminOnly />}
+        {() => <ProtectedRoute component={AdminRedemptions} minRole="admin" />}
       </Route>
       <Route path="/admin/pap">
-        {() => <ProtectedRoute component={AdminPap} adminOnly />}
+        {() => <ProtectedRoute component={AdminPap} minRole="admin" />}
+      </Route>
+      {/* FC Routes - fc, admin & controller */}
+      <Route path="/admin/fleets">
+        {() => <ProtectedRoute component={AdminFleets} minRole="fc" />}
       </Route>
       <Route path="/admin/announcements">
-        {() => <ProtectedRoute component={AdminAnnouncements} adminOnly />}
+        {() => <ProtectedRoute component={AdminAnnouncements} minRole="fc" />}
       </Route>
       
       <Route component={NotFound} />

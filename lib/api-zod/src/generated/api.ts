@@ -23,7 +23,7 @@ export const GetMeResponse = zod.object({
   eveCharacterName: zod.string().nullish(),
   corporationId: zod.number().nullish(),
   corporationName: zod.string().nullish(),
-  role: zod.enum(["member", "admin"]),
+  role: zod.enum(["member", "fc", "admin", "controller"]),
   totalPap: zod.number(),
   redeemablePap: zod.number(),
   createdAt: zod.coerce.date(),
@@ -46,7 +46,7 @@ export const ListUsersResponseItem = zod.object({
   eveCharacterName: zod.string().nullish(),
   corporationId: zod.number().nullish(),
   corporationName: zod.string().nullish(),
-  role: zod.enum(["member", "admin"]),
+  role: zod.enum(["member", "fc", "admin", "controller"]),
   totalPap: zod.number(),
   redeemablePap: zod.number(),
   createdAt: zod.coerce.date(),
@@ -66,7 +66,7 @@ export const GetUserResponse = zod.object({
   eveCharacterName: zod.string().nullish(),
   corporationId: zod.number().nullish(),
   corporationName: zod.string().nullish(),
-  role: zod.enum(["member", "admin"]),
+  role: zod.enum(["member", "fc", "admin", "controller"]),
   totalPap: zod.number(),
   redeemablePap: zod.number(),
   createdAt: zod.coerce.date(),
@@ -92,7 +92,7 @@ export const UpdateUserRoleParams = zod.object({
 });
 
 export const UpdateUserRoleBody = zod.object({
-  role: zod.enum(["member", "admin"]),
+  role: zod.enum(["member", "fc", "admin", "controller"]),
 });
 
 export const UpdateUserRoleResponse = zod.object({
@@ -101,7 +101,7 @@ export const UpdateUserRoleResponse = zod.object({
   eveCharacterName: zod.string().nullish(),
   corporationId: zod.number().nullish(),
   corporationName: zod.string().nullish(),
-  role: zod.enum(["member", "admin"]),
+  role: zod.enum(["member", "fc", "admin", "controller"]),
   totalPap: zod.number(),
   redeemablePap: zod.number(),
   createdAt: zod.coerce.date(),

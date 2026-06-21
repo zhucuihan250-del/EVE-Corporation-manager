@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, rewardsTable, usersTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
-import { requireAuth } from "../middlewares/auth";
+import { requireAuth, hasRole } from "../middlewares/auth";
 import {
   CreateRewardBody,
   UpdateRewardParams,
@@ -20,7 +20,7 @@ router.get("/rewards", requireAuth, async (req: Request, res: Response): Promise
 // POST /api/rewards - admin only
 router.post("/rewards", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || currentUser.role !== "admin") {
+  if (!currentUser || !hasRole(currentUser.role, "admin")) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -48,7 +48,7 @@ router.post("/rewards", requireAuth, async (req: Request, res: Response): Promis
 // PATCH /api/rewards/:id - admin only
 router.patch("/rewards/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || currentUser.role !== "admin") {
+  if (!currentUser || !hasRole(currentUser.role, "admin")) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -89,7 +89,7 @@ router.patch("/rewards/:id", requireAuth, async (req: Request, res: Response): P
 // DELETE /api/rewards/:id - admin only
 router.delete("/rewards/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || currentUser.role !== "admin") {
+  if (!currentUser || !hasRole(currentUser.role, "admin")) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }

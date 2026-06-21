@@ -2,7 +2,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { db, fleetsTable, usersTable, papRecordsTable, charactersTable } from "@workspace/db";
 import { eq, desc, sql, inArray, and, count } from "drizzle-orm";
 import { refreshAccessToken } from "../lib/eve-sso";
-import { requireAuth } from "../middlewares/auth";
+import { requireAuth, hasRole } from "../middlewares/auth";
 import {
   CreateFleetBody,
   GetFleetParams,
@@ -44,7 +44,7 @@ router.get("/fleets", requireAuth, async (req: Request, res: Response): Promise<
 // POST /api/fleets - admin only
 router.post("/fleets", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || currentUser.role !== "admin") {
+  if (!currentUser || !hasRole(currentUser.role, "fc")) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -177,7 +177,7 @@ router.get("/fleets/:id", requireAuth, async (req: Request, res: Response): Prom
 // PATCH /api/fleets/:id - admin only
 router.patch("/fleets/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || currentUser.role !== "admin") {
+  if (!currentUser || !hasRole(currentUser.role, "fc")) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -232,7 +232,7 @@ router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response)
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
-  if (!dryRun && currentUser.role !== "admin") {
+  if (!dryRun && !hasRole(currentUser.role, "fc")) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -473,7 +473,7 @@ router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response)
 // DELETE /api/fleets/:id - admin only
 router.delete("/fleets/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || currentUser.role !== "admin") {
+  if (!currentUser || !hasRole(currentUser.role, "fc")) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -491,7 +491,7 @@ router.delete("/fleets/:id", requireAuth, async (req: Request, res: Response): P
 // POST /api/fleets/:id/participants - add participant and award PAP
 router.post("/fleets/:id/participants", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || currentUser.role !== "admin") {
+  if (!currentUser || !hasRole(currentUser.role, "fc")) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }

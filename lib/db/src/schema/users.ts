@@ -11,7 +11,7 @@ export const usersTable = pgTable("users", {
   accessToken: text("access_token"),
   refreshToken: text("refresh_token"),
   tokenExpiry: timestamp("token_expiry", { withTimezone: true }),
-  role: text("role", { enum: ["member", "admin"] }).notNull().default("member"),
+  role: text("role", { enum: ["member", "fc", "admin", "controller"] }).notNull().default("member"),
   totalPap: real("total_pap").notNull().default(0),
   redeemablePap: real("redeemable_pap").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

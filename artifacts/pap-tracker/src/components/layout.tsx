@@ -55,7 +55,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
     localStorage.setItem("pap-lang", next);
   };
 
-  const isAdmin = user?.role === 'admin';
+  const ROLE_LEVELS = ["member", "fc", "admin", "controller"] as const;
+  type Role = typeof ROLE_LEVELS[number];
+  const hasRole = (minRole: Role) =>
+    user ? ROLE_LEVELS.indexOf(user.role as Role) >= ROLE_LEVELS.indexOf(minRole) : false;
+  const isAdmin = hasRole("admin");
+  const isFc = hasRole("fc");
+  const isController = hasRole("controller");
 
   return (
     <SidebarProvider>
@@ -116,27 +122,34 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </SidebarGroupContent>
             </SidebarGroup>
 
-            {isAdmin && (
+            {isFc && (
               <SidebarGroup>
-                <SidebarGroupLabel className="text-xs uppercase tracking-widest text-primary font-mono">{t("nav.command")}</SidebarGroupLabel>
+                <SidebarGroupLabel className="text-xs uppercase tracking-widest text-primary font-mono">
+                  {t("nav.command")}
+                  {isController && <span className="ml-1 text-yellow-400">★</span>}
+                </SidebarGroupLabel>
                 <SidebarGroupContent>
                   <SidebarMenu>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={location === "/admin"}>
-                        <Link href="/admin" className="font-mono flex items-center gap-3">
-                          <Database className="w-4 h-4" />
-                          <span>{t("nav.overview")}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={location.startsWith("/admin/users")}>
-                        <Link href="/admin/users" className="font-mono flex items-center gap-3">
-                          <Users className="w-4 h-4" />
-                          <span>{t("nav.personnel")}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
+                    {isAdmin && (
+                      <>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild isActive={location === "/admin"}>
+                            <Link href="/admin" className="font-mono flex items-center gap-3">
+                              <Database className="w-4 h-4" />
+                              <span>{t("nav.overview")}</span>
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild isActive={location.startsWith("/admin/users")}>
+                            <Link href="/admin/users" className="font-mono flex items-center gap-3">
+                              <Users className="w-4 h-4" />
+                              <span>{t("nav.personnel")}</span>
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      </>
+                    )}
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild isActive={location.startsWith("/admin/fleets")}>
                         <Link href="/admin/fleets" className="font-mono flex items-center gap-3">
@@ -153,30 +166,34 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={location.startsWith("/admin/rewards")}>
-                        <Link href="/admin/rewards" className="font-mono flex items-center gap-3">
-                          <Gift className="w-4 h-4" />
-                          <span>{t("nav.rewards")}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={location.startsWith("/admin/redemptions")}>
-                        <Link href="/admin/redemptions" className="font-mono flex items-center gap-3">
-                          <Inbox className="w-4 h-4" />
-                          <span>{t("nav.requisitions")}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={location.startsWith("/admin/pap")}>
-                        <Link href="/admin/pap" className="font-mono flex items-center gap-3">
-                          <BookOpen className="w-4 h-4" />
-                          <span>{t("nav.papLedger")}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
+                    {isAdmin && (
+                      <>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild isActive={location.startsWith("/admin/rewards")}>
+                            <Link href="/admin/rewards" className="font-mono flex items-center gap-3">
+                              <Gift className="w-4 h-4" />
+                              <span>{t("nav.rewards")}</span>
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild isActive={location.startsWith("/admin/redemptions")}>
+                            <Link href="/admin/redemptions" className="font-mono flex items-center gap-3">
+                              <Inbox className="w-4 h-4" />
+                              <span>{t("nav.requisitions")}</span>
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild isActive={location.startsWith("/admin/pap")}>
+                            <Link href="/admin/pap" className="font-mono flex items-center gap-3">
+                              <BookOpen className="w-4 h-4" />
+                              <span>{t("nav.papLedger")}</span>
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      </>
+                    )}
                   </SidebarMenu>
                 </SidebarGroupContent>
               </SidebarGroup>

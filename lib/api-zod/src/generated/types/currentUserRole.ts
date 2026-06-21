@@ -11,5 +11,7 @@ export type CurrentUserRole =
 
 export const CurrentUserRole = {
   member: "member",
+  fc: "fc",
   admin: "admin",
+  controller: "controller",
 } as const;

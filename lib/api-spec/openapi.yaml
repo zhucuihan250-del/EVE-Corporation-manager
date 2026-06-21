@@ -746,7 +746,7 @@ components:
           type: ["string", "null"]
         role:
           type: string
-          enum: [member, admin]
+          enum: [member, fc, admin, controller]
         totalPap:
           type: number
         redeemablePap:
@@ -776,7 +776,7 @@ components:
           type: ["string", "null"]
         role:
           type: string
-          enum: [member, admin]
+          enum: [member, fc, admin, controller]
         totalPap:
           type: number
         redeemablePap:
@@ -796,7 +796,7 @@ components:
       properties:
         role:
           type: string
-          enum: [member, admin]
+          enum: [member, fc, admin, controller]
       required:
         - role
 

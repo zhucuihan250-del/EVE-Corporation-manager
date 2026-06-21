@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, usersTable, papRecordsTable, charactersTable, redemptionsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
-import { requireAuth } from "../middlewares/auth";
+import { requireAuth, hasRole } from "../middlewares/auth";
 import {
   UpdateUserRoleParams,
   UpdateUserRoleBody,
@@ -26,10 +26,10 @@ async function loadUser(req: Request & { user?: typeof usersTable.$inferSelect }
   next();
 }
 
-// GET /api/users - list all users (admin only)
+// GET /api/users - list all users (admin or above)
 router.get("/users", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || currentUser.role !== "admin") {
+  if (!currentUser || !hasRole(currentUser.role, "admin")) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -75,11 +75,11 @@ router.get("/users/:id", requireAuth, async (req: Request, res: Response): Promi
   });
 });
 
-// PATCH /api/users/:id/role - admin only
+// PATCH /api/users/:id/role - controller only
 router.patch("/users/:id/role", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || currentUser.role !== "admin") {
-    res.status(403).json({ error: "Forbidden" });
+  if (!currentUser || !hasRole(currentUser.role, "controller")) {
+    res.status(403).json({ error: "Forbidden: controller only" });
     return;
   }
 
@@ -119,10 +119,10 @@ router.patch("/users/:id/role", requireAuth, async (req: Request, res: Response)
   });
 });
 
-// PATCH /api/users/:id/pap - admin manual PAP adjustment
+// PATCH /api/users/:id/pap - admin or above
 router.patch("/users/:id/pap", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || currentUser.role !== "admin") {
+  if (!currentUser || !hasRole(currentUser.role, "admin")) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -163,10 +163,10 @@ router.patch("/users/:id/pap", requireAuth, async (req: Request, res: Response):
   res.json({ success: true, message: "PAP adjusted" });
 });
 
-// DELETE /api/users/:id - completely remove a user and all their data (admin only)
+// DELETE /api/users/:id - completely remove a user and all their data (admin or above)
 router.delete("/users/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || currentUser.role !== "admin") {
+  if (!currentUser || !hasRole(currentUser.role, "admin")) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }

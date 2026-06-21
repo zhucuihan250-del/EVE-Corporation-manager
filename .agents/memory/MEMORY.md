@@ -3,3 +3,4 @@
 - [EVE SSO token refresh](eve-sso-token-refresh.md) — refreshAccessToken added to eve-sso.ts; fleet scan auto-refreshes 60s before expiry.
 - [Alt character linking](alt-character-linking.md) — link-alt flow: set req.session.linkingUserId, redirect to SSO, callback detects and creates characters row under main user.
 - [Announcements feature](announcements-feature.md) — rally levels are "MAX CTA", "CTA", "战略", "散打"; stored as plain text in DB; color-coded in UI.
+- [Role hierarchy](role-hierarchy.md) — 4 roles: member < fc < admin < controller; controller-only: role changes; fc+: fleets & announcements; admin+: everything else.

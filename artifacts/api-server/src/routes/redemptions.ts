@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, redemptionsTable, rewardsTable, usersTable } from "@workspace/db";
 import { eq, desc, sql } from "drizzle-orm";
-import { requireAuth } from "../middlewares/auth";
+import { requireAuth, hasRole } from "../middlewares/auth";
 import { CreateRedemptionBody } from "@workspace/api-zod";
 import { papRecordsTable } from "@workspace/db";
 
@@ -126,7 +126,7 @@ router.post("/redemptions", requireAuth, async (req: Request, res: Response): Pr
 // PATCH /api/redemptions/:id - admin only (fulfill/cancel)
 router.patch("/redemptions/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || currentUser.role !== "admin") {
+  if (!currentUser || !hasRole(currentUser.role, "admin")) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -168,7 +168,7 @@ router.patch("/redemptions/:id", requireAuth, async (req: Request, res: Response
 // GET /api/redemptions/all - admin only
 router.get("/redemptions/all", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || currentUser.role !== "admin") {
+  if (!currentUser || !hasRole(currentUser.role, "admin")) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }

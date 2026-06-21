@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, papRecordsTable, usersTable, fleetsTable, charactersTable } from "@workspace/db";
 import { eq, desc, sql } from "drizzle-orm";
-import { requireAuth } from "../middlewares/auth";
+import { requireAuth, hasRole } from "../middlewares/auth";
 import { CreateManualPapBody } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -63,7 +63,7 @@ router.get("/pap", requireAuth, async (req: Request, res: Response): Promise<voi
 // GET /api/pap/all - admin only
 router.get("/pap/all", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || currentUser.role !== "admin") {
+  if (!currentUser || !hasRole(currentUser.role, "admin")) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -94,7 +94,7 @@ router.get("/pap/all", requireAuth, async (req: Request, res: Response): Promise
 // POST /api/pap/manual - admin only
 router.post("/pap/manual", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || currentUser.role !== "admin") {
+  if (!currentUser || !hasRole(currentUser.role, "admin")) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }

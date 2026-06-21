@@ -2,7 +2,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { db, announcementsTable, usersTable } from "@workspace/db";
 import { eq, asc } from "drizzle-orm";
 import { CreateAnnouncementBody, DeleteAnnouncementParams } from "@workspace/api-zod";
-import { requireAuth } from "../middlewares/auth";
+import { requireAuth, hasRole } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
@@ -30,7 +30,7 @@ router.get("/announcements", requireAuth, async (req: Request, res: Response): P
 // POST /api/announcements - create announcement (admin only)
 router.post("/announcements", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || currentUser.role !== "admin") {
+  if (!currentUser || !hasRole(currentUser.role, "fc")) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -58,7 +58,7 @@ router.post("/announcements", requireAuth, async (req: Request, res: Response): 
 // DELETE /api/announcements/:id - delete announcement (admin only)
 router.delete("/announcements/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || currentUser.role !== "admin") {
+  if (!currentUser || !hasRole(currentUser.role, "fc")) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }

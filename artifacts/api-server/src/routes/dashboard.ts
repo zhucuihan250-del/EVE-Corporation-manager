@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, usersTable, fleetsTable, papRecordsTable, redemptionsTable } from "@workspace/db";
 import { eq, desc, count, sql, and, sum } from "drizzle-orm";
-import { requireAuth } from "../middlewares/auth";
+import { requireAuth, hasRole } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
@@ -44,7 +44,7 @@ router.get("/dashboard/summary", requireAuth, async (req: Request, res: Response
 // GET /api/dashboard/admin-summary - admin only
 router.get("/dashboard/admin-summary", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || currentUser.role !== "admin") {
+  if (!currentUser || !hasRole(currentUser.role, "admin")) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }

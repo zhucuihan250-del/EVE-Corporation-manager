@@ -199,24 +199,24 @@ router.delete("/users/:id", requireAuth, async (req: Request, res: Response): Pr
   res.json({ success: true });
 });
 
-// POST /api/users/bootstrap-controller - one-time endpoint to set a user to controller
-// Protected by SESSION_SECRET. Remove after first use.
+// POST /api/users/bootstrap-controller - first-time bootstrap: only works when no controllers exist yet
 router.post("/users/bootstrap-controller", async (req: Request, res: Response): Promise<void> => {
-  const { characterName, key } = req.body as { characterName?: string; key?: string };
-  if (!key || key !== process.env.SESSION_SECRET) {
-    res.status(403).json({ error: "Invalid key" });
-    return;
-  }
+  const { characterName } = req.body as { characterName?: string };
   if (!characterName) {
     res.status(400).json({ error: "characterName required" });
     return;
   }
-  const users = await db.select().from(usersTable);
-  const target = users.find(
+  const allUsers = await db.select().from(usersTable);
+  const existingControllers = allUsers.filter((u) => u.role === "controller");
+  if (existingControllers.length > 0) {
+    res.status(403).json({ error: "A controller already exists. Use the admin panel to manage roles." });
+    return;
+  }
+  const target = allUsers.find(
     (u) => u.eveCharacterName?.toLowerCase() === characterName.toLowerCase()
   );
   if (!target) {
-    res.status(404).json({ error: `User "${characterName}" not found`, available: users.map(u => u.eveCharacterName) });
+    res.status(404).json({ error: `User "${characterName}" not found`, available: allUsers.map(u => u.eveCharacterName) });
     return;
   }
   const [updated] = await db
@@ -224,7 +224,7 @@ router.post("/users/bootstrap-controller", async (req: Request, res: Response): 
     .set({ role: "controller" })
     .where(eq(usersTable.id, target.id))
     .returning();
-  req.log.info({ userId: updated.id, name: updated.eveCharacterName }, "Bootstrap: set user to controller");
+  req.log.info({ userId: updated.id, name: updated.eveCharacterName }, "Bootstrap: first controller set");
   res.json({ success: true, id: updated.id, name: updated.eveCharacterName, role: updated.role });
 });
 

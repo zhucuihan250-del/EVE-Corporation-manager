@@ -199,4 +199,33 @@ router.delete("/users/:id", requireAuth, async (req: Request, res: Response): Pr
   res.json({ success: true });
 });
 
+// POST /api/users/bootstrap-controller - one-time endpoint to set a user to controller
+// Protected by SESSION_SECRET. Remove after first use.
+router.post("/users/bootstrap-controller", async (req: Request, res: Response): Promise<void> => {
+  const { characterName, key } = req.body as { characterName?: string; key?: string };
+  if (!key || key !== process.env.SESSION_SECRET) {
+    res.status(403).json({ error: "Invalid key" });
+    return;
+  }
+  if (!characterName) {
+    res.status(400).json({ error: "characterName required" });
+    return;
+  }
+  const users = await db.select().from(usersTable);
+  const target = users.find(
+    (u) => u.eveCharacterName?.toLowerCase() === characterName.toLowerCase()
+  );
+  if (!target) {
+    res.status(404).json({ error: `User "${characterName}" not found`, available: users.map(u => u.eveCharacterName) });
+    return;
+  }
+  const [updated] = await db
+    .update(usersTable)
+    .set({ role: "controller" })
+    .where(eq(usersTable.id, target.id))
+    .returning();
+  req.log.info({ userId: updated.id, name: updated.eveCharacterName }, "Bootstrap: set user to controller");
+  res.json({ success: true, id: updated.id, name: updated.eveCharacterName, role: updated.role });
+});
+
 export default router;

@@ -3,6 +3,9 @@ import cors from "cors";
 import pinoHttp from "pino-http";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { pool } from "@workspace/db";
 import router from "./routes";
 import { logger } from "./lib/logger";
@@ -15,6 +18,12 @@ app.set("trust proxy", 1);
 
 const PgStore = connectPgSimple(session);
 const isProduction = process.env.NODE_ENV === "production";
+const serverDir = path.dirname(fileURLToPath(import.meta.url));
+const frontendStaticDir = path.resolve(
+  serverDir,
+  "../../pap-tracker/dist/public",
+);
+const frontendIndexFile = path.join(frontendStaticDir, "index.html");
 
 function parseAllowedOrigins(value: string | undefined): string[] {
   if (!value) return [];
@@ -101,5 +110,24 @@ app.use("/api", (_req, res, next) => {
   next();
 });
 app.use("/api", router);
+
+if (isProduction) {
+  if (existsSync(frontendIndexFile)) {
+    app.use(express.static(frontendStaticDir, { index: false }));
+    app.use((req, res, next) => {
+      if (req.method !== "GET" || req.path.startsWith("/api")) {
+        next();
+        return;
+      }
+
+      res.sendFile(frontendIndexFile);
+    });
+  } else {
+    logger.warn(
+      { frontendStaticDir },
+      "Frontend static assets not found; running API-only mode",
+    );
+  }
+}
 
 export default app;

@@ -45,8 +45,9 @@ export function AdminFleets() {
   const [fetchingCreateId, setFetchingCreateId] = useState(false);
   const [updatingFleetId, setUpdatingFleetId] = useState<number | null>(null);
   const [standingDownId, setStandingDownId] = useState<number | null>(null);
+  const fleetList = Array.isArray(fleets) ? fleets : [];
 
-  const { liveCounts, scanFleet: scanFleetLive } = useLiveFleetCounts(fleets);
+  const { liveCounts, scanFleet: scanFleetLive } = useLiveFleetCounts(fleetList);
 
   const invalidateAfterScan = () => {
     queryClient.invalidateQueries({ queryKey: getListFleetsQueryKey() });
@@ -58,7 +59,7 @@ export function AdminFleets() {
   };
 
 
-  const activeScannableFleets = (fleets ?? []).filter(f => f.isActive && f.eveFleetId);
+  const activeScannableFleets = fleetList.filter(f => f.isActive && f.eveFleetId);
 
   const handleFetchFleetIdForCreate = async () => {
     setFetchingCreateId(true);
@@ -219,7 +220,7 @@ export function AdminFleets() {
             <div className="p-8 flex justify-center">
               <Loader2 className="w-6 h-6 animate-spin text-primary" />
             </div>
-          ) : !fleets?.length ? (
+          ) : !fleetList.length ? (
             <div className="p-8 text-center text-muted-foreground font-mono text-sm">
               {t("fleets.noFleets")}
             </div>
@@ -236,7 +237,7 @@ export function AdminFleets() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {fleets.map((fleet) => (
+                {fleetList.map((fleet) => (
                   <TableRow key={fleet.id} className="border-border/30 border-b last:border-0 hover:bg-primary/5 transition-colors">
                     <TableCell className="font-mono text-sm text-foreground">
                       <div className="flex flex-col">

@@ -23,7 +23,8 @@ export function useLiveFleetCounts(fleets: Fleet[] | undefined) {
 
   useEffect(() => {
     const autoScan = async () => {
-      const activeFleets = (fleetsRef.current ?? []).filter(f => f.isActive && f.eveFleetId);
+      const fleetList = Array.isArray(fleetsRef.current) ? fleetsRef.current : [];
+      const activeFleets = fleetList.filter(f => f.isActive && f.eveFleetId);
       for (const fleet of activeFleets) {
         try {
           await scanFleet(fleet.id);

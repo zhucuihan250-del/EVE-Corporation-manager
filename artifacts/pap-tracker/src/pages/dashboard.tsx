@@ -66,8 +66,11 @@ export function Dashboard() {
     query: { queryKey: ["announcements"] }
   });
 
-  const activeFleets = allFleets?.filter((f) => f.isActive) ?? [];
-  const pastFleets = recentFleets?.filter((f) => !f.isActive) ?? [];
+  const allFleetList = Array.isArray(allFleets) ? allFleets : [];
+  const recentFleetList = Array.isArray(recentFleets) ? recentFleets : [];
+  const announcementList = Array.isArray(announcements) ? announcements : [];
+  const activeFleets = allFleetList.filter((f) => f.isActive);
+  const pastFleets = recentFleetList.filter((f) => !f.isActive);
   const { liveCounts } = useLiveFleetCounts(activeFleets);
   const { data: papHistory, isLoading: isPapHistoryLoading } = usePapHistory();
   const hasAnyPap = papHistory?.some((d) => d.pap > 0);
@@ -291,7 +294,7 @@ export function Dashboard() {
                 <Skeleton className="h-16 w-full bg-card/50" />
                 <Skeleton className="h-16 w-full bg-card/50" />
               </div>
-            ) : !announcements?.length ? (
+            ) : !announcementList.length ? (
               <div className="flex-1 flex flex-col items-center justify-center p-8 text-muted-foreground font-mono text-sm">
                 <div className="w-12 h-12 rounded-full border border-dashed border-border flex items-center justify-center mb-4">
                   <Radio className="w-6 h-6 text-muted-foreground/50" />
@@ -300,7 +303,7 @@ export function Dashboard() {
               </div>
             ) : (
               <div className="divide-y divide-border/30 overflow-auto max-h-80">
-                {announcements.map((ann) => {
+                {announcementList.map((ann) => {
                   const level = ann.rallyLevel as RallyLevel;
                   const colorClass = RALLY_LEVEL_COLORS[level] ?? "bg-muted/20 text-muted-foreground border-border/30 border";
                   return (

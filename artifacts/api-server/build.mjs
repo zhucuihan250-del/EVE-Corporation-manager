@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
 import { build as esbuild } from "esbuild";
 import esbuildPluginPino from "esbuild-plugin-pino";
 import { rm } from "node:fs/promises";
@@ -9,8 +10,34 @@ import { rm } from "node:fs/promises";
 globalThis.require = createRequire(import.meta.url);
 
 const artifactDir = path.dirname(fileURLToPath(import.meta.url));
+const workspaceDir = path.resolve(artifactDir, "../..");
+
+function runPnpm(args) {
+  const command = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+  const result = spawnSync(command, args, {
+    cwd: workspaceDir,
+    stdio: "inherit",
+    env: process.env,
+  });
+
+  if (result.error) {
+    throw result.error;
+  }
+
+  if (result.status !== 0) {
+    throw new Error(`pnpm ${args.join(" ")} failed with exit code ${result.status}`);
+  }
+}
+
+function buildFrontendStatic() {
+  if (process.env.SKIP_FRONTEND_BUILD === "1") return;
+
+  runPnpm(["--filter", "@workspace/pap-tracker", "build"]);
+}
 
 async function buildAll() {
+  buildFrontendStatic();
+
   const distDir = path.resolve(artifactDir, "dist");
   await rm(distDir, { recursive: true, force: true });
 

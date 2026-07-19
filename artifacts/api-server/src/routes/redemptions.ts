@@ -131,7 +131,7 @@ router.patch("/redemptions/:id", requireAuth, async (req: Request, res: Response
     return;
   }
 
-  const id = parseInt(req.params.id);
+  const id = typeof req.params.id === "string" ? parseInt(req.params.id, 10) : NaN;
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid redemption ID" });
     return;

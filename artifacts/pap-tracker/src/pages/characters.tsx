@@ -8,8 +8,7 @@ import { useTranslation } from "react-i18next";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect } from "react";
 import { useSearch } from "wouter";
-
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+import { apiUrl } from "@/lib/api";
 
 export function Characters() {
   const { t } = useTranslation();
@@ -27,7 +26,7 @@ export function Characters() {
   }, []);
 
   const handleLinkAlt = () => {
-    window.location.href = `${BASE}/api/auth/eve/link-alt`;
+    window.location.href = apiUrl("/api/auth/eve/link-alt");
   };
 
   return (

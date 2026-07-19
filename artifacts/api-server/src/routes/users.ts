@@ -171,7 +171,7 @@ router.delete("/users/:id", requireAuth, async (req: Request, res: Response): Pr
     return;
   }
 
-  const targetId = parseInt(req.params.id, 10);
+  const targetId = typeof req.params.id === "string" ? parseInt(req.params.id, 10) : NaN;
   if (isNaN(targetId)) {
     res.status(400).json({ error: "Invalid user ID" });
     return;

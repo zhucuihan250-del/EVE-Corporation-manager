@@ -368,9 +368,9 @@ router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response)
             .values({
               userId: existingUser.id,
               eveCharacterId: charId,
-              eveCharacterName: existingUser.eveCharacterName,
+              eveCharacterName: existingUser.eveCharacterName ?? `Character ${charId}`,
               corporationId: existingUser.corporationId,
-              corporationName: existingUser.corporationName,
+              corporationName: existingUser.corporationName ?? "",
               isMain: true,
             })
             .returning();

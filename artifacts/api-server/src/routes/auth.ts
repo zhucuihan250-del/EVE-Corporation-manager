@@ -39,6 +39,18 @@ function getCallbackUrl(req: Request): string {
   return `${proto}://${host}/api/auth/eve/callback`;
 }
 
+function getFrontendRedirectUrl(path: string): string {
+  const frontendUrl = process.env.FRONTEND_URL?.trim();
+  if (!frontendUrl) return path;
+
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return new URL(normalizedPath, `${frontendUrl.replace(/\/+$/, "")}/`).toString();
+}
+
+function redirectToFrontend(res: Response, path: string): void {
+  res.redirect(getFrontendRedirectUrl(path));
+}
+
 // GET /api/auth/eve/login - redirect to EVE SSO
 router.get("/auth/eve/login", (req: Request, res: Response): void => {
   const callbackUrl = getCallbackUrl(req);
@@ -53,7 +65,7 @@ router.get("/auth/eve/link-alt", requireAuth, (req: Request, res: Response): voi
   req.session.save((err) => {
     if (err) {
       req.log.error({ err }, "Session save error for link-alt");
-      res.redirect("/characters?error=session");
+      redirectToFrontend(res, "/characters?error=session");
       return;
     }
     const callbackUrl = getCallbackUrl(req);
@@ -105,7 +117,7 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
           }).where(eq(charactersTable.id, existingChar.id));
           req.log.info({ charId: characterId, mainUserId }, "Re-linked character updated");
           req.session.save(() => {});
-          res.redirect("/characters?linked=true");
+          redirectToFrontend(res, "/characters?linked=true");
           return;
         }
         // Belongs to a different user — check if it is an orphan (auto-registered, no access token)
@@ -113,14 +125,14 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
         if (charOwner?.accessToken) {
           // Another real authenticated user owns this character — cannot steal it
           req.session.save(() => {});
-          res.redirect("/characters?error=already_linked");
+          redirectToFrontend(res, "/characters?error=already_linked");
           return;
         }
         // Orphan account: merge its PAP into the main account then delete it
         await mergeOrphanUser(charOwner ?? null, mainUserId, req.log);
         req.log.info({ orphanId: existingChar.userId, mainUserId, charId: characterId }, "Merged orphan (from chars table) into main account on alt link");
         req.session.save(() => {});
-        res.redirect("/characters?linked=true");
+        redirectToFrontend(res, "/characters?linked=true");
         return;
       }
 
@@ -134,7 +146,7 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
       if (orphanByMain && orphanByMain.id !== mainUserId) {
         if (orphanByMain.accessToken) {
           req.session.save(() => {});
-          res.redirect("/characters?error=already_linked");
+          redirectToFrontend(res, "/characters?error=already_linked");
           return;
         }
         // Orphan in usersTable — create the characters record first, then merge
@@ -149,7 +161,7 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
         await mergeOrphanUser(orphanByMain, mainUserId, req.log);
         req.log.info({ orphanId: orphanByMain.id, mainUserId, charId: characterId }, "Merged orphan (from users table) into main account on alt link");
         req.session.save(() => {});
-        res.redirect("/characters?linked=true");
+        redirectToFrontend(res, "/characters?linked=true");
         return;
       }
 
@@ -165,7 +177,7 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
 
       req.session.save((saveErr) => {
         if (saveErr) req.log.error({ err: saveErr }, "Session save error after alt link");
-        res.redirect("/characters?linked=true");
+        redirectToFrontend(res, "/characters?linked=true");
       });
       return;
     }
@@ -196,11 +208,11 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
           req.session.save((err) => {
             if (err) {
               req.log.error({ err }, "Session save error (alt-as-main login)");
-              res.redirect("/?error=session");
+              redirectToFrontend(res, "/?error=session");
               return;
             }
             req.log.info({ altCharId: characterId, mainUserId: mainUser.id }, "Alt character login resolved to main account");
-            res.redirect("/");
+            redirectToFrontend(res, "/");
           });
           return;
         }
@@ -274,14 +286,14 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
     req.session.save((err) => {
       if (err) {
         req.log.error({ err }, "Session save error");
-        res.redirect("/?error=session");
+        redirectToFrontend(res, "/?error=session");
         return;
       }
-      res.redirect("/");
+      redirectToFrontend(res, "/");
     });
   } catch (err) {
     req.log.error({ err }, "EVE SSO callback error");
-    res.redirect("/?error=auth");
+    redirectToFrontend(res, "/?error=auth");
   }
 });
 

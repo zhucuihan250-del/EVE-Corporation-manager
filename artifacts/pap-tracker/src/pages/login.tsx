@@ -4,19 +4,20 @@ import { useGetMe } from "@workspace/api-client-react";
 import { useLocation } from "wouter";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { apiUrl } from "@/lib/api";
+import { getErrorMessage, isUnauthorizedError } from "@/lib/api-error";
 
 export function Login() {
   const { t } = useTranslation();
-  const { data: user, isLoading } = useGetMe();
+  const { data: user, isLoading, isError, error } = useGetMe();
   const [, setLocation] = useLocation();
+  const hasApiError = isError && !isUnauthorizedError(error);
 
   useEffect(() => {
     if (!isLoading && user) {
       setLocation("/dashboard");
     }
   }, [user, isLoading, setLocation]);
-
-  if (isLoading) return null;
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-black dark relative overflow-hidden">
@@ -29,12 +30,24 @@ export function Login() {
         
         <h1 className="text-2xl font-mono text-foreground font-bold tracking-widest mb-2 text-center uppercase">{t("login.title")}</h1>
         <p className="text-sm font-mono text-muted-foreground mb-8 text-center">{t("login.subtitle")}</p>
+
+        {isLoading && (
+          <p className="mb-4 font-mono text-xs text-muted-foreground">Checking session...</p>
+        )}
+
+        {hasApiError && (
+          <div className="mb-4 w-full rounded-sm border border-destructive/40 bg-destructive/10 p-3">
+            <p className="font-mono text-xs text-destructive">
+              {getErrorMessage(error)}
+            </p>
+          </div>
+        )}
         
         <Button 
           asChild 
           className="w-full h-12 font-mono text-sm tracking-widest bg-primary hover:bg-primary/90 text-primary-foreground rounded-none shadow-[0_0_10px_rgba(250,204,21,0.3)] hover:shadow-[0_0_20px_rgba(250,204,21,0.5)] transition-all duration-300"
         >
-          <a href="/api/auth/eve/login">
+          <a href={apiUrl("/api/auth/eve/login")}>
             {t("login.button")}
           </a>
         </Button>

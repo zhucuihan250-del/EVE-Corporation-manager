@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { apiUrl } from "@/lib/api";
 
 type PapHistoryEntry = { date: string; pap: number };
 
@@ -16,9 +17,12 @@ function usePapHistory() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/dashboard/pap-history")
-      .then((r) => r.json())
-      .then((d) => { setData(d as PapHistoryEntry[]); })
+    fetch(apiUrl("/api/dashboard/pap-history"), { credentials: "include" })
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`PAP history request failed: ${r.status}`);
+        return r.json();
+      })
+      .then((d) => { setData(Array.isArray(d) ? d as PapHistoryEntry[] : []); })
       .catch(() => setData([]))
       .finally(() => setIsLoading(false));
   }, []);

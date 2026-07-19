@@ -5,6 +5,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useGetMe } from "@workspace/api-client-react";
 import { Loader2 } from "lucide-react";
 import { useEffect } from "react";
+import { AppErrorBoundary, AppLoadError } from "@/components/app-error-boundary";
+import { isUnauthorizedError } from "@/lib/api-error";
 
 import NotFound from "@/pages/not-found";
 import { Login } from "@/pages/login";
@@ -40,16 +42,26 @@ function hasRole(userRole: string, minRole: Role): boolean {
 }
 
 function ProtectedRoute({ component: Component, minRole }: { component: any, minRole?: Role }) {
-  const { data: user, isLoading, isError } = useGetMe();
+  const { data: user, isLoading, isError, error } = useGetMe();
   const [, setLocation] = useLocation();
+  const isUnauthorized = isUnauthorizedError(error);
 
   useEffect(() => {
-    if (!isLoading && (isError || !user)) {
+    if (isLoading) return;
+
+    if (isError) {
+      if (isUnauthorized) {
+        setLocation("/");
+      }
+      return;
+    }
+
+    if (!user) {
       setLocation("/");
     } else if (!isLoading && user && minRole && !hasRole(user.role, minRole)) {
       setLocation("/dashboard");
     }
-  }, [isLoading, isError, user, setLocation, minRole]);
+  }, [isLoading, isError, isUnauthorized, user, setLocation, minRole]);
 
   if (isLoading) {
     return (
@@ -57,6 +69,10 @@ function ProtectedRoute({ component: Component, minRole }: { component: any, min
         <Loader2 className="w-8 h-8 animate-spin" />
       </div>
     );
+  }
+
+  if (isError && !isUnauthorized) {
+    return <AppLoadError title="Unable to initialize the application" error={error} />;
   }
 
   if (isError || !user || (minRole && !hasRole(user.role, minRole))) {
@@ -123,9 +139,11 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
+        <AppErrorBoundary>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <Router />
+          </WouterRouter>
+        </AppErrorBoundary>
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>

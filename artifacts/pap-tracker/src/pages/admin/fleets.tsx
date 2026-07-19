@@ -13,6 +13,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { useLiveFleetCounts } from "@/hooks/use-live-fleet-counts";
+import { apiUrl } from "@/lib/api";
 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -20,7 +21,7 @@ import { Label } from "@/components/ui/label";
 import { useTranslation } from "react-i18next";
 
 async function fetchEsiFleetId(): Promise<{ fleetId: string; role: string }> {
-  const resp = await fetch("/api/fleets/esi-my-fleet", { credentials: "include" });
+  const resp = await fetch(apiUrl("/api/fleets/esi-my-fleet"), { credentials: "include" });
   const data = await resp.json();
   if (!resp.ok) throw new Error(data.error || "ESI error");
   return data;
@@ -139,15 +140,16 @@ export function AdminFleets() {
           { id: fleet.id },
           {
             onSuccess: (data) => {
+              const scanData = data as typeof data & { esiMemberCount?: number; autoRegistered?: number };
               if (data.awarded > 0) {
                 toast({
                   title: t("fleets.scanComplete"),
                   description: t("fleets.scanCompleteDesc", {
-                    esiMemberCount: data.esiMemberCount ?? 0,
+                    esiMemberCount: scanData.esiMemberCount ?? 0,
                     awarded: data.awarded,
                     skipped: data.skipped,
                     notFound: data.notFound,
-                    autoRegistered: (data as { autoRegistered?: number }).autoRegistered ?? 0,
+                    autoRegistered: scanData.autoRegistered ?? 0,
                   }),
                 });
               }

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { apiUrl } from "@/lib/api";
 
 type Fleet = { id: number; isActive: boolean; eveFleetId?: string | null };
 
@@ -8,7 +9,7 @@ export function useLiveFleetCounts(fleets: Fleet[] | undefined) {
   fleetsRef.current = fleets;
 
   const scanFleet = useCallback(async (fleetId: number) => {
-    const resp = await fetch(`/api/fleets/${fleetId}/scan?dryRun=true`, {
+    const resp = await fetch(apiUrl(`/api/fleets/${fleetId}/scan?dryRun=true`), {
       method: "POST",
       credentials: "include",
     });

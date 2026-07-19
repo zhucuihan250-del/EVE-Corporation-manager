@@ -32,12 +32,12 @@ async function ensureSessionTable() {
 
 ensureSessionTable()
   .then(() => {
-    app.listen(port, (err) => {
+    app.listen(port, "0.0.0.0", (err) => {
       if (err) {
         logger.error({ err }, "Error listening on port");
         process.exit(1);
       }
-      logger.info({ port }, "Server listening");
+      logger.info({ host: "0.0.0.0", port }, "Server listening");
     });
   })
   .catch((err) => {

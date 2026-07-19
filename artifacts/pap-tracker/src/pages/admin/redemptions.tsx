@@ -99,7 +99,7 @@ export function AdminRedemptions() {
                           <Button
                             size="sm"
                             className="h-7 rounded-sm font-mono text-[10px] bg-emerald-600 hover:bg-emerald-700"
-                            onClick={() => handleUpdateStatus(redemption.id, "fulfilled", redemption.userName)}
+                            onClick={() => handleUpdateStatus(redemption.id, "fulfilled", redemption.userName ?? null)}
                             disabled={updateRedemption.isPending}
                           >
                             <CheckCircle className="w-3 h-3 mr-1" /> {t("adminRedemptions.fulfill")}
@@ -108,7 +108,7 @@ export function AdminRedemptions() {
                             size="sm"
                             variant="destructive"
                             className="h-7 rounded-sm font-mono text-[10px]"
-                            onClick={() => handleUpdateStatus(redemption.id, "cancelled", redemption.userName)}
+                            onClick={() => handleUpdateStatus(redemption.id, "cancelled", redemption.userName ?? null)}
                             disabled={updateRedemption.isPending}
                           >
                             <XCircle className="w-3 h-3 mr-1" /> {t("adminRedemptions.cancel")}

@@ -1,7 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useGetDashboardSummary, useGetRecentFleets, useListAnnouncements, useListFleets } from "@workspace/api-client-react";
-import { useLiveFleetCounts } from "@/hooks/use-live-fleet-counts";
-import { Target, Activity, Award, Trophy, Swords, Radio, CalendarClock, Shield, Users, TrendingUp } from "lucide-react";
+import { Target, Activity, Award, Trophy, Swords, Radio, CalendarClock, Shield, TrendingUp } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -71,7 +70,6 @@ export function Dashboard() {
   const announcementList = Array.isArray(announcements) ? announcements : [];
   const activeFleets = allFleetList.filter((f) => f.isActive);
   const pastFleets = recentFleetList.filter((f) => !f.isActive);
-  const { liveCounts } = useLiveFleetCounts(activeFleets);
   const { data: papHistory, isLoading: isPapHistoryLoading } = usePapHistory();
   const hasAnyPap = papHistory?.some((d) => d.pap > 0);
   const chartData = papHistory?.map((d) => ({
@@ -219,9 +217,6 @@ export function Dashboard() {
                         <div className="flex items-center gap-3 text-xs font-mono text-muted-foreground flex-wrap">
                           <span className="flex items-center gap-1">
                             <Shield className="w-3 h-3 text-primary/60" /> {fleet.fleetCommander}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Users className="w-3 h-3 text-primary/60" /> {liveCounts[fleet.id] ?? fleet.participantCount ?? 0} {t("dashboard.pilots")}
                           </span>
                         </div>
                       </div>

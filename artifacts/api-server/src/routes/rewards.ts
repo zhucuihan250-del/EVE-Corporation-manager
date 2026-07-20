@@ -100,7 +100,16 @@ router.delete("/rewards/:id", requireAuth, async (req: Request, res: Response): 
     return;
   }
 
-  await db.delete(rewardsTable).where(eq(rewardsTable.id, params.data.id));
+  const [deletedReward] = await db
+    .delete(rewardsTable)
+    .where(eq(rewardsTable.id, params.data.id))
+    .returning({ id: rewardsTable.id });
+
+  if (!deletedReward) {
+    res.status(404).json({ error: "Reward not found" });
+    return;
+  }
+
   res.sendStatus(204);
 });
 

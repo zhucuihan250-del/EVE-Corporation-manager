@@ -1,9 +1,9 @@
-import { useListRewards, useCreateReward, useUpdateReward, getListRewardsQueryKey } from "@workspace/api-client-react";
+import { useListRewards, useCreateReward, useUpdateReward, useDeleteReward, getListRewardsQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, Plus, Gift, Edit2 } from "lucide-react";
+import { AlertTriangle, Loader2, Plus, Gift, Edit2, Trash2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
@@ -17,17 +17,25 @@ export function AdminRewards() {
   const { data: rewards, isLoading } = useListRewards({ query: { queryKey: ["adminRewards"] } });
   const createReward = useCreateReward();
   const updateReward = useUpdateReward();
+  const deleteReward = useDeleteReward();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [currentId, setCurrentId] = useState<number | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
   
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [papCost, setPapCost] = useState("");
   const [stock, setStock] = useState("");
+
+  const invalidateRewardQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ["adminRewards"] });
+    queryClient.invalidateQueries({ queryKey: ["rewards"] });
+    queryClient.invalidateQueries({ queryKey: getListRewardsQueryKey() });
+  };
 
   const resetForm = () => {
     setName("");
@@ -54,7 +62,7 @@ export function AdminRewards() {
         {
           onSuccess: () => {
             toast({ title: t("adminRewards.assetUpdated"), description: t("adminRewards.assetUpdatedDesc") });
-            queryClient.invalidateQueries({ queryKey: getListRewardsQueryKey() });
+            invalidateRewardQueries();
             setModalOpen(false);
             resetForm();
           }
@@ -66,7 +74,7 @@ export function AdminRewards() {
         {
           onSuccess: () => {
             toast({ title: t("adminRewards.assetCreated"), description: t("adminRewards.assetCreatedDesc") });
-            queryClient.invalidateQueries({ queryKey: getListRewardsQueryKey() });
+            invalidateRewardQueries();
             setModalOpen(false);
             resetForm();
           }
@@ -91,10 +99,35 @@ export function AdminRewards() {
       {
         onSuccess: () => {
           toast({ title: t("adminRewards.statusUpdated"), description: t("adminRewards.statusUpdatedDesc") });
-          queryClient.invalidateQueries({ queryKey: getListRewardsQueryKey() });
+          invalidateRewardQueries();
         }
       }
     );
+  };
+
+  const handleDelete = () => {
+    if (!deleteTarget) return;
+
+    deleteReward.mutate(
+      { id: deleteTarget.id },
+      {
+        onSuccess: () => {
+          toast({ title: t("adminRewards.assetDeleted"), description: t("adminRewards.assetDeletedDesc") });
+          invalidateRewardQueries();
+          setDeleteTarget(null);
+        },
+        onError: () => {
+          toast({ title: t("adminRewards.assetDeleteFailed"), variant: "destructive" });
+        },
+      }
+    );
+  };
+
+  const handleDeleteFromEdit = () => {
+    if (currentId === null) return;
+
+    setModalOpen(false);
+    setDeleteTarget({ id: currentId, name });
   };
 
   return (
@@ -153,14 +186,26 @@ export function AdminRewards() {
                         {reward.isAvailable ? t("adminRewards.available") : t("adminRewards.restricted")}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right whitespace-nowrap">
                       <Button 
                         variant="ghost" 
                         size="sm" 
                         className="h-8 w-8 p-0 text-muted-foreground hover:text-primary"
                         onClick={() => openEdit(reward)}
+                        aria-label={t("adminRewards.editAsset", { name: reward.name })}
+                        disabled={deleteReward.isPending}
                       >
                         <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => setDeleteTarget({ id: reward.id, name: reward.name })}
+                        aria-label={t("adminRewards.deleteAsset", { name: reward.name })}
+                        disabled={deleteReward.isPending}
+                      >
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -226,9 +271,57 @@ export function AdminRewards() {
             </div>
           </div>
           <DialogFooter>
+            {editMode && (
+              <Button
+                variant="destructive"
+                onClick={handleDeleteFromEdit}
+                disabled={updateReward.isPending || deleteReward.isPending}
+                className="rounded-sm"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                {t("adminRewards.removeAsset")}
+              </Button>
+            )}
             <Button variant="outline" onClick={() => setModalOpen(false)} className="rounded-sm">{t("adminRewards.cancel")}</Button>
             <Button onClick={handleSave} disabled={createReward.isPending || updateReward.isPending || !name || !papCost} className="rounded-sm">
               {createReward.isPending || updateReward.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : t("adminRewards.saveAsset")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleteReward.isPending) setDeleteTarget(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-[460px] bg-card border-destructive/40 rounded-sm font-mono">
+          <DialogHeader>
+            <DialogTitle className="tracking-wider uppercase text-destructive flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" />
+              {t("adminRewards.deleteAssetConfirmTitle", { name: deleteTarget?.name ?? "" })}
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-xs leading-relaxed">
+              {t("adminRewards.deleteAssetConfirmDesc")}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteTarget(null)}
+              disabled={deleteReward.isPending}
+              className="rounded-sm text-xs"
+            >
+              {t("adminRewards.cancel")}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleteReward.isPending}
+              className="rounded-sm text-xs tracking-wider"
+            >
+              {deleteReward.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : t("adminRewards.deleteAssetConfirm")}
             </Button>
           </DialogFooter>
         </DialogContent>

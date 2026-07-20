@@ -511,6 +511,8 @@ paths:
       responses:
         "204":
           description: Reward deleted
+        "404":
+          description: Reward not found
 
   /redemptions:
     get:

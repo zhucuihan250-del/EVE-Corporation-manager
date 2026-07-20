@@ -1,5 +1,5 @@
 import app from "./app";
-import { pool } from "@workspace/db";
+import { pool, runMigrations } from "@workspace/db";
 import { logger } from "./lib/logger";
 
 const rawPort = process.env["PORT"];
@@ -30,7 +30,13 @@ async function ensureSessionTable() {
   logger.info("Session table ready");
 }
 
-ensureSessionTable()
+async function prepareDatabase() {
+  await runMigrations(pool);
+  logger.info("Database migrations complete");
+  await ensureSessionTable();
+}
+
+prepareDatabase()
   .then(() => {
     app.listen(port, "0.0.0.0", (err) => {
       if (err) {
@@ -41,6 +47,6 @@ ensureSessionTable()
     });
   })
   .catch((err) => {
-    logger.error({ err }, "Failed to ensure session table, aborting");
+    logger.error({ err }, "Failed to prepare database, aborting");
     process.exit(1);
   });

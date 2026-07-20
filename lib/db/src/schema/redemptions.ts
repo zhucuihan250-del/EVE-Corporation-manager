@@ -8,6 +8,7 @@ export const redemptionsTable = pgTable("redemptions", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
   rewardId: integer("reward_id").notNull().references(() => rewardsTable.id, { onDelete: "cascade" }),
+  rewardName: text("reward_name").notNull(),
   papCost: real("pap_cost").notNull(),
   status: text("status", { enum: ["pending", "fulfilled", "cancelled"] }).notNull().default("pending"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

@@ -39,11 +39,10 @@ router.get("/redemptions", requireAuth, async (req: Request, res: Response): Pro
       papCost: redemptionsTable.papCost,
       status: redemptionsTable.status,
       createdAt: redemptionsTable.createdAt,
-      rewardName: rewardsTable.name,
+      rewardName: redemptionsTable.rewardName,
       userName: usersTable.eveCharacterName,
     })
     .from(redemptionsTable)
-    .leftJoin(rewardsTable, eq(redemptionsTable.rewardId, rewardsTable.id))
     .leftJoin(usersTable, eq(redemptionsTable.userId, usersTable.id))
     .where(eq(redemptionsTable.userId, req.session.userId!))
     .orderBy(desc(redemptionsTable.createdAt));
@@ -111,6 +110,7 @@ router.post("/redemptions", requireAuth, async (req: Request, res: Response): Pr
     .values({
       userId: user.id,
       rewardId: reward.id,
+      rewardName: reward.name,
       papCost: reward.papCost,
       status: "pending",
     })
@@ -118,7 +118,6 @@ router.post("/redemptions", requireAuth, async (req: Request, res: Response): Pr
 
   res.status(201).json({
     ...redemption,
-    rewardName: reward.name,
     userName: user.eveCharacterName,
   });
 });
@@ -155,12 +154,10 @@ router.patch("/redemptions/:id", requireAuth, async (req: Request, res: Response
     .where(eq(redemptionsTable.id, id))
     .returning();
 
-  const [reward] = await db.select().from(rewardsTable).where(eq(rewardsTable.id, updated.rewardId));
   const [member] = await db.select().from(usersTable).where(eq(usersTable.id, updated.userId));
 
   res.json(formatRedemption({
     ...updated,
-    rewardName: reward?.name ?? null,
     userName: member?.eveCharacterName ?? null,
   }));
 });
@@ -181,11 +178,10 @@ router.get("/redemptions/all", requireAuth, async (req: Request, res: Response):
       papCost: redemptionsTable.papCost,
       status: redemptionsTable.status,
       createdAt: redemptionsTable.createdAt,
-      rewardName: rewardsTable.name,
+      rewardName: redemptionsTable.rewardName,
       userName: usersTable.eveCharacterName,
     })
     .from(redemptionsTable)
-    .leftJoin(rewardsTable, eq(redemptionsTable.rewardId, rewardsTable.id))
     .leftJoin(usersTable, eq(redemptionsTable.userId, usersTable.id))
     .orderBy(desc(redemptionsTable.createdAt));
 

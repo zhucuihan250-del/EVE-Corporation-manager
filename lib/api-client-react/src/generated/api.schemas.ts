@@ -11,6 +11,7 @@ export interface HealthStatus {
 
 export interface ErrorResponse {
   error: string;
+  code?: string;
 }
 
 export interface SuccessResponse {
@@ -210,6 +211,15 @@ export interface Reward {
   papCost: number;
   /** @nullable */
   stock?: number | null;
+  /**
+   * @minimum 1
+   * @nullable
+   */
+  eligibilityMonths: number | null;
+  /** @nullable */
+  eligibilityEndsAt?: string | null;
+  /** @nullable */
+  isEligible?: boolean | null;
   isAvailable: boolean;
   createdAt: string;
 }
@@ -221,6 +231,11 @@ export interface CreateRewardBody {
   papCost: number;
   /** @nullable */
   stock?: number | null;
+  /**
+   * @minimum 1
+   * @nullable
+   */
+  eligibilityMonths?: number | null;
 }
 
 export interface UpdateRewardBody {
@@ -230,6 +245,11 @@ export interface UpdateRewardBody {
   papCost?: number;
   /** @nullable */
   stock?: number | null;
+  /**
+   * @minimum 1
+   * @nullable
+   */
+  eligibilityMonths?: number | null;
   isAvailable?: boolean;
 }
 

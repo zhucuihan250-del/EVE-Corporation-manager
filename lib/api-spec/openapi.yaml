@@ -720,6 +720,8 @@ components:
       properties:
         error:
           type: string
+        code:
+          type: string
       required:
         - error
 
@@ -1038,6 +1040,14 @@ components:
           type: number
         stock:
           type: ["integer", "null"]
+        eligibilityMonths:
+          type: ["integer", "null"]
+          minimum: 1
+        eligibilityEndsAt:
+          type: ["string", "null"]
+          format: date-time
+        isEligible:
+          type: ["boolean", "null"]
         isAvailable:
           type: boolean
         createdAt:
@@ -1047,6 +1057,7 @@ components:
         - id
         - name
         - papCost
+        - eligibilityMonths
         - isAvailable
         - createdAt
 
@@ -1061,6 +1072,9 @@ components:
           type: number
         stock:
           type: ["integer", "null"]
+        eligibilityMonths:
+          type: ["integer", "null"]
+          minimum: 1
       required:
         - name
         - papCost
@@ -1076,6 +1090,9 @@ components:
           type: number
         stock:
           type: ["integer", "null"]
+        eligibilityMonths:
+          type: ["integer", "null"]
+          minimum: 1
         isAvailable:
           type: boolean
 

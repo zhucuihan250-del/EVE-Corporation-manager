@@ -13,5 +13,10 @@ export interface UpdateRewardBody {
   papCost?: number;
   /** @nullable */
   stock?: number | null;
+  /**
+   * @minimum 1
+   * @nullable
+   */
+  eligibilityMonths?: number | null;
   isAvailable?: boolean;
 }

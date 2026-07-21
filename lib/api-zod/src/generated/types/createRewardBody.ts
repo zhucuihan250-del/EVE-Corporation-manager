@@ -13,4 +13,9 @@ export interface CreateRewardBody {
   papCost: number;
   /** @nullable */
   stock?: number | null;
+  /**
+   * @minimum 1
+   * @nullable
+   */
+  eligibilityMonths?: number | null;
 }

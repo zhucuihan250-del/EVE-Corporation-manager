@@ -4,6 +4,7 @@ import { eq, sql } from "drizzle-orm";
 import { getAuthorizationUrl, getLinkAltAuthorizationUrl, exchangeCode, getCharacterInfo, getCorporationName } from "../lib/eve-sso";
 import { requireAuth } from "../middlewares/auth";
 import { logger } from "../lib/logger";
+import { getCorporationJoinDate } from "../lib/corporation-membership";
 
 const router: IRouter = Router();
 
@@ -219,6 +220,10 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
       }
     }
 
+    const corporationJoinedAt = corporationId
+      ? await getCorporationJoinDate(characterId, corporationId)
+      : null;
+
     if (!user) {
       // Check if there are any users (first user becomes admin)
       const allUsers = await db.select().from(usersTable);
@@ -231,6 +236,7 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
           eveCharacterName: characterName,
           corporationId,
           corporationName,
+          corporationJoinedAt,
           accessToken,
           refreshToken,
           tokenExpiry,
@@ -257,6 +263,8 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
           eveCharacterName: characterName,
           corporationId,
           corporationName,
+          corporationJoinedAt: corporationJoinedAt
+            ?? (user.corporationId === corporationId ? user.corporationJoinedAt : null),
           accessToken,
           refreshToken,
           tokenExpiry,

@@ -8,6 +8,7 @@ export const usersTable = pgTable("users", {
   eveCharacterName: text("eve_character_name"),
   corporationId: integer("corporation_id"),
   corporationName: text("corporation_name"),
+  corporationJoinedAt: timestamp("corporation_joined_at", { withTimezone: true }),
   accessToken: text("access_token"),
   refreshToken: text("refresh_token"),
   tokenExpiry: timestamp("token_expiry", { withTimezone: true }),

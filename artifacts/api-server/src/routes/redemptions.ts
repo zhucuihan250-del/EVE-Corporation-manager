@@ -4,6 +4,7 @@ import { eq, desc, sql } from "drizzle-orm";
 import { requireAuth, hasRole } from "../middlewares/auth";
 import { CreateRedemptionBody } from "@workspace/api-zod";
 import { papRecordsTable } from "@workspace/db";
+import { addCalendarMonths, ensureCorporationJoinedAt } from "../lib/corporation-membership";
 
 const router: IRouter = Router();
 
@@ -78,6 +79,26 @@ router.post("/redemptions", requireAuth, async (req: Request, res: Response): Pr
   if (!user) {
     res.status(401).json({ error: "User not found" });
     return;
+  }
+
+  if (reward.eligibilityMonths !== null) {
+    const corporationJoinedAt = await ensureCorporationJoinedAt(user);
+    if (!corporationJoinedAt) {
+      res.status(503).json({
+        error: "Unable to verify corporation join date. Please try again later.",
+        code: "CORPORATION_JOIN_DATE_UNAVAILABLE",
+      });
+      return;
+    }
+
+    const eligibilityEndsAt = addCalendarMonths(corporationJoinedAt, reward.eligibilityMonths);
+    if (Date.now() > eligibilityEndsAt.getTime()) {
+      res.status(403).json({
+        error: `This reward is only available within ${reward.eligibilityMonths} month(s) of joining the corporation.`,
+        code: "REWARD_ELIGIBILITY_EXPIRED",
+      });
+      return;
+    }
   }
 
   if (user.redeemablePap < reward.papCost) {

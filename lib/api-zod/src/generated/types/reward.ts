@@ -14,6 +14,15 @@ export interface Reward {
   papCost: number;
   /** @nullable */
   stock?: number | null;
+  /**
+   * @minimum 1
+   * @nullable
+   */
+  eligibilityMonths: number | null;
+  /** @nullable */
+  eligibilityEndsAt?: Date | null;
+  /** @nullable */
+  isEligible?: boolean | null;
   isAvailable: boolean;
   createdAt: Date;
 }

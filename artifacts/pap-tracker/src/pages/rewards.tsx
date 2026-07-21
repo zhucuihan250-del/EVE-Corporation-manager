@@ -2,7 +2,7 @@ import { useListRewards, useCreateRedemption, getGetDashboardSummaryQueryKey } f
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ShoppingCart } from "lucide-react";
+import { Clock3, Loader2, ShoppingCart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -26,9 +26,15 @@ export function Rewards() {
           queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
         },
         onError: (err: any) => {
+          const errorCode = err?.data?.code;
+          const errorMessage = err?.data?.error;
           toast({
             title: t("rewards.redemptionFailed"),
-            description: err.error || t("rewards.insufficientPap"),
+            description: errorCode === "REWARD_ELIGIBILITY_EXPIRED"
+              ? t("rewards.eligibilityExpiredDesc")
+              : errorCode === "CORPORATION_JOIN_DATE_UNAVAILABLE"
+                ? t("rewards.eligibilityVerificationUnavailable")
+                : errorMessage || t("rewards.insufficientPap"),
             variant: "destructive",
           });
         }
@@ -55,36 +61,54 @@ export function Rewards() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {rewards.map((reward) => (
-            <Card key={reward.id} className="bg-card/40 backdrop-blur border-border/50 rounded-sm flex flex-col">
-              <CardHeader className="pb-4">
-                <div className="flex justify-between items-start gap-4">
-                  <CardTitle className="text-lg font-mono tracking-wider">{reward.name}</CardTitle>
-                  <Badge variant="outline" className="font-mono bg-primary/10 text-primary border-primary/20 shrink-0">
-                    {reward.papCost} PAP
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="flex-1">
-                <p className="text-sm text-muted-foreground font-mono mb-4">{reward.description || "Standard issue item."}</p>
-                <div className="flex items-center gap-2 text-xs font-mono">
-                  <span className="text-muted-foreground">{t("rewards.stock")}:</span>
-                  <span className={reward.stock === 0 ? "text-destructive" : "text-foreground"}>
-                    {reward.stock === null ? t("rewards.unlimited") : reward.stock}
-                  </span>
-                </div>
-              </CardContent>
-              <CardFooter className="pt-4 border-t border-border/30">
-                <Button 
-                  className="w-full font-mono text-xs tracking-wider rounded-sm" 
-                  disabled={!reward.isAvailable || reward.stock === 0 || createRedemption.isPending}
-                  onClick={() => handleRedeem(reward.id, reward.name)}
-                >
-                  {createRedemption.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><ShoppingCart className="w-4 h-4 mr-2" /> {t("rewards.requisition")}</>}
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
+          {rewards.map((reward) => {
+            const eligibilityExpired = reward.isEligible === false;
+
+            return (
+              <Card key={reward.id} className="bg-card/40 backdrop-blur border-border/50 rounded-sm flex flex-col">
+                <CardHeader className="pb-4">
+                  <div className="flex justify-between items-start gap-4">
+                    <CardTitle className="text-lg font-mono tracking-wider">{reward.name}</CardTitle>
+                    <Badge variant="outline" className="font-mono bg-primary/10 text-primary border-primary/20 shrink-0">
+                      {reward.papCost} PAP
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1">
+                  <p className="text-sm text-muted-foreground font-mono mb-4">{reward.description || "Standard issue item."}</p>
+                  <div className="flex items-center gap-2 text-xs font-mono">
+                    <span className="text-muted-foreground">{t("rewards.stock")}:</span>
+                    <span className={reward.stock === 0 ? "text-destructive" : "text-foreground"}>
+                      {reward.stock === null ? t("rewards.unlimited") : reward.stock}
+                    </span>
+                  </div>
+                  {reward.eligibilityMonths !== null && (
+                    <div className={`flex items-center gap-2 text-xs font-mono mt-3 ${eligibilityExpired ? "text-destructive" : "text-amber-400"}`}>
+                      <Clock3 className="w-3.5 h-3.5 shrink-0" />
+                      <span>
+                        {eligibilityExpired
+                          ? t("rewards.eligibilityExpired")
+                          : t("rewards.limitedToNewMembers", { months: reward.eligibilityMonths })}
+                      </span>
+                    </div>
+                  )}
+                </CardContent>
+                <CardFooter className="pt-4 border-t border-border/30">
+                  <Button
+                    className="w-full font-mono text-xs tracking-wider rounded-sm"
+                    disabled={!reward.isAvailable || reward.stock === 0 || eligibilityExpired || createRedemption.isPending}
+                    onClick={() => handleRedeem(reward.id, reward.name)}
+                  >
+                    {createRedemption.isPending
+                      ? <Loader2 className="w-4 h-4 animate-spin" />
+                      : eligibilityExpired
+                        ? t("rewards.eligibilityExpired")
+                        : <><ShoppingCart className="w-4 h-4 mr-2" /> {t("rewards.requisition")}</>}
+                  </Button>
+                </CardFooter>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

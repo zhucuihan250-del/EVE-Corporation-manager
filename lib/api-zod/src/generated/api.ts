@@ -347,12 +347,16 @@ export const CreateManualPapBody = zod.object({
 /**
  * @summary List all available rewards
  */
+
 export const ListRewardsResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),
   description: zod.string().nullish(),
   papCost: zod.number(),
   stock: zod.number().nullish(),
+  eligibilityMonths: zod.number().min(1).nullable(),
+  eligibilityEndsAt: zod.coerce.date().nullish(),
+  isEligible: zod.boolean().nullish(),
   isAvailable: zod.boolean(),
   createdAt: zod.coerce.date(),
 });
@@ -361,11 +365,13 @@ export const ListRewardsResponse = zod.array(ListRewardsResponseItem);
 /**
  * @summary Create a new reward (admin only)
  */
+
 export const CreateRewardBody = zod.object({
   name: zod.string(),
   description: zod.string().nullish(),
   papCost: zod.number(),
   stock: zod.number().nullish(),
+  eligibilityMonths: zod.number().min(1).nullish(),
 });
 
 /**
@@ -380,6 +386,7 @@ export const UpdateRewardBody = zod.object({
   description: zod.string().nullish(),
   papCost: zod.number().optional(),
   stock: zod.number().nullish(),
+  eligibilityMonths: zod.number().min(1).nullish(),
   isAvailable: zod.boolean().optional(),
 });
 
@@ -389,6 +396,9 @@ export const UpdateRewardResponse = zod.object({
   description: zod.string().nullish(),
   papCost: zod.number(),
   stock: zod.number().nullish(),
+  eligibilityMonths: zod.number().min(1).nullable(),
+  eligibilityEndsAt: zod.coerce.date().nullish(),
+  isEligible: zod.boolean().nullish(),
   isAvailable: zod.boolean(),
   createdAt: zod.coerce.date(),
 });

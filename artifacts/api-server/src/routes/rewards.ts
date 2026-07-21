@@ -8,13 +8,43 @@ import {
   UpdateRewardBody,
   DeleteRewardParams,
 } from "@workspace/api-zod";
+import { addCalendarMonths, ensureCorporationJoinedAt } from "../lib/corporation-membership";
 
 const router: IRouter = Router();
+
+function isValidEligibilityMonths(value: number | null | undefined): boolean {
+  return value === null || value === undefined || (Number.isInteger(value) && value > 0);
+}
 
 // GET /api/rewards
 router.get("/rewards", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const rewards = await db.select().from(rewardsTable).orderBy(desc(rewardsTable.createdAt));
-  res.json(rewards);
+  const hasLimitedRewards = rewards.some((reward) => reward.eligibilityMonths !== null);
+  const [currentUser] = hasLimitedRewards
+    ? await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!))
+    : [];
+  const corporationJoinedAt = currentUser
+    ? await ensureCorporationJoinedAt(currentUser)
+    : null;
+  const now = Date.now();
+
+  res.json(
+    rewards.map((reward) => {
+      const eligibilityEndsAt = reward.eligibilityMonths !== null && corporationJoinedAt
+        ? addCalendarMonths(corporationJoinedAt, reward.eligibilityMonths)
+        : null;
+
+      return {
+        ...reward,
+        eligibilityEndsAt,
+        isEligible: reward.eligibilityMonths === null
+          ? true
+          : eligibilityEndsAt
+            ? now <= eligibilityEndsAt.getTime()
+            : null,
+      };
+    }),
+  );
 });
 
 // POST /api/rewards - admin only
@@ -30,6 +60,10 @@ router.post("/rewards", requireAuth, async (req: Request, res: Response): Promis
     res.status(400).json({ error: body.error.message });
     return;
   }
+  if (!isValidEligibilityMonths(body.data.eligibilityMonths)) {
+    res.status(400).json({ error: "Eligibility months must be a positive integer" });
+    return;
+  }
 
   const [reward] = await db
     .insert(rewardsTable)
@@ -38,6 +72,7 @@ router.post("/rewards", requireAuth, async (req: Request, res: Response): Promis
       description: body.data.description ?? null,
       papCost: body.data.papCost,
       stock: body.data.stock ?? null,
+      eligibilityMonths: body.data.eligibilityMonths ?? null,
       isAvailable: true,
     })
     .returning();
@@ -64,12 +99,17 @@ router.patch("/rewards/:id", requireAuth, async (req: Request, res: Response): P
     res.status(400).json({ error: body.error.message });
     return;
   }
+  if (!isValidEligibilityMonths(body.data.eligibilityMonths)) {
+    res.status(400).json({ error: "Eligibility months must be a positive integer" });
+    return;
+  }
 
   const updates: Partial<typeof rewardsTable.$inferInsert> = {};
   if (body.data.name !== undefined) updates.name = body.data.name;
   if (body.data.description !== undefined) updates.description = body.data.description;
   if (body.data.papCost !== undefined) updates.papCost = body.data.papCost;
   if (body.data.stock !== undefined) updates.stock = body.data.stock;
+  if (body.data.eligibilityMonths !== undefined) updates.eligibilityMonths = body.data.eligibilityMonths;
   if (body.data.isAvailable !== undefined) updates.isAvailable = body.data.isAvailable;
 
   const [reward] = await db

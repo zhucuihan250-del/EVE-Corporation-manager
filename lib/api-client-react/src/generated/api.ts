@@ -2080,7 +2080,7 @@ export const deleteReward = async (
 };
 
 export const getDeleteRewardMutationOptions = <
-  TError = ErrorType<unknown>,
+  TError = ErrorType<void>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -2121,13 +2121,13 @@ export type DeleteRewardMutationResult = NonNullable<
   Awaited<ReturnType<typeof deleteReward>>
 >;
 
-export type DeleteRewardMutationError = ErrorType<unknown>;
+export type DeleteRewardMutationError = ErrorType<void>;
 
 /**
  * @summary Delete a reward (admin only)
  */
 export const useDeleteReward = <
-  TError = ErrorType<unknown>,
+  TError = ErrorType<void>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<

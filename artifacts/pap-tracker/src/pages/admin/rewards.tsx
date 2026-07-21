@@ -30,6 +30,7 @@ export function AdminRewards() {
   const [description, setDescription] = useState("");
   const [papCost, setPapCost] = useState("");
   const [stock, setStock] = useState("");
+  const [eligibilityMonths, setEligibilityMonths] = useState("");
 
   const invalidateRewardQueries = () => {
     queryClient.invalidateQueries({ queryKey: ["adminRewards"] });
@@ -42,18 +43,25 @@ export function AdminRewards() {
     setDescription("");
     setPapCost("");
     setStock("");
+    setEligibilityMonths("");
     setCurrentId(null);
     setEditMode(false);
   };
 
   const handleSave = () => {
     if (!name || !papCost) return;
+    const parsedEligibilityMonths = eligibilityMonths === "" ? null : Number(eligibilityMonths);
+    if (
+      parsedEligibilityMonths !== null
+      && (!Number.isInteger(parsedEligibilityMonths) || parsedEligibilityMonths < 1)
+    ) return;
     
     const payload = {
       name,
       description,
       papCost: Number(papCost),
-      stock: stock ? Number(stock) : null
+      stock: stock ? Number(stock) : null,
+      eligibilityMonths: parsedEligibilityMonths,
     };
 
     if (editMode && currentId) {
@@ -90,6 +98,7 @@ export function AdminRewards() {
     setDescription(reward.description || "");
     setPapCost(reward.papCost.toString());
     setStock(reward.stock !== null ? reward.stock.toString() : "");
+    setEligibilityMonths(reward.eligibilityMonths !== null ? reward.eligibilityMonths.toString() : "");
     setModalOpen(true);
   };
 
@@ -162,6 +171,7 @@ export function AdminRewards() {
                   <TableHead className="font-mono text-xs text-muted-foreground">{t("adminRewards.assetName")}</TableHead>
                   <TableHead className="font-mono text-xs text-muted-foreground">{t("adminRewards.cost")}</TableHead>
                   <TableHead className="font-mono text-xs text-muted-foreground">{t("adminRewards.stock")}</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground">{t("adminRewards.eligibility")}</TableHead>
                   <TableHead className="font-mono text-xs text-muted-foreground">{t("adminRewards.status")}</TableHead>
                   <TableHead className="font-mono text-xs text-muted-foreground text-right">{t("adminRewards.actions")}</TableHead>
                 </TableRow>
@@ -180,6 +190,11 @@ export function AdminRewards() {
                     </TableCell>
                     <TableCell className="font-mono text-sm text-muted-foreground">
                       {reward.stock === null ? t("adminRewards.unlimited") : reward.stock}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {reward.eligibilityMonths === null
+                        ? t("adminRewards.noEligibilityLimit")
+                        : t("adminRewards.limitedMonths", { months: reward.eligibilityMonths })}
                     </TableCell>
                     <TableCell>
                       <Badge variant={reward.isAvailable ? 'default' : 'secondary'} className="font-mono text-[10px] rounded-sm cursor-pointer" onClick={() => handleToggleAvailability(reward.id, reward.isAvailable)}>
@@ -269,6 +284,19 @@ export function AdminRewards() {
                 placeholder={t("adminRewards.stockPlaceholder")}
               />
             </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="eligibilityMonths" className="text-right text-xs tracking-widest">{t("adminRewards.eligibilityMonths")}</Label>
+              <Input
+                id="eligibilityMonths"
+                type="number"
+                min="1"
+                step="1"
+                value={eligibilityMonths}
+                onChange={(e) => setEligibilityMonths(e.target.value)}
+                className="col-span-3 bg-background/50 border-border/50 rounded-sm"
+                placeholder={t("adminRewards.eligibilityMonthsPlaceholder")}
+              />
+            </div>
           </div>
           <DialogFooter>
             {editMode && (
@@ -283,7 +311,17 @@ export function AdminRewards() {
               </Button>
             )}
             <Button variant="outline" onClick={() => setModalOpen(false)} className="rounded-sm">{t("adminRewards.cancel")}</Button>
-            <Button onClick={handleSave} disabled={createReward.isPending || updateReward.isPending || !name || !papCost} className="rounded-sm">
+            <Button
+              onClick={handleSave}
+              disabled={
+                createReward.isPending
+                || updateReward.isPending
+                || !name
+                || !papCost
+                || (eligibilityMonths !== "" && (!Number.isInteger(Number(eligibilityMonths)) || Number(eligibilityMonths) < 1))
+              }
+              className="rounded-sm"
+            >
               {createReward.isPending || updateReward.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : t("adminRewards.saveAsset")}
             </Button>
           </DialogFooter>

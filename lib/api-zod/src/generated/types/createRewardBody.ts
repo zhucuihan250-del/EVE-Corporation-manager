@@ -18,4 +18,9 @@ export interface CreateRewardBody {
    * @nullable
    */
   eligibilityMonths?: number | null;
+  /**
+   * @minimum 1
+   * @nullable
+   */
+  maxRedemptionsPerUser?: number | null;
 }

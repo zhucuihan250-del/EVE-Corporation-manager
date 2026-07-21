@@ -10,11 +10,13 @@ export const rewardsTable = pgTable("rewards", {
   papCost: real("pap_cost").notNull(),
   stock: integer("stock"),
   eligibilityMonths: integer("eligibility_months"),
+  maxRedemptionsPerUser: integer("max_redemptions_per_user"),
   isAvailable: boolean("is_available").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 }, (table) => [
   check("rewards_eligibility_months_positive", sql`${table.eligibilityMonths} IS NULL OR ${table.eligibilityMonths} > 0`),
+  check("rewards_max_redemptions_per_user_positive", sql`${table.maxRedemptionsPerUser} IS NULL OR ${table.maxRedemptionsPerUser} > 0`),
 ]);
 
 export const insertRewardSchema = createInsertSchema(rewardsTable).omit({ id: true, createdAt: true, updatedAt: true });

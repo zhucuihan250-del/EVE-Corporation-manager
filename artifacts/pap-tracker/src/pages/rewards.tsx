@@ -2,7 +2,7 @@ import { useListRewards, useCreateRedemption, getGetDashboardSummaryQueryKey } f
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Clock3, Loader2, ShoppingCart } from "lucide-react";
+import { Clock3, Loader2, Repeat2, ShoppingCart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -24,6 +24,7 @@ export function Rewards() {
             description: t("rewards.redemptionRequestedDesc", { name }),
           });
           queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+          queryClient.invalidateQueries({ queryKey: ["rewards"] });
         },
         onError: (err: any) => {
           const errorCode = err?.data?.code;
@@ -34,6 +35,8 @@ export function Rewards() {
               ? t("rewards.eligibilityExpiredDesc")
               : errorCode === "CORPORATION_JOIN_DATE_UNAVAILABLE"
                 ? t("rewards.eligibilityVerificationUnavailable")
+                : errorCode === "REWARD_REDEMPTION_LIMIT_REACHED"
+                  ? t("rewards.redemptionLimitReachedDesc")
                 : errorMessage || t("rewards.insufficientPap"),
             variant: "destructive",
           });
@@ -63,6 +66,7 @@ export function Rewards() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {rewards.map((reward) => {
             const eligibilityExpired = reward.isEligible === false;
+            const redemptionLimitReached = reward.hasReachedRedemptionLimit === true;
 
             return (
               <Card key={reward.id} className="bg-card/40 backdrop-blur border-border/50 rounded-sm flex flex-col">
@@ -92,18 +96,33 @@ export function Rewards() {
                       </span>
                     </div>
                   )}
+                  {reward.maxRedemptionsPerUser !== null && (
+                    <div className={`flex items-center gap-2 text-xs font-mono mt-3 ${redemptionLimitReached ? "text-destructive" : "text-primary"}`}>
+                      <Repeat2 className="w-3.5 h-3.5 shrink-0" />
+                      <span>
+                        {redemptionLimitReached
+                          ? t("rewards.redemptionLimitReached")
+                          : t("rewards.redemptionsRemaining", {
+                            remaining: reward.remainingRedemptions ?? 0,
+                            limit: reward.maxRedemptionsPerUser,
+                          })}
+                      </span>
+                    </div>
+                  )}
                 </CardContent>
                 <CardFooter className="pt-4 border-t border-border/30">
                   <Button
                     className="w-full font-mono text-xs tracking-wider rounded-sm"
-                    disabled={!reward.isAvailable || reward.stock === 0 || eligibilityExpired || createRedemption.isPending}
+                    disabled={!reward.isAvailable || reward.stock === 0 || eligibilityExpired || redemptionLimitReached || createRedemption.isPending}
                     onClick={() => handleRedeem(reward.id, reward.name)}
                   >
                     {createRedemption.isPending
                       ? <Loader2 className="w-4 h-4 animate-spin" />
                       : eligibilityExpired
                         ? t("rewards.eligibilityExpired")
-                        : <><ShoppingCart className="w-4 h-4 mr-2" /> {t("rewards.requisition")}</>}
+                        : redemptionLimitReached
+                          ? t("rewards.redemptionLimitReached")
+                          : <><ShoppingCart className="w-4 h-4 mr-2" /> {t("rewards.requisition")}</>}
                   </Button>
                 </CardFooter>
               </Card>

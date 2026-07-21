@@ -18,5 +18,10 @@ export interface UpdateRewardBody {
    * @nullable
    */
   eligibilityMonths?: number | null;
+  /**
+   * @minimum 1
+   * @nullable
+   */
+  maxRedemptionsPerUser?: number | null;
   isAvailable?: boolean;
 }

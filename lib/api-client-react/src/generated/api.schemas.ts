@@ -216,6 +216,22 @@ export interface Reward {
    * @nullable
    */
   eligibilityMonths: number | null;
+  /**
+   * @minimum 1
+   * @nullable
+   */
+  maxRedemptionsPerUser: number | null;
+  /**
+   * @minimum 0
+   * @nullable
+   */
+  userRedemptionCount?: number | null;
+  /**
+   * @minimum 0
+   * @nullable
+   */
+  remainingRedemptions?: number | null;
+  hasReachedRedemptionLimit?: boolean;
   /** @nullable */
   eligibilityEndsAt?: string | null;
   /** @nullable */
@@ -236,6 +252,11 @@ export interface CreateRewardBody {
    * @nullable
    */
   eligibilityMonths?: number | null;
+  /**
+   * @minimum 1
+   * @nullable
+   */
+  maxRedemptionsPerUser?: number | null;
 }
 
 export interface UpdateRewardBody {
@@ -250,6 +271,11 @@ export interface UpdateRewardBody {
    * @nullable
    */
   eligibilityMonths?: number | null;
+  /**
+   * @minimum 1
+   * @nullable
+   */
+  maxRedemptionsPerUser?: number | null;
   isAvailable?: boolean;
 }
 

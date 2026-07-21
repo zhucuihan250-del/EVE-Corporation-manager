@@ -1,13 +1,18 @@
 import type { Pool, PoolClient } from "pg";
 import { redemptionRewardNameSnapshotMigration } from "./0001-redemption-reward-name-snapshot";
 import { limitedTimeRewardsMigration } from "./0002-limited-time-rewards";
+import { rewardRedemptionLimitsMigration } from "./0003-reward-redemption-limits";
 
 type Migration = {
   id: string;
   up(client: PoolClient): Promise<void>;
 };
 
-const migrations: Migration[] = [redemptionRewardNameSnapshotMigration, limitedTimeRewardsMigration];
+const migrations: Migration[] = [
+  redemptionRewardNameSnapshotMigration,
+  limitedTimeRewardsMigration,
+  rewardRedemptionLimitsMigration,
+];
 
 export async function runMigrations(pool: Pool): Promise<void> {
   const client = await pool.connect();

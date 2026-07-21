@@ -12,6 +12,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useTranslation } from "react-i18next";
 
+function isOptionalPositiveInteger(value: string): boolean {
+  return value === "" || (Number.isInteger(Number(value)) && Number(value) > 0);
+}
+
 export function AdminRewards() {
   const { t } = useTranslation();
   const { data: rewards, isLoading } = useListRewards({ query: { queryKey: ["adminRewards"] } });
@@ -31,6 +35,7 @@ export function AdminRewards() {
   const [papCost, setPapCost] = useState("");
   const [stock, setStock] = useState("");
   const [eligibilityMonths, setEligibilityMonths] = useState("");
+  const [maxRedemptionsPerUser, setMaxRedemptionsPerUser] = useState("");
 
   const invalidateRewardQueries = () => {
     queryClient.invalidateQueries({ queryKey: ["adminRewards"] });
@@ -44,6 +49,7 @@ export function AdminRewards() {
     setPapCost("");
     setStock("");
     setEligibilityMonths("");
+    setMaxRedemptionsPerUser("");
     setCurrentId(null);
     setEditMode(false);
   };
@@ -51,10 +57,10 @@ export function AdminRewards() {
   const handleSave = () => {
     if (!name || !papCost) return;
     const parsedEligibilityMonths = eligibilityMonths === "" ? null : Number(eligibilityMonths);
-    if (
-      parsedEligibilityMonths !== null
-      && (!Number.isInteger(parsedEligibilityMonths) || parsedEligibilityMonths < 1)
-    ) return;
+    const parsedMaxRedemptionsPerUser = maxRedemptionsPerUser === ""
+      ? null
+      : Number(maxRedemptionsPerUser);
+    if (!isOptionalPositiveInteger(eligibilityMonths) || !isOptionalPositiveInteger(maxRedemptionsPerUser)) return;
     
     const payload = {
       name,
@@ -62,6 +68,7 @@ export function AdminRewards() {
       papCost: Number(papCost),
       stock: stock ? Number(stock) : null,
       eligibilityMonths: parsedEligibilityMonths,
+      maxRedemptionsPerUser: parsedMaxRedemptionsPerUser,
     };
 
     if (editMode && currentId) {
@@ -99,6 +106,7 @@ export function AdminRewards() {
     setPapCost(reward.papCost.toString());
     setStock(reward.stock !== null ? reward.stock.toString() : "");
     setEligibilityMonths(reward.eligibilityMonths !== null ? reward.eligibilityMonths.toString() : "");
+    setMaxRedemptionsPerUser(reward.maxRedemptionsPerUser !== null ? reward.maxRedemptionsPerUser.toString() : "");
     setModalOpen(true);
   };
 
@@ -172,6 +180,7 @@ export function AdminRewards() {
                   <TableHead className="font-mono text-xs text-muted-foreground">{t("adminRewards.cost")}</TableHead>
                   <TableHead className="font-mono text-xs text-muted-foreground">{t("adminRewards.stock")}</TableHead>
                   <TableHead className="font-mono text-xs text-muted-foreground">{t("adminRewards.eligibility")}</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground">{t("adminRewards.redemptionLimit")}</TableHead>
                   <TableHead className="font-mono text-xs text-muted-foreground">{t("adminRewards.status")}</TableHead>
                   <TableHead className="font-mono text-xs text-muted-foreground text-right">{t("adminRewards.actions")}</TableHead>
                 </TableRow>
@@ -195,6 +204,11 @@ export function AdminRewards() {
                       {reward.eligibilityMonths === null
                         ? t("adminRewards.noEligibilityLimit")
                         : t("adminRewards.limitedMonths", { months: reward.eligibilityMonths })}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {reward.maxRedemptionsPerUser === null
+                        ? t("adminRewards.unlimited")
+                        : t("adminRewards.limitedRedemptions", { count: reward.maxRedemptionsPerUser })}
                     </TableCell>
                     <TableCell>
                       <Badge variant={reward.isAvailable ? 'default' : 'secondary'} className="font-mono text-[10px] rounded-sm cursor-pointer" onClick={() => handleToggleAvailability(reward.id, reward.isAvailable)}>
@@ -232,7 +246,7 @@ export function AdminRewards() {
       </Card>
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="sm:max-w-[425px] bg-card border-primary/20 rounded-sm font-mono">
+        <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto bg-card border-primary/20 rounded-sm font-mono">
           <DialogHeader>
             <DialogTitle className="tracking-wider uppercase text-primary flex items-center gap-2">
               <Gift className="w-5 h-5" /> {editMode ? t("adminRewards.modifyAsset") : t("adminRewards.registerAsset")}
@@ -297,6 +311,19 @@ export function AdminRewards() {
                 placeholder={t("adminRewards.eligibilityMonthsPlaceholder")}
               />
             </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="maxRedemptionsPerUser" className="text-right text-xs tracking-widest">{t("adminRewards.maxRedemptionsPerUser")}</Label>
+              <Input
+                id="maxRedemptionsPerUser"
+                type="number"
+                min="1"
+                step="1"
+                value={maxRedemptionsPerUser}
+                onChange={(e) => setMaxRedemptionsPerUser(e.target.value)}
+                className="col-span-3 bg-background/50 border-border/50 rounded-sm"
+                placeholder={t("adminRewards.maxRedemptionsPerUserPlaceholder")}
+              />
+            </div>
           </div>
           <DialogFooter>
             {editMode && (
@@ -318,7 +345,8 @@ export function AdminRewards() {
                 || updateReward.isPending
                 || !name
                 || !papCost
-                || (eligibilityMonths !== "" && (!Number.isInteger(Number(eligibilityMonths)) || Number(eligibilityMonths) < 1))
+                || !isOptionalPositiveInteger(eligibilityMonths)
+                || !isOptionalPositiveInteger(maxRedemptionsPerUser)
               }
               className="rounded-sm"
             >

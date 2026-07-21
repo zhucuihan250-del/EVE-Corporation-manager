@@ -348,6 +348,10 @@ export const CreateManualPapBody = zod.object({
  * @summary List all available rewards
  */
 
+export const listRewardsResponseUserRedemptionCountMin = 0;
+
+export const listRewardsResponseRemainingRedemptionsMin = 0;
+
 export const ListRewardsResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),
@@ -355,6 +359,16 @@ export const ListRewardsResponseItem = zod.object({
   papCost: zod.number(),
   stock: zod.number().nullish(),
   eligibilityMonths: zod.number().min(1).nullable(),
+  maxRedemptionsPerUser: zod.number().min(1).nullable(),
+  userRedemptionCount: zod
+    .number()
+    .min(listRewardsResponseUserRedemptionCountMin)
+    .nullish(),
+  remainingRedemptions: zod
+    .number()
+    .min(listRewardsResponseRemainingRedemptionsMin)
+    .nullish(),
+  hasReachedRedemptionLimit: zod.boolean().optional(),
   eligibilityEndsAt: zod.coerce.date().nullish(),
   isEligible: zod.boolean().nullish(),
   isAvailable: zod.boolean(),
@@ -372,6 +386,7 @@ export const CreateRewardBody = zod.object({
   papCost: zod.number(),
   stock: zod.number().nullish(),
   eligibilityMonths: zod.number().min(1).nullish(),
+  maxRedemptionsPerUser: zod.number().min(1).nullish(),
 });
 
 /**
@@ -387,8 +402,13 @@ export const UpdateRewardBody = zod.object({
   papCost: zod.number().optional(),
   stock: zod.number().nullish(),
   eligibilityMonths: zod.number().min(1).nullish(),
+  maxRedemptionsPerUser: zod.number().min(1).nullish(),
   isAvailable: zod.boolean().optional(),
 });
+
+export const updateRewardResponseUserRedemptionCountMin = 0;
+
+export const updateRewardResponseRemainingRedemptionsMin = 0;
 
 export const UpdateRewardResponse = zod.object({
   id: zod.number(),
@@ -397,6 +417,16 @@ export const UpdateRewardResponse = zod.object({
   papCost: zod.number(),
   stock: zod.number().nullish(),
   eligibilityMonths: zod.number().min(1).nullable(),
+  maxRedemptionsPerUser: zod.number().min(1).nullable(),
+  userRedemptionCount: zod
+    .number()
+    .min(updateRewardResponseUserRedemptionCountMin)
+    .nullish(),
+  remainingRedemptions: zod
+    .number()
+    .min(updateRewardResponseRemainingRedemptionsMin)
+    .nullish(),
+  hasReachedRedemptionLimit: zod.boolean().optional(),
   eligibilityEndsAt: zod.coerce.date().nullish(),
   isEligible: zod.boolean().nullish(),
   isAvailable: zod.boolean(),

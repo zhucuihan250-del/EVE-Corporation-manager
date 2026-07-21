@@ -546,7 +546,19 @@ paths:
               schema:
                 $ref: "#/components/schemas/Redemption"
         "400":
-          description: Insufficient PAP balance
+          description: Invalid request, insufficient PAP, unavailable reward, or depleted stock
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Corporation tenure or per-user redemption limit reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Corporation join date could not be verified
           content:
             application/json:
               schema:
@@ -1043,6 +1055,17 @@ components:
         eligibilityMonths:
           type: ["integer", "null"]
           minimum: 1
+        maxRedemptionsPerUser:
+          type: ["integer", "null"]
+          minimum: 1
+        userRedemptionCount:
+          type: ["integer", "null"]
+          minimum: 0
+        remainingRedemptions:
+          type: ["integer", "null"]
+          minimum: 0
+        hasReachedRedemptionLimit:
+          type: boolean
         eligibilityEndsAt:
           type: ["string", "null"]
           format: date-time
@@ -1058,6 +1081,7 @@ components:
         - name
         - papCost
         - eligibilityMonths
+        - maxRedemptionsPerUser
         - isAvailable
         - createdAt
 
@@ -1073,6 +1097,9 @@ components:
         stock:
           type: ["integer", "null"]
         eligibilityMonths:
+          type: ["integer", "null"]
+          minimum: 1
+        maxRedemptionsPerUser:
           type: ["integer", "null"]
           minimum: 1
       required:
@@ -1091,6 +1118,9 @@ components:
         stock:
           type: ["integer", "null"]
         eligibilityMonths:
+          type: ["integer", "null"]
+          minimum: 1
+        maxRedemptionsPerUser:
           type: ["integer", "null"]
           minimum: 1
         isAvailable:

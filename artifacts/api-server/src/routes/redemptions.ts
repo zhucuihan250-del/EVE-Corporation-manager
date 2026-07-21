@@ -1,12 +1,23 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, redemptionsTable, rewardsTable, usersTable } from "@workspace/db";
-import { eq, desc, sql } from "drizzle-orm";
+import { and, count, desc, eq, ne, sql } from "drizzle-orm";
 import { requireAuth, hasRole } from "../middlewares/auth";
 import { CreateRedemptionBody } from "@workspace/api-zod";
 import { papRecordsTable } from "@workspace/db";
 import { addCalendarMonths, ensureCorporationJoinedAt } from "../lib/corporation-membership";
 
 const router: IRouter = Router();
+
+class RedemptionRequestError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+    readonly code?: string,
+  ) {
+    super(message);
+    this.name = "RedemptionRequestError";
+  }
+}
 
 function formatRedemption(r: {
   id: number;
@@ -65,24 +76,15 @@ router.post("/redemptions", requireAuth, async (req: Request, res: Response): Pr
     return;
   }
 
-  if (!reward.isAvailable) {
-    res.status(400).json({ error: "Reward is not available" });
-    return;
-  }
-
-  if (reward.stock !== null && reward.stock <= 0) {
-    res.status(400).json({ error: "Reward is out of stock" });
-    return;
-  }
-
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
   if (!user) {
     res.status(401).json({ error: "User not found" });
     return;
   }
 
-  if (reward.eligibilityMonths !== null) {
-    const corporationJoinedAt = await ensureCorporationJoinedAt(user);
+  let corporationJoinedAt = user.corporationJoinedAt;
+  if (reward.eligibilityMonths !== null && !corporationJoinedAt) {
+    corporationJoinedAt = await ensureCorporationJoinedAt(user);
     if (!corporationJoinedAt) {
       res.status(503).json({
         error: "Unable to verify corporation join date. Please try again later.",
@@ -91,56 +93,128 @@ router.post("/redemptions", requireAuth, async (req: Request, res: Response): Pr
       return;
     }
 
-    const eligibilityEndsAt = addCalendarMonths(corporationJoinedAt, reward.eligibilityMonths);
-    if (Date.now() > eligibilityEndsAt.getTime()) {
-      res.status(403).json({
-        error: `This reward is only available within ${reward.eligibilityMonths} month(s) of joining the corporation.`,
-        code: "REWARD_ELIGIBILITY_EXPIRED",
+  }
+
+  try {
+    const result = await db.transaction(async (tx) => {
+      const [currentReward] = await tx
+        .select()
+        .from(rewardsTable)
+        .where(eq(rewardsTable.id, reward.id))
+        .for("update");
+      if (!currentReward) {
+        throw new RedemptionRequestError(404, "Reward not found");
+      }
+
+      const [currentUser] = await tx
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.id, user.id))
+        .for("update");
+      if (!currentUser) {
+        throw new RedemptionRequestError(401, "User not found");
+      }
+
+      if (!currentReward.isAvailable) {
+        throw new RedemptionRequestError(400, "Reward is not available");
+      }
+
+      if (currentReward.stock !== null && currentReward.stock <= 0) {
+        throw new RedemptionRequestError(400, "Reward is out of stock");
+      }
+
+      if (currentReward.eligibilityMonths !== null) {
+        const joinedAt = currentUser.corporationJoinedAt ?? corporationJoinedAt;
+        if (!joinedAt) {
+          throw new RedemptionRequestError(
+            503,
+            "Unable to verify corporation join date. Please try again later.",
+            "CORPORATION_JOIN_DATE_UNAVAILABLE",
+          );
+        }
+
+        const eligibilityEndsAt = addCalendarMonths(joinedAt, currentReward.eligibilityMonths);
+        if (Date.now() > eligibilityEndsAt.getTime()) {
+          throw new RedemptionRequestError(
+            403,
+            `This reward is only available within ${currentReward.eligibilityMonths} month(s) of joining the corporation.`,
+            "REWARD_ELIGIBILITY_EXPIRED",
+          );
+        }
+      }
+
+      if (currentReward.maxRedemptionsPerUser !== null) {
+        const [redemptionCount] = await tx
+          .select({ count: count() })
+          .from(redemptionsTable)
+          .where(and(
+            eq(redemptionsTable.userId, currentUser.id),
+            eq(redemptionsTable.rewardId, currentReward.id),
+            ne(redemptionsTable.status, "cancelled"),
+          ));
+
+        if (redemptionCount.count >= currentReward.maxRedemptionsPerUser) {
+          throw new RedemptionRequestError(
+            403,
+            `This reward can only be redeemed ${currentReward.maxRedemptionsPerUser} time(s) per user.`,
+            "REWARD_REDEMPTION_LIMIT_REACHED",
+          );
+        }
+      }
+
+      if (currentUser.redeemablePap < currentReward.papCost) {
+        throw new RedemptionRequestError(
+          400,
+          `Insufficient PAP balance. Need ${currentReward.papCost}, have ${currentUser.redeemablePap}`,
+        );
+      }
+
+      await tx.update(usersTable).set({
+        redeemablePap: sql`redeemable_pap - ${currentReward.papCost}`,
+      }).where(eq(usersTable.id, currentUser.id));
+
+      await tx.insert(papRecordsTable).values({
+        userId: currentUser.id,
+        amount: -currentReward.papCost,
+        type: "adjustment",
+        reason: `Redeemed: ${currentReward.name}`,
+      });
+
+      if (currentReward.stock !== null) {
+        await tx.update(rewardsTable).set({
+          stock: sql`stock - 1`,
+        }).where(eq(rewardsTable.id, currentReward.id));
+      }
+
+      const [redemption] = await tx
+        .insert(redemptionsTable)
+        .values({
+          userId: currentUser.id,
+          rewardId: currentReward.id,
+          rewardName: currentReward.name,
+          papCost: currentReward.papCost,
+          status: "pending",
+        })
+        .returning();
+
+      return {
+        ...redemption,
+        userName: currentUser.eveCharacterName,
+      };
+    });
+
+    res.status(201).json(result);
+  } catch (error) {
+    if (error instanceof RedemptionRequestError) {
+      res.status(error.status).json({
+        error: error.message,
+        ...(error.code ? { code: error.code } : {}),
       });
       return;
     }
+
+    throw error;
   }
-
-  if (user.redeemablePap < reward.papCost) {
-    res.status(400).json({ error: `Insufficient PAP balance. Need ${reward.papCost}, have ${user.redeemablePap}` });
-    return;
-  }
-
-  // Deduct PAP
-  await db.update(usersTable).set({
-    redeemablePap: sql`redeemable_pap - ${reward.papCost}`,
-  }).where(eq(usersTable.id, user.id));
-
-  // Create PAP deduction record
-  await db.insert(papRecordsTable).values({
-    userId: user.id,
-    amount: -reward.papCost,
-    type: "adjustment",
-    reason: `Redeemed: ${reward.name}`,
-  });
-
-  // Decrement stock if tracked
-  if (reward.stock !== null) {
-    await db.update(rewardsTable).set({
-      stock: sql`stock - 1`,
-    }).where(eq(rewardsTable.id, reward.id));
-  }
-
-  const [redemption] = await db
-    .insert(redemptionsTable)
-    .values({
-      userId: user.id,
-      rewardId: reward.id,
-      rewardName: reward.name,
-      papCost: reward.papCost,
-      status: "pending",
-    })
-    .returning();
-
-  res.status(201).json({
-    ...redemption,
-    userName: user.eveCharacterName,
-  });
 });
 
 // PATCH /api/redemptions/:id - admin only (fulfill/cancel)

@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { db, rewardsTable, usersTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { db, redemptionsTable, rewardsTable, usersTable } from "@workspace/db";
+import { and, count, desc, eq, ne } from "drizzle-orm";
 import { requireAuth, hasRole } from "../middlewares/auth";
 import {
   CreateRewardBody,
@@ -12,20 +12,34 @@ import { addCalendarMonths, ensureCorporationJoinedAt } from "../lib/corporation
 
 const router: IRouter = Router();
 
-function isValidEligibilityMonths(value: number | null | undefined): boolean {
+function isValidOptionalPositiveInteger(value: number | null | undefined): boolean {
   return value === null || value === undefined || (Number.isInteger(value) && value > 0);
 }
 
 // GET /api/rewards
 router.get("/rewards", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const rewards = await db.select().from(rewardsTable).orderBy(desc(rewardsTable.createdAt));
-  const hasLimitedRewards = rewards.some((reward) => reward.eligibilityMonths !== null);
-  const [currentUser] = hasLimitedRewards
+  const hasTenureLimitedRewards = rewards.some((reward) => reward.eligibilityMonths !== null);
+  const hasRedemptionLimitedRewards = rewards.some((reward) => reward.maxRedemptionsPerUser !== null);
+  const [currentUser] = hasTenureLimitedRewards
     ? await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!))
     : [];
   const corporationJoinedAt = currentUser
     ? await ensureCorporationJoinedAt(currentUser)
     : null;
+  const redemptionCounts = hasRedemptionLimitedRewards
+    ? await db
+      .select({ rewardId: redemptionsTable.rewardId, count: count() })
+      .from(redemptionsTable)
+      .where(and(
+        eq(redemptionsTable.userId, req.session.userId!),
+        ne(redemptionsTable.status, "cancelled"),
+      ))
+      .groupBy(redemptionsTable.rewardId)
+    : [];
+  const redemptionCountByRewardId = new Map(
+    redemptionCounts.map((record) => [record.rewardId, record.count]),
+  );
   const now = Date.now();
 
   res.json(
@@ -33,9 +47,18 @@ router.get("/rewards", requireAuth, async (req: Request, res: Response): Promise
       const eligibilityEndsAt = reward.eligibilityMonths !== null && corporationJoinedAt
         ? addCalendarMonths(corporationJoinedAt, reward.eligibilityMonths)
         : null;
+      const userRedemptionCount = reward.maxRedemptionsPerUser === null
+        ? null
+        : (redemptionCountByRewardId.get(reward.id) ?? 0);
+      const remainingRedemptions = reward.maxRedemptionsPerUser === null
+        ? null
+        : Math.max(0, reward.maxRedemptionsPerUser - (userRedemptionCount ?? 0));
 
       return {
         ...reward,
+        userRedemptionCount,
+        remainingRedemptions,
+        hasReachedRedemptionLimit: remainingRedemptions === 0 && reward.maxRedemptionsPerUser !== null,
         eligibilityEndsAt,
         isEligible: reward.eligibilityMonths === null
           ? true
@@ -60,8 +83,12 @@ router.post("/rewards", requireAuth, async (req: Request, res: Response): Promis
     res.status(400).json({ error: body.error.message });
     return;
   }
-  if (!isValidEligibilityMonths(body.data.eligibilityMonths)) {
+  if (!isValidOptionalPositiveInteger(body.data.eligibilityMonths)) {
     res.status(400).json({ error: "Eligibility months must be a positive integer" });
+    return;
+  }
+  if (!isValidOptionalPositiveInteger(body.data.maxRedemptionsPerUser)) {
+    res.status(400).json({ error: "Maximum redemptions per user must be a positive integer" });
     return;
   }
 
@@ -73,6 +100,7 @@ router.post("/rewards", requireAuth, async (req: Request, res: Response): Promis
       papCost: body.data.papCost,
       stock: body.data.stock ?? null,
       eligibilityMonths: body.data.eligibilityMonths ?? null,
+      maxRedemptionsPerUser: body.data.maxRedemptionsPerUser ?? null,
       isAvailable: true,
     })
     .returning();
@@ -99,8 +127,12 @@ router.patch("/rewards/:id", requireAuth, async (req: Request, res: Response): P
     res.status(400).json({ error: body.error.message });
     return;
   }
-  if (!isValidEligibilityMonths(body.data.eligibilityMonths)) {
+  if (!isValidOptionalPositiveInteger(body.data.eligibilityMonths)) {
     res.status(400).json({ error: "Eligibility months must be a positive integer" });
+    return;
+  }
+  if (!isValidOptionalPositiveInteger(body.data.maxRedemptionsPerUser)) {
+    res.status(400).json({ error: "Maximum redemptions per user must be a positive integer" });
     return;
   }
 
@@ -110,6 +142,7 @@ router.patch("/rewards/:id", requireAuth, async (req: Request, res: Response): P
   if (body.data.papCost !== undefined) updates.papCost = body.data.papCost;
   if (body.data.stock !== undefined) updates.stock = body.data.stock;
   if (body.data.eligibilityMonths !== undefined) updates.eligibilityMonths = body.data.eligibilityMonths;
+  if (body.data.maxRedemptionsPerUser !== undefined) updates.maxRedemptionsPerUser = body.data.maxRedemptionsPerUser;
   if (body.data.isAvailable !== undefined) updates.isAvailable = body.data.isAvailable;
 
   const [reward] = await db

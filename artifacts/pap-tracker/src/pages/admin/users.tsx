@@ -6,11 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, ShieldAlert, Shield, MoreHorizontal, Activity, Users, Trash2, Star, AlertTriangle, Crown, Sword } from "lucide-react";
+import { Loader2, ShieldAlert, Shield, MoreHorizontal, Activity, Users, Trash2, Star, AlertTriangle, Crown, Sword, Search, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,6 +57,7 @@ export function AdminUsers() {
   const { toast } = useToast();
 
   const amController = me ? hasRole(me.role, "controller") : false;
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [adjustModalOpen, setAdjustModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<number | null>(null);
@@ -70,6 +71,15 @@ export function AdminUsers() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
   const [deleteConfirmInput, setDeleteConfirmInput] = useState("");
+
+  const visibleUsers = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLocaleLowerCase();
+    if (!normalizedQuery) return users ?? [];
+
+    return (users ?? []).filter((user) =>
+      (user.eveCharacterName ?? "").toLocaleLowerCase().includes(normalizedQuery),
+    );
+  }, [searchQuery, users]);
 
   const { data: userCharacters, isLoading: charsLoading } = useGetUserCharacters(
     charsUserId ?? 0,
@@ -165,8 +175,29 @@ export function AdminUsers() {
       </div>
 
       <Card className="bg-card/40 backdrop-blur border-border/50 rounded-sm">
-        <CardHeader className="border-b border-border/30 pb-4">
+        <CardHeader className="border-b border-border/30 pb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="text-sm font-mono tracking-wider uppercase">{t("personnel.activeMembers")}</CardTitle>
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <Input
+              type="search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder={t("personnel.searchPlaceholder")}
+              aria-label={t("personnel.searchPlaceholder")}
+              className="h-9 pl-9 pr-9 bg-background/50 border-border/50 rounded-sm font-mono text-xs"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                aria-label={t("personnel.clearSearch")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
@@ -176,6 +207,10 @@ export function AdminUsers() {
           ) : !users?.length ? (
             <div className="p-8 text-center text-muted-foreground font-mono text-sm">
               {t("personnel.noPersonnel")}
+            </div>
+          ) : !visibleUsers.length ? (
+            <div className="p-8 text-center text-muted-foreground font-mono text-sm">
+              {t("personnel.noSearchResults")}
             </div>
           ) : (
             <Table>
@@ -189,7 +224,7 @@ export function AdminUsers() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map((user) => (
+                {visibleUsers.map((user) => (
                   <TableRow key={user.id} className="border-border/30 border-b last:border-0 hover:bg-primary/5 transition-colors">
                     <TableCell className="font-mono text-sm text-foreground">
                       {user.eveCharacterName || `Unknown (ID: ${user.eveCharacterId})`}

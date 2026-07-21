@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, usersTable, papRecordsTable, charactersTable, redemptionsTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import { requireAuth, hasRole } from "../middlewares/auth";
 import {
   UpdateUserRoleParams,
@@ -34,7 +34,14 @@ router.get("/users", requireAuth, async (req: Request, res: Response): Promise<v
     return;
   }
 
-  const users = await db.select().from(usersTable).orderBy(desc(usersTable.totalPap));
+  const users = await db
+    .select()
+    .from(usersTable)
+    .orderBy(
+      sql`NULLIF(BTRIM(${usersTable.eveCharacterName}), '') IS NULL`,
+      sql`LOWER(${usersTable.eveCharacterName})`,
+      asc(usersTable.id),
+    );
   res.json(users.map(u => ({
     id: u.id,
     eveCharacterId: u.eveCharacterId,

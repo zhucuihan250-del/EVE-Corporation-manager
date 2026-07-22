@@ -83,6 +83,20 @@ export const battleReportParticipantsTable = pgTable(
   ],
 );
 
+export type BattleReportAttacker = {
+  characterId: number | null;
+  characterName: string | null;
+  corporationId: number | null;
+  corporationName: string | null;
+  allianceId: number | null;
+  allianceName: string | null;
+  shipTypeId: number | null;
+  shipName: string | null;
+  damageDone: number;
+  finalBlow: boolean;
+  isFleetMember: boolean;
+};
+
 export const battleReportKillmailsTable = pgTable(
   "battle_report_killmails",
   {
@@ -111,6 +125,10 @@ export const battleReportKillmailsTable = pgTable(
     friendlyDamage: integer("friendly_damage").notNull().default(0),
     friendlyAttackers: integer("friendly_attackers").notNull().default(0),
     finalBlowByFleet: boolean("final_blow_by_fleet").notNull().default(false),
+    attackers: jsonb("attackers")
+      .$type<BattleReportAttacker[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
     zkillboardUrl: text("zkillboard_url"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

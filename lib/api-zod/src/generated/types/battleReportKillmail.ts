@@ -5,6 +5,7 @@
  * EVE Online PAP Tracking System API
  * OpenAPI spec version: 0.1.0
  */
+import type { BattleReportAttacker } from "./battleReportAttacker";
 
 export interface BattleReportKillmail {
   id: number;
@@ -34,6 +35,7 @@ export interface BattleReportKillmail {
   friendlyDamage: number;
   friendlyAttackers: number;
   finalBlowByFleet: boolean;
+  attackers: BattleReportAttacker[];
   /** @nullable */
   zkillboardUrl?: string | null;
 }

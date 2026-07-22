@@ -229,6 +229,65 @@ function buildRuleSuggestions(
     });
   }
 
+  const enemyThreats = [
+    ...report.killmails
+      .filter((killmail) => killmail.victimIsFleetMember)
+      .reduce(
+        (map, killmail) => {
+          for (const attacker of killmail.attackers ?? []) {
+            if (attacker.isFleetMember) continue;
+            const key =
+              attacker.characterId ??
+              `${attacker.characterName ?? "unknown"}-${attacker.shipTypeId ?? "unknown"}`;
+            const entry = map.get(key) ?? {
+              pilotName: attacker.characterName,
+              shipName: attacker.shipName,
+              killmailIds: new Set<number>(),
+              finalBlows: 0,
+              damageDone: 0,
+            };
+            entry.killmailIds.add(killmail.killmailId);
+            entry.finalBlows += Number(attacker.finalBlow);
+            entry.damageDone += attacker.damageDone;
+            map.set(key, entry);
+          }
+          return map;
+        },
+        new Map<
+          number | string,
+          {
+            pilotName: string | null;
+            shipName: string | null;
+            killmailIds: Set<number>;
+            finalBlows: number;
+            damageDone: number;
+          }
+        >(),
+      )
+      .values(),
+  ].sort(
+    (left, right) =>
+      right.finalBlows - left.finalBlows ||
+      right.killmailIds.size - left.killmailIds.size ||
+      right.damageDone - left.damageDone,
+  );
+  const leadingThreat = enemyThreats[0];
+  if (
+    leadingThreat &&
+    (leadingThreat.finalBlows > 0 || leadingThreat.killmailIds.size > 1)
+  ) {
+    suggestions.push({
+      category: "target_calling",
+      title: "复查对敌方高威胁舰船的识别与处理",
+      observation: `${leadingThreat.pilotName ?? "未知飞行员"} 驾驶 ${leadingThreat.shipName ?? "未知舰船"}，参与 ${leadingThreat.killmailIds.size} 次本方损失并取得 ${leadingThreat.finalBlows} 次最后一击。`,
+      evidence: `攻击者快照记录累计伤害 ${Math.round(leadingThreat.damageDone).toLocaleString()}，关联击杀邮件 ${[...leadingThreat.killmailIds].join("、")}。`,
+      recommendation:
+        "结合现场侦察与广播记录，复查是否应更早标记、规避或优先处理该类高威胁舰船。",
+      confidence: 0.86,
+      relatedKillmailIds: [...leadingThreat.killmailIds],
+    });
+  }
+
   if (report.friendlyLosses > report.hostileLosses) {
     suggestions.push({
       category: "target_calling",
@@ -395,6 +454,83 @@ async function requestOpenAiAnalysis(
       friendlyDamage: Math.round(killmail.friendlyDamage),
       friendlyAttackers: killmail.friendlyAttackers,
       finalBlowByFleet: killmail.finalBlowByFleet,
+      attackerEvidence: [...(killmail.attackers ?? [])]
+        .filter((attacker) =>
+          killmail.victimIsFleetMember
+            ? !attacker.isFleetMember
+            : attacker.isFleetMember,
+        )
+        .sort(
+          (left, right) =>
+            Number(right.finalBlow) - Number(left.finalBlow) ||
+            right.damageDone - left.damageDone,
+        )
+        .slice(0, 25)
+        .map((attacker) => ({
+          side: attacker.isFleetMember ? "friendly" : "hostile",
+          pilot: attacker.characterName,
+          corporation: attacker.corporationName,
+          alliance: attacker.allianceName,
+          ship: attacker.shipName,
+          damageDone: attacker.damageDone,
+          finalBlow: attacker.finalBlow,
+        })),
+    }));
+  const enemyComposition = [
+    ...report.killmails
+      .filter((killmail) => killmail.victimIsFleetMember)
+      .reduce(
+        (map, killmail) => {
+          for (const attacker of killmail.attackers ?? []) {
+            if (attacker.isFleetMember) continue;
+            const key = attacker.shipTypeId ?? `unknown-${attacker.shipName}`;
+            const entry = map.get(key) ?? {
+              ship: attacker.shipName,
+              pilots: new Set<string>(),
+              killmailIds: new Set<number>(),
+              finalBlows: 0,
+              damageDone: 0,
+            };
+            entry.pilots.add(
+              String(
+                attacker.characterId ??
+                  attacker.characterName ??
+                  `npc-${attacker.shipTypeId ?? "unknown"}`,
+              ),
+            );
+            entry.killmailIds.add(killmail.killmailId);
+            entry.finalBlows += Number(attacker.finalBlow);
+            entry.damageDone += attacker.damageDone;
+            map.set(key, entry);
+          }
+          return map;
+        },
+        new Map<
+          number | string,
+          {
+            ship: string | null;
+            pilots: Set<string>;
+            killmailIds: Set<number>;
+            finalBlows: number;
+            damageDone: number;
+          }
+        >(),
+      )
+      .values(),
+  ]
+    .sort(
+      (left, right) =>
+        right.killmailIds.size - left.killmailIds.size ||
+        right.damageDone - left.damageDone,
+    )
+    .slice(0, 30)
+    .map((entry) => ({
+      ship: entry.ship,
+      observedPilots: entry.pilots.size,
+      killInvolvements: entry.killmailIds.size,
+      finalBlows: entry.finalBlows,
+      damageDone: entry.damageDone,
+      relatedKillmailIds: [...entry.killmailIds],
     }));
 
   const schema = {
@@ -507,7 +643,7 @@ async function requestOpenAiAnalysis(
           },
         },
         instructions:
-          "你是 EVE Online 舰队战斗复盘助手。只使用提供的击杀邮件证据，用简体中文输出。识别关键舰船、关键击杀、60 秒战损高峰并提供可执行建议。不能从数据证明的指挥、站位、语音或移动情况必须表述为待复查或推测，禁止指责个人。所有引用的 killmailId 必须来自输入。",
+          "你是 EVE Online 舰队战斗复盘助手。只使用提供的击杀邮件证据，用简体中文输出。识别关键舰船、关键击杀、60 秒战损高峰，并结合 attackerEvidence 与 enemyComposition 分析敌方舰船构成、参与击杀次数、伤害和最后一击集中度，提供可执行建议。keyShips 与 keyKills 必须标注该 killmail 中被击毁的舰船；敌方攻击舰船应写入建议的观察与证据。不能从数据证明的指挥、站位、语音或移动情况必须表述为待复查或推测，禁止指责个人。所有引用的 killmailId 必须来自输入。",
         input: JSON.stringify({
           battle: {
             name: report.fleetName,
@@ -521,6 +657,7 @@ async function requestOpenAiAnalysis(
             totalLost: Math.round(report.totalLost),
           },
           events,
+          enemyComposition,
         }),
       }),
     });

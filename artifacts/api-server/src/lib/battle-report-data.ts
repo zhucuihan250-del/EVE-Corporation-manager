@@ -83,6 +83,7 @@ export async function loadBattleReportDetail(reportId: number) {
         friendlyDamage: battleReportKillmailsTable.friendlyDamage,
         friendlyAttackers: battleReportKillmailsTable.friendlyAttackers,
         finalBlowByFleet: battleReportKillmailsTable.finalBlowByFleet,
+        attackers: battleReportKillmailsTable.attackers,
         zkillboardUrl: battleReportKillmailsTable.zkillboardUrl,
       })
       .from(battleReportKillmailsTable)

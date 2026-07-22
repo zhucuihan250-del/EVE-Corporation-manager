@@ -189,6 +189,28 @@ export interface BattleReportParticipant {
   losses: number;
 }
 
+export interface BattleReportAttacker {
+  /** @nullable */
+  characterId?: number | null;
+  /** @nullable */
+  characterName?: string | null;
+  /** @nullable */
+  corporationId?: number | null;
+  /** @nullable */
+  corporationName?: string | null;
+  /** @nullable */
+  allianceId?: number | null;
+  /** @nullable */
+  allianceName?: string | null;
+  /** @nullable */
+  shipTypeId?: number | null;
+  /** @nullable */
+  shipName?: string | null;
+  damageDone: number;
+  finalBlow: boolean;
+  isFleetMember: boolean;
+}
+
 export interface BattleReportKillmail {
   id: number;
   killmailId: number;
@@ -217,6 +239,7 @@ export interface BattleReportKillmail {
   friendlyDamage: number;
   friendlyAttackers: number;
   finalBlowByFleet: boolean;
+  attackers: BattleReportAttacker[];
   /** @nullable */
   zkillboardUrl?: string | null;
 }

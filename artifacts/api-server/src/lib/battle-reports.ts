@@ -7,6 +7,7 @@ import {
   db,
   fleetsTable,
   papRecordsTable,
+  type BattleReportAttacker,
 } from "@workspace/db";
 import { logger } from "./logger";
 
@@ -84,6 +85,7 @@ type StoredKillmail = {
   friendlyDamage: number;
   friendlyAttackers: number;
   finalBlowByFleet: boolean;
+  attackers: BattleReportAttacker[];
   zkillboardUrl: string;
 };
 
@@ -335,6 +337,9 @@ async function runBattleReportGeneration(reportId: number, force: boolean): Prom
     if (killmail.victim.corporation_id) idsToResolve.push(killmail.victim.corporation_id);
     if (killmail.victim.alliance_id) idsToResolve.push(killmail.victim.alliance_id);
     for (const attacker of killmail.attackers) {
+      if (attacker.character_id) idsToResolve.push(attacker.character_id);
+      if (attacker.corporation_id) idsToResolve.push(attacker.corporation_id);
+      if (attacker.alliance_id) idsToResolve.push(attacker.alliance_id);
       if (attacker.ship_type_id) idsToResolve.push(attacker.ship_type_id);
     }
   }
@@ -373,6 +378,19 @@ async function runBattleReportGeneration(reportId: number, force: boolean): Prom
     );
     const friendlyDamage = friendlyAttackers.reduce((sum, attacker) => sum + attacker.damage_done, 0);
     const finalBlowByFleet = friendlyAttackers.some((attacker) => attacker.final_blow);
+    const attackers: BattleReportAttacker[] = killmail.attackers.map((attacker) => ({
+      characterId: attacker.character_id ?? null,
+      characterName: attacker.character_id ? names.get(attacker.character_id)?.name ?? null : null,
+      corporationId: attacker.corporation_id ?? null,
+      corporationName: attacker.corporation_id ? names.get(attacker.corporation_id)?.name ?? null : null,
+      allianceId: attacker.alliance_id ?? null,
+      allianceName: attacker.alliance_id ? names.get(attacker.alliance_id)?.name ?? null : null,
+      shipTypeId: attacker.ship_type_id ?? null,
+      shipName: attacker.ship_type_id ? names.get(attacker.ship_type_id)?.name ?? null : null,
+      damageDone: attacker.damage_done,
+      finalBlow: attacker.final_blow,
+      isFleetMember: attacker.character_id ? participantIds.has(attacker.character_id) : false,
+    }));
 
     if (victimIsFleetMember) {
       friendlyLosses++;
@@ -424,6 +442,7 @@ async function runBattleReportGeneration(reportId: number, force: boolean): Prom
       friendlyDamage,
       friendlyAttackers: friendlyAttackers.length,
       finalBlowByFleet,
+      attackers,
       zkillboardUrl: `https://zkillboard.com/kill/${killmail.killmail_id}/`,
     });
   }

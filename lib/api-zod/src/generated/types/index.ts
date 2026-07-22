@@ -23,6 +23,7 @@ export * from "./battleReplaySuggestionCategory";
 export * from "./battleReplaySummary";
 export * from "./battleReplaySummaryAiStatus";
 export * from "./battleReplaySummaryReviewStatus";
+export * from "./battleReportAttacker";
 export * from "./battleReportDetail";
 export * from "./battleReportKillmail";
 export * from "./battleReportParticipant";

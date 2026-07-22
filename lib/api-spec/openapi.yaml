@@ -1193,6 +1193,36 @@ components:
         - finalBlows
         - losses
 
+    BattleReportAttacker:
+      type: object
+      properties:
+        characterId:
+          type: ["integer", "null"]
+        characterName:
+          type: ["string", "null"]
+        corporationId:
+          type: ["integer", "null"]
+        corporationName:
+          type: ["string", "null"]
+        allianceId:
+          type: ["integer", "null"]
+        allianceName:
+          type: ["string", "null"]
+        shipTypeId:
+          type: ["integer", "null"]
+        shipName:
+          type: ["string", "null"]
+        damageDone:
+          type: integer
+        finalBlow:
+          type: boolean
+        isFleetMember:
+          type: boolean
+      required:
+        - damageDone
+        - finalBlow
+        - isFleetMember
+
     BattleReportKillmail:
       type: object
       properties:
@@ -1235,6 +1265,10 @@ components:
           type: integer
         finalBlowByFleet:
           type: boolean
+        attackers:
+          type: array
+          items:
+            $ref: "#/components/schemas/BattleReportAttacker"
         zkillboardUrl:
           type: ["string", "null"]
       required:
@@ -1249,6 +1283,7 @@ components:
         - friendlyDamage
         - friendlyAttackers
         - finalBlowByFleet
+        - attackers
 
     BattleReportDetail:
       allOf:

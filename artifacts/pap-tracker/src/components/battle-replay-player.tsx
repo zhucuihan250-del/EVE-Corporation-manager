@@ -40,7 +40,10 @@ export function BattleReplayPlayer({
   onEventChange?: (occurredAt: string) => void;
 }) {
   const { t } = useTranslation();
-  const events = useMemo(
+  const [eventFilter, setEventFilter] = useState<"all" | "fleet" | "enemy">(
+    "all",
+  );
+  const allEvents = useMemo(
     () =>
       [...killmails].sort(
         (left, right) =>
@@ -49,10 +52,34 @@ export function BattleReplayPlayer({
       ),
     [killmails],
   );
+  const events = useMemo(
+    () =>
+      allEvents.filter((event) => {
+        if (eventFilter === "fleet") return !event.victimIsFleetMember;
+        if (eventFilter === "enemy") return event.victimIsFleetMember;
+        return true;
+      }),
+    [allEvents, eventFilter],
+  );
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const activeEvent = events[currentIndex];
+  const relevantAttackers = useMemo(
+    () =>
+      [...(activeEvent?.attackers ?? [])]
+        .filter((attacker) =>
+          activeEvent?.victimIsFleetMember
+            ? !attacker.isFleetMember
+            : attacker.isFleetMember,
+        )
+        .sort(
+          (left, right) =>
+            Number(right.finalBlow) - Number(left.finalBlow) ||
+            right.damageDone - left.damageDone,
+        ),
+    [activeEvent],
+  );
 
   const markers = useMemo(() => {
     const result = new Map<number, string[]>();
@@ -105,14 +132,41 @@ export function BattleReplayPlayer({
 
   if (!activeEvent) {
     return (
-      <div className="p-10 text-center font-mono text-sm text-muted-foreground">
-        {t("battleReports.noKillmails")}
+      <div className="space-y-4">
+        {allEvents.length > 0 && (
+          <EventFilters
+            value={eventFilter}
+            onChange={(value) => {
+              setEventFilter(value);
+              setCurrentIndex(0);
+              setIsPlaying(false);
+            }}
+            t={t}
+          />
+        )}
+        <div className="p-10 text-center font-mono text-sm text-muted-foreground">
+          {t(
+            allEvents.length === 0
+              ? "battleReports.noKillmails"
+              : "battleReplay.noFilteredEvents",
+          )}
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
+      <EventFilters
+        value={eventFilter}
+        onChange={(value) => {
+          setEventFilter(value);
+          setCurrentIndex(0);
+          setIsPlaying(false);
+        }}
+        t={t}
+      />
+
       <Card
         className={`rounded-sm overflow-hidden ${activeEvent.victimIsFleetMember ? "border-red-500/30 bg-red-500/5" : "border-emerald-500/30 bg-emerald-500/5"}`}
       >
@@ -179,6 +233,74 @@ export function BattleReplayPlayer({
                 </a>
               )}
             </div>
+          </div>
+
+          <div className="mt-5 border-t border-border/30 pt-4">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <p className="font-mono text-xs font-bold uppercase tracking-wider">
+                {activeEvent.victimIsFleetMember
+                  ? t("battleReplay.enemyAttackers")
+                  : t("battleReplay.fleetAttackers")}
+              </p>
+              <span className="font-mono text-[10px] text-muted-foreground">
+                {t("battleReplay.attackersObserved", {
+                  count: relevantAttackers.length,
+                })}
+              </span>
+            </div>
+            {relevantAttackers.length === 0 ? (
+              <p className="font-mono text-xs text-muted-foreground">
+                {t("battleReplay.noAttackerData")}
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {relevantAttackers.slice(0, 8).map((attacker, index) => (
+                  <div
+                    key={`${attacker.characterId ?? "npc"}-${attacker.shipTypeId ?? "ship"}-${index}`}
+                    className="flex items-center gap-3 border border-border/35 bg-background/35 rounded-sm p-2.5"
+                  >
+                    {attacker.shipTypeId ? (
+                      <img
+                        src={`https://images.evetech.net/types/${attacker.shipTypeId}/icon?size=64`}
+                        alt=""
+                        className="w-9 h-9 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-9 h-9 shrink-0 border border-border/40 bg-muted/20" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-bold truncate">
+                          {attacker.shipName || t("battleReplay.unknownShip")}
+                        </span>
+                        {attacker.finalBlow && (
+                          <Badge className="shrink-0 bg-red-500/15 border-red-500/30 text-red-400 text-[9px] px-1.5 py-0">
+                            {t("battleReplay.finalBlow")}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="font-mono text-[10px] text-muted-foreground truncate mt-0.5">
+                        {attacker.characterName ||
+                          t("battleReplay.unknownPilot")}
+                        {attacker.corporationName
+                          ? ` · ${attacker.corporationName}`
+                          : ""}
+                      </p>
+                    </div>
+                    <span className="font-mono text-[10px] text-muted-foreground shrink-0">
+                      {formatIsk(attacker.damageDone)} DMG
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {relevantAttackers.length > 8 && (
+              <p className="font-mono text-[10px] text-muted-foreground mt-2 text-right">
+                {t("battleReplay.moreAttackers", {
+                  count: relevantAttackers.length - 8,
+                })}
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -291,6 +413,33 @@ export function BattleReplayPlayer({
             ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function EventFilters({
+  value,
+  onChange,
+  t,
+}: {
+  value: "all" | "fleet" | "enemy";
+  onChange: (value: "all" | "fleet" | "enemy") => void;
+  t: (key: string) => string;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {(["all", "fleet", "enemy"] as const).map((filter) => (
+        <Button
+          key={filter}
+          type="button"
+          variant={value === filter ? "default" : "outline"}
+          size="sm"
+          className="rounded-sm font-mono text-xs"
+          onClick={() => onChange(filter)}
+        >
+          {t(`battleReplay.eventFilter.${filter}`)}
+        </Button>
+      ))}
     </div>
   );
 }

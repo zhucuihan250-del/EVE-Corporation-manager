@@ -436,11 +436,79 @@ export function BattleReportDetail() {
   }
 
   const totalEfficiency = efficiency(report);
-  const hostilePilotCount = new Set(
-    report.killmails
-      .filter((killmail) => !killmail.victimIsFleetMember)
-      .map((killmail) => killmail.victimCharacterId || `ship-${killmail.id}`),
-  ).size;
+  const enemyKills = [...report.killmails]
+    .filter((killmail) => killmail.victimIsFleetMember)
+    .sort(
+      (left, right) =>
+        new Date(left.killmailTime).getTime() -
+        new Date(right.killmailTime).getTime(),
+    );
+  const hostileAttackers = enemyKills.flatMap((killmail) =>
+    (killmail.attackers ?? []).filter((attacker) => !attacker.isFleetMember),
+  );
+  const hostilePilotCount = hostileAttackers.length
+    ? new Set(
+        hostileAttackers.map(
+          (attacker) =>
+            attacker.characterId ||
+            attacker.characterName ||
+            `ship-${attacker.shipTypeId ?? "unknown"}`,
+        ),
+      ).size
+    : new Set(
+        report.killmails
+          .filter((killmail) => !killmail.victimIsFleetMember)
+          .map(
+            (killmail) => killmail.victimCharacterId || `ship-${killmail.id}`,
+          ),
+      ).size;
+  const enemyCompositions = [
+    ...enemyKills
+      .reduce(
+        (map, killmail) => {
+          for (const attacker of killmail.attackers ?? []) {
+            if (attacker.isFleetMember) continue;
+            const key = attacker.shipTypeId ?? `unknown-${attacker.shipName}`;
+            const entry = map.get(key) ?? {
+              typeId: attacker.shipTypeId,
+              name: attacker.shipName || t("battleReplay.unknownShip"),
+              pilotKeys: new Set<string>(),
+              killmailIds: new Set<number>(),
+              finalBlows: 0,
+              damageDone: 0,
+            };
+            entry.pilotKeys.add(
+              String(
+                attacker.characterId ||
+                  attacker.characterName ||
+                  `npc-${attacker.shipTypeId ?? "unknown"}`,
+              ),
+            );
+            entry.killmailIds.add(killmail.killmailId);
+            entry.finalBlows += Number(attacker.finalBlow);
+            entry.damageDone += attacker.damageDone;
+            map.set(key, entry);
+          }
+          return map;
+        },
+        new Map<
+          number | string,
+          {
+            typeId?: number | null;
+            name: string;
+            pilotKeys: Set<string>;
+            killmailIds: Set<number>;
+            finalBlows: number;
+            damageDone: number;
+          }
+        >(),
+      )
+      .values(),
+  ].sort(
+    (left, right) =>
+      right.killmailIds.size - left.killmailIds.size ||
+      right.damageDone - left.damageDone,
+  );
   const compositions = [
     ...report.participants
       .reduce((map, pilot) => {
@@ -620,6 +688,10 @@ export function BattleReportDetail() {
             <Users className="w-3.5 h-3.5 mr-2" />
             {t("battleReports.fleetMembers")}
           </TabsTrigger>
+          <TabsTrigger value="enemy" className="font-mono text-xs rounded-sm">
+            <Crosshair className="w-3.5 h-3.5 mr-2" />
+            {t("battleReports.enemyIntel")}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="summary" className="space-y-4">
@@ -693,6 +765,131 @@ export function BattleReportDetail() {
               <PilotTable report={report} />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="enemy" className="space-y-4">
+          <div className="grid grid-cols-1 xl:grid-cols-[0.85fr_1.4fr] gap-4">
+            <Card className="bg-card/35 border-border/50 rounded-sm">
+              <CardHeader className="border-b border-border/30 pb-3">
+                <CardTitle className="font-mono text-sm uppercase">
+                  {t("battleReports.enemyComposition")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 space-y-3">
+                {enemyCompositions.length === 0 ? (
+                  <p className="py-8 text-center font-mono text-xs text-muted-foreground">
+                    {t("battleReports.noEnemyData")}
+                  </p>
+                ) : (
+                  enemyCompositions.map((ship) => (
+                    <div
+                      key={`${ship.typeId ?? "unknown"}-${ship.name}`}
+                      className="flex items-center gap-3 border border-border/35 bg-background/25 rounded-sm p-3"
+                    >
+                      {ship.typeId ? (
+                        <img
+                          src={`https://images.evetech.net/types/${ship.typeId}/icon?size=64`}
+                          alt=""
+                          className="w-10 h-10 shrink-0"
+                        />
+                      ) : (
+                        <Swords className="w-10 h-10 p-2 text-muted-foreground" />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="font-mono text-xs font-bold truncate">
+                          {ship.name}
+                        </p>
+                        <p className="font-mono text-[10px] text-muted-foreground mt-1">
+                          {t("battleReports.enemyShipStats", {
+                            pilots: ship.pilotKeys.size,
+                            kills: ship.killmailIds.size,
+                            finalBlows: ship.finalBlows,
+                          })}
+                        </p>
+                      </div>
+                      <span className="font-mono text-[10px] text-muted-foreground shrink-0">
+                        {formatIsk(ship.damageDone)} DMG
+                      </span>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card/35 border-border/50 rounded-sm">
+              <CardHeader className="border-b border-border/30 pb-3">
+                <CardTitle className="font-mono text-sm uppercase">
+                  {t("battleReports.enemyKills")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 space-y-2">
+                {enemyKills.length === 0 ? (
+                  <p className="py-8 text-center font-mono text-xs text-muted-foreground">
+                    {t("battleReports.noEnemyKills")}
+                  </p>
+                ) : (
+                  enemyKills.map((killmail) => {
+                    const finalBlow = (killmail.attackers ?? []).find(
+                      (attacker) =>
+                        !attacker.isFleetMember && attacker.finalBlow,
+                    );
+                    const enemyAttackerCount = (
+                      killmail.attackers ?? []
+                    ).filter((attacker) => !attacker.isFleetMember).length;
+                    return (
+                      <div
+                        key={killmail.killmailId}
+                        className="flex flex-col md:flex-row md:items-center gap-3 border border-red-500/20 bg-red-500/5 rounded-sm p-3"
+                      >
+                        <img
+                          src={`https://images.evetech.net/types/${killmail.victimShipTypeId}/icon?size=64`}
+                          alt=""
+                          className="w-10 h-10 shrink-0"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-mono text-xs font-bold truncate">
+                            {killmail.victimCharacterName ||
+                              t("battleReports.unknownVictim")}{" "}
+                            {" · "}
+                            {killmail.victimShipName ||
+                              `Type ${killmail.victimShipTypeId}`}
+                          </p>
+                          <p className="font-mono text-[10px] text-muted-foreground mt-1 truncate">
+                            {format(
+                              new Date(killmail.killmailTime),
+                              "HH:mm:ss",
+                            )}{" "}
+                            {" · "}
+                            {killmail.solarSystemName || killmail.solarSystemId}
+                            {finalBlow
+                              ? ` · ${t("battleReports.finalBlowBy", {
+                                  pilot:
+                                    finalBlow.characterName ||
+                                    t("battleReplay.unknownPilot"),
+                                  ship:
+                                    finalBlow.shipName ||
+                                    t("battleReplay.unknownShip"),
+                                })}`
+                              : ""}
+                          </p>
+                        </div>
+                        <div className="md:text-right shrink-0">
+                          <p className="font-mono text-xs font-bold text-red-400">
+                            {formatIsk(killmail.totalValue)} ISK
+                          </p>
+                          <p className="font-mono text-[10px] text-muted-foreground mt-1">
+                            {t("battleReports.enemyAttackerCount", {
+                              count: enemyAttackerCount,
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
 

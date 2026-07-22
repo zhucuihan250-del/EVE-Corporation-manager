@@ -1,0 +1,4 @@
+# Railway currently watches this service directory for deploy triggers.
+# Update this marker when a frontend-only release must rebuild the API service,
+# which also bundles and serves the production frontend.
+6146fb8

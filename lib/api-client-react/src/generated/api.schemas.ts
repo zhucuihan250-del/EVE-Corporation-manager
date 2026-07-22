@@ -221,10 +221,204 @@ export interface BattleReportKillmail {
   zkillboardUrl?: string | null;
 }
 
+export type BattleReviewStatus =
+  (typeof BattleReviewStatus)[keyof typeof BattleReviewStatus];
+
+export const BattleReviewStatus = {
+  draft: "draft",
+  published: "published",
+} as const;
+
+export type BattleReviewAiStatus =
+  (typeof BattleReviewAiStatus)[keyof typeof BattleReviewAiStatus];
+
+export const BattleReviewAiStatus = {
+  not_started: "not_started",
+  generating: "generating",
+  ready: "ready",
+  failed: "failed",
+} as const;
+
+/**
+ * @nullable
+ */
+export type BattleReviewAiSource =
+  | (typeof BattleReviewAiSource)[keyof typeof BattleReviewAiSource]
+  | null;
+
+export const BattleReviewAiSource = {
+  openai: "openai",
+  rules: "rules",
+} as const;
+
+export type BattleReplayAnalysisVersion =
+  (typeof BattleReplayAnalysisVersion)[keyof typeof BattleReplayAnalysisVersion];
+
+export const BattleReplayAnalysisVersion = {
+  NUMBER_1: 1,
+} as const;
+
+export type BattleReplayAnalysisSource =
+  (typeof BattleReplayAnalysisSource)[keyof typeof BattleReplayAnalysisSource];
+
+export const BattleReplayAnalysisSource = {
+  openai: "openai",
+  rules: "rules",
+} as const;
+
+export interface BattleReplayKeyEvent {
+  killmailId: number;
+  occurredAt: string;
+  title: string;
+  reason: string;
+  confidence: number;
+  /** @nullable */
+  shipName?: string | null;
+  /** @nullable */
+  pilotName?: string | null;
+  friendlyLoss: boolean;
+  totalValue: number;
+}
+
+export interface BattleReplayLossPeak {
+  startedAt: string;
+  endedAt: string;
+  title: string;
+  reason: string;
+  confidence: number;
+  killmailIds: number[];
+  friendlyLosses: number;
+  hostileLosses: number;
+  totalValue: number;
+}
+
+export type BattleReplaySuggestionCategory =
+  (typeof BattleReplaySuggestionCategory)[keyof typeof BattleReplaySuggestionCategory];
+
+export const BattleReplaySuggestionCategory = {
+  target_calling: "target_calling",
+  logistics: "logistics",
+  positioning: "positioning",
+  extraction: "extraction",
+  fleet_composition: "fleet_composition",
+  tempo: "tempo",
+  other: "other",
+} as const;
+
+export interface BattleReplaySuggestion {
+  category: BattleReplaySuggestionCategory;
+  title: string;
+  observation: string;
+  evidence: string;
+  recommendation: string;
+  confidence: number;
+  relatedKillmailIds: number[];
+}
+
+export interface BattleReplayAnalysis {
+  version: BattleReplayAnalysisVersion;
+  source: BattleReplayAnalysisSource;
+  model: string;
+  generatedAt: string;
+  summary: string;
+  keyShips: BattleReplayKeyEvent[];
+  keyKills: BattleReplayKeyEvent[];
+  lossPeaks: BattleReplayLossPeak[];
+  suggestions: BattleReplaySuggestion[];
+}
+
+export type BattleReviewManualNodeCategory =
+  (typeof BattleReviewManualNodeCategory)[keyof typeof BattleReviewManualNodeCategory];
+
+export const BattleReviewManualNodeCategory = {
+  key_ship: "key_ship",
+  key_kill: "key_kill",
+  loss_peak: "loss_peak",
+  phase: "phase",
+  note: "note",
+} as const;
+
+export interface BattleReviewManualNode {
+  /** @maxLength 100 */
+  id: string;
+  category: BattleReviewManualNodeCategory;
+  occurredAt: string;
+  /** @maxLength 160 */
+  title: string;
+  /** @maxLength 2000 */
+  description: string;
+}
+
+export interface BattleReview {
+  status: BattleReviewStatus;
+  aiStatus: BattleReviewAiStatus;
+  /** @nullable */
+  aiSource?: BattleReviewAiSource;
+  /** @nullable */
+  aiModel?: string | null;
+  /** @nullable */
+  aiError?: string | null;
+  aiAnalysis?: BattleReplayAnalysis | null;
+  manualNodes: BattleReviewManualNode[];
+  conclusion: string;
+  /** @nullable */
+  aiAnalyzedAt?: string | null;
+  /** @nullable */
+  publishedAt?: string | null;
+  updatedAt: string;
+}
+
 export type BattleReportDetail = BattleReportSummary & {
   participants: BattleReportParticipant[];
   killmails: BattleReportKillmail[];
+  publishedReview?: BattleReview | null;
 };
+
+export type BattleReplaySummaryReviewStatus =
+  (typeof BattleReplaySummaryReviewStatus)[keyof typeof BattleReplaySummaryReviewStatus];
+
+export const BattleReplaySummaryReviewStatus = {
+  not_started: "not_started",
+  draft: "draft",
+  published: "published",
+} as const;
+
+export type BattleReplaySummaryAiStatus =
+  (typeof BattleReplaySummaryAiStatus)[keyof typeof BattleReplaySummaryAiStatus];
+
+export const BattleReplaySummaryAiStatus = {
+  not_started: "not_started",
+  generating: "generating",
+  ready: "ready",
+  failed: "failed",
+} as const;
+
+export type BattleReplaySummary = BattleReportSummary & {
+  reviewStatus: BattleReplaySummaryReviewStatus;
+  aiStatus: BattleReplaySummaryAiStatus;
+  /** @nullable */
+  reviewUpdatedAt?: string | null;
+};
+
+export type BattleReplayDetail = BattleReportDetail & {
+  review: BattleReview | null;
+};
+
+export type UpdateBattleReplayBodyStatus =
+  (typeof UpdateBattleReplayBodyStatus)[keyof typeof UpdateBattleReplayBodyStatus];
+
+export const UpdateBattleReplayBodyStatus = {
+  draft: "draft",
+  published: "published",
+} as const;
+
+export interface UpdateBattleReplayBody {
+  status: UpdateBattleReplayBodyStatus;
+  /** @maxLength 10000 */
+  conclusion: string;
+  /** @maxItems 100 */
+  manualNodes: BattleReviewManualNode[];
+}
 
 export interface UpdateFleetBody {
   name?: string;
@@ -442,4 +636,15 @@ export interface TopContributor {
 
 export type RefreshBattleReport202 = {
   status: string;
+};
+
+export type AnalyzeBattleReplay202Status =
+  (typeof AnalyzeBattleReplay202Status)[keyof typeof AnalyzeBattleReplay202Status];
+
+export const AnalyzeBattleReplay202Status = {
+  generating: "generating",
+} as const;
+
+export type AnalyzeBattleReplay202 = {
+  status: AnalyzeBattleReplay202Status;
 };

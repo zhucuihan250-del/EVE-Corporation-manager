@@ -10,6 +10,7 @@ import redemptionsRouter from "./redemptions";
 import dashboardRouter from "./dashboard";
 import announcementsRouter from "./announcements";
 import battleReportsRouter from "./battle-reports";
+import battleReplaysRouter from "./battle-replays";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(redemptionsRouter);
 router.use(dashboardRouter);
 router.use(announcementsRouter);
 router.use(battleReportsRouter);
+router.use(battleReplaysRouter);
 
 export default router;

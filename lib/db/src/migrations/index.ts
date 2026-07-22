@@ -3,6 +3,7 @@ import { redemptionRewardNameSnapshotMigration } from "./0001-redemption-reward-
 import { limitedTimeRewardsMigration } from "./0002-limited-time-rewards";
 import { rewardRedemptionLimitsMigration } from "./0003-reward-redemption-limits";
 import { fleetBattleReportsMigration } from "./0004-fleet-battle-reports";
+import { battleReportReviewsMigration } from "./0005-battle-report-reviews";
 
 type Migration = {
   id: string;
@@ -14,6 +15,7 @@ const migrations: Migration[] = [
   limitedTimeRewardsMigration,
   rewardRedemptionLimitsMigration,
   fleetBattleReportsMigration,
+  battleReportReviewsMigration,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {
@@ -21,7 +23,10 @@ export async function runMigrations(pool: Pool): Promise<void> {
 
   try {
     await client.query("BEGIN");
-    await client.query("SELECT pg_advisory_xact_lock($1::integer, $2::integer)", [20260720, 1]);
+    await client.query(
+      "SELECT pg_advisory_xact_lock($1::integer, $2::integer)",
+      [20260720, 1],
+    );
     await client.query(`
       CREATE TABLE IF NOT EXISTS "app_migrations" (
         "id" text PRIMARY KEY,
@@ -30,14 +35,19 @@ export async function runMigrations(pool: Pool): Promise<void> {
     `);
 
     for (const migration of migrations) {
-      const applied = await client.query('SELECT 1 FROM "app_migrations" WHERE "id" = $1', [migration.id]);
+      const applied = await client.query(
+        'SELECT 1 FROM "app_migrations" WHERE "id" = $1',
+        [migration.id],
+      );
 
       if (applied.rowCount) {
         continue;
       }
 
       await migration.up(client);
-      await client.query('INSERT INTO "app_migrations" ("id") VALUES ($1)', [migration.id]);
+      await client.query('INSERT INTO "app_migrations" ("id") VALUES ($1)', [
+        migration.id,
+      ]);
     }
 
     await client.query("COMMIT");

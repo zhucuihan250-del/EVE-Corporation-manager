@@ -457,6 +457,112 @@ paths:
                 required:
                   - status
 
+  /command/battle-replays:
+    get:
+      operationId: listBattleReplays
+      tags: [battle-replays]
+      summary: List battle reports with FC review status (FC and above)
+      responses:
+        "200":
+          description: Battle reports available for command review
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BattleReplaySummary"
+        "403":
+          description: FC role required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /command/battle-replays/{id}:
+    get:
+      operationId: getBattleReplay
+      tags: [battle-replays]
+      summary: Get the complete FC battle-review workbench (FC and above)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Battle report and private review draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BattleReplayDetail"
+        "404":
+          description: Battle report not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: updateBattleReplay
+      tags: [battle-replays]
+      summary: Save or publish FC nodes, annotations, and conclusion (FC and above)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBattleReplayBody"
+      responses:
+        "200":
+          description: Saved battle review
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BattleReview"
+        "400":
+          description: Invalid review content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /command/battle-replays/{id}/analyze:
+    post:
+      operationId: analyzeBattleReplay
+      tags: [battle-replays]
+      summary: Run evidence-based AI battle analysis (FC and above)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "202":
+          description: Analysis queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [generating]
+                required:
+                  - status
+        "404":
+          description: Battle report not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /pap:
     get:
       operationId: listPapRecords
@@ -1157,9 +1263,269 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/BattleReportKillmail"
+            publishedReview:
+              oneOf:
+                - $ref: "#/components/schemas/BattleReview"
+                - type: "null"
           required:
             - participants
             - killmails
+
+    BattleReviewManualNode:
+      type: object
+      properties:
+        id:
+          type: string
+          maxLength: 100
+        category:
+          type: string
+          enum: [key_ship, key_kill, loss_peak, phase, note]
+        occurredAt:
+          type: string
+          format: date-time
+        title:
+          type: string
+          maxLength: 160
+        description:
+          type: string
+          maxLength: 2000
+      required: [id, category, occurredAt, title, description]
+
+    BattleReplayKeyEvent:
+      type: object
+      properties:
+        killmailId:
+          type: integer
+        occurredAt:
+          type: string
+          format: date-time
+        title:
+          type: string
+        reason:
+          type: string
+        confidence:
+          type: number
+        shipName:
+          type: ["string", "null"]
+        pilotName:
+          type: ["string", "null"]
+        friendlyLoss:
+          type: boolean
+        totalValue:
+          type: number
+      required:
+        [
+          killmailId,
+          occurredAt,
+          title,
+          reason,
+          confidence,
+          friendlyLoss,
+          totalValue,
+        ]
+
+    BattleReplayLossPeak:
+      type: object
+      properties:
+        startedAt:
+          type: string
+          format: date-time
+        endedAt:
+          type: string
+          format: date-time
+        title:
+          type: string
+        reason:
+          type: string
+        confidence:
+          type: number
+        killmailIds:
+          type: array
+          items:
+            type: integer
+        friendlyLosses:
+          type: integer
+        hostileLosses:
+          type: integer
+        totalValue:
+          type: number
+      required:
+        [
+          startedAt,
+          endedAt,
+          title,
+          reason,
+          confidence,
+          killmailIds,
+          friendlyLosses,
+          hostileLosses,
+          totalValue,
+        ]
+
+    BattleReplaySuggestion:
+      type: object
+      properties:
+        category:
+          type: string
+          enum:
+            [
+              target_calling,
+              logistics,
+              positioning,
+              extraction,
+              fleet_composition,
+              tempo,
+              other,
+            ]
+        title:
+          type: string
+        observation:
+          type: string
+        evidence:
+          type: string
+        recommendation:
+          type: string
+        confidence:
+          type: number
+        relatedKillmailIds:
+          type: array
+          items:
+            type: integer
+      required:
+        [
+          category,
+          title,
+          observation,
+          evidence,
+          recommendation,
+          confidence,
+          relatedKillmailIds,
+        ]
+
+    BattleReplayAnalysis:
+      type: object
+      properties:
+        version:
+          type: integer
+          enum: [1]
+        source:
+          type: string
+          enum: [openai, rules]
+        model:
+          type: string
+        generatedAt:
+          type: string
+          format: date-time
+        summary:
+          type: string
+        keyShips:
+          type: array
+          items:
+            $ref: "#/components/schemas/BattleReplayKeyEvent"
+        keyKills:
+          type: array
+          items:
+            $ref: "#/components/schemas/BattleReplayKeyEvent"
+        lossPeaks:
+          type: array
+          items:
+            $ref: "#/components/schemas/BattleReplayLossPeak"
+        suggestions:
+          type: array
+          items:
+            $ref: "#/components/schemas/BattleReplaySuggestion"
+      required:
+        [
+          version,
+          source,
+          model,
+          generatedAt,
+          summary,
+          keyShips,
+          keyKills,
+          lossPeaks,
+          suggestions,
+        ]
+
+    BattleReview:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [draft, published]
+        aiStatus:
+          type: string
+          enum: [not_started, generating, ready, failed]
+        aiSource:
+          type: ["string", "null"]
+          enum: [openai, rules, null]
+        aiModel:
+          type: ["string", "null"]
+        aiError:
+          type: ["string", "null"]
+        aiAnalysis:
+          oneOf:
+            - $ref: "#/components/schemas/BattleReplayAnalysis"
+            - type: "null"
+        manualNodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/BattleReviewManualNode"
+        conclusion:
+          type: string
+        aiAnalyzedAt:
+          type: ["string", "null"]
+          format: date-time
+        publishedAt:
+          type: ["string", "null"]
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [status, aiStatus, manualNodes, conclusion, updatedAt]
+
+    BattleReplaySummary:
+      allOf:
+        - $ref: "#/components/schemas/BattleReportSummary"
+        - type: object
+          properties:
+            reviewStatus:
+              type: string
+              enum: [not_started, draft, published]
+            aiStatus:
+              type: string
+              enum: [not_started, generating, ready, failed]
+            reviewUpdatedAt:
+              type: ["string", "null"]
+              format: date-time
+          required: [reviewStatus, aiStatus]
+
+    BattleReplayDetail:
+      allOf:
+        - $ref: "#/components/schemas/BattleReportDetail"
+        - type: object
+          properties:
+            review:
+              oneOf:
+                - $ref: "#/components/schemas/BattleReview"
+                - type: "null"
+          required: [review]
+
+    UpdateBattleReplayBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [draft, published]
+        conclusion:
+          type: string
+          maxLength: 10000
+        manualNodes:
+          type: array
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/BattleReviewManualNode"
+      required: [status, conclusion, manualNodes]
 
     UpdateFleetBody:
       type: object

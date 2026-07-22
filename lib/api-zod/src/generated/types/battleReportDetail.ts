@@ -8,8 +8,10 @@
 import type { BattleReportKillmail } from "./battleReportKillmail";
 import type { BattleReportParticipant } from "./battleReportParticipant";
 import type { BattleReportSummary } from "./battleReportSummary";
+import type { BattleReview } from "./battleReview";
 
 export type BattleReportDetail = BattleReportSummary & {
   participants: BattleReportParticipant[];
   killmails: BattleReportKillmail[];
+  publishedReview?: BattleReview | null;
 };

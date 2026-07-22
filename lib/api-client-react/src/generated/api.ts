@@ -20,9 +20,13 @@ import type {
   AddParticipantBody,
   AdjustPapBody,
   AdminSummary,
+  AnalyzeBattleReplay202,
   Announcement,
+  BattleReplayDetail,
+  BattleReplaySummary,
   BattleReportDetail,
   BattleReportSummary,
+  BattleReview,
   Character,
   CreateAnnouncementBody,
   CreateFleetBody,
@@ -41,6 +45,7 @@ import type {
   ScanFleetResponse,
   SuccessResponse,
   TopContributor,
+  UpdateBattleReplayBody,
   UpdateFleetBody,
   UpdateRedemptionBody,
   UpdateRewardBody,
@@ -1827,6 +1832,339 @@ export const useRefreshBattleReport = <
   TContext
 > => {
   return useMutation(getRefreshBattleReportMutationOptions(options));
+};
+
+/**
+ * @summary List battle reports with FC review status (FC and above)
+ */
+export const getListBattleReplaysUrl = () => {
+  return `/api/command/battle-replays`;
+};
+
+export const listBattleReplays = async (
+  options?: RequestInit,
+): Promise<BattleReplaySummary[]> => {
+  return customFetch<BattleReplaySummary[]>(getListBattleReplaysUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListBattleReplaysQueryKey = () => {
+  return [`/api/command/battle-replays`] as const;
+};
+
+export const getListBattleReplaysQueryOptions = <
+  TData = Awaited<ReturnType<typeof listBattleReplays>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listBattleReplays>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListBattleReplaysQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listBattleReplays>>
+  > = ({ signal }) => listBattleReplays({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listBattleReplays>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListBattleReplaysQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listBattleReplays>>
+>;
+export type ListBattleReplaysQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary List battle reports with FC review status (FC and above)
+ */
+
+export function useListBattleReplays<
+  TData = Awaited<ReturnType<typeof listBattleReplays>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listBattleReplays>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListBattleReplaysQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get the complete FC battle-review workbench (FC and above)
+ */
+export const getGetBattleReplayUrl = (id: number) => {
+  return `/api/command/battle-replays/${id}`;
+};
+
+export const getBattleReplay = async (
+  id: number,
+  options?: RequestInit,
+): Promise<BattleReplayDetail> => {
+  return customFetch<BattleReplayDetail>(getGetBattleReplayUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetBattleReplayQueryKey = (id: number) => {
+  return [`/api/command/battle-replays/${id}`] as const;
+};
+
+export const getGetBattleReplayQueryOptions = <
+  TData = Awaited<ReturnType<typeof getBattleReplay>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getBattleReplay>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetBattleReplayQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getBattleReplay>>> = ({
+    signal,
+  }) => getBattleReplay(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getBattleReplay>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetBattleReplayQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getBattleReplay>>
+>;
+export type GetBattleReplayQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get the complete FC battle-review workbench (FC and above)
+ */
+
+export function useGetBattleReplay<
+  TData = Awaited<ReturnType<typeof getBattleReplay>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getBattleReplay>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetBattleReplayQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Save or publish FC nodes, annotations, and conclusion (FC and above)
+ */
+export const getUpdateBattleReplayUrl = (id: number) => {
+  return `/api/command/battle-replays/${id}`;
+};
+
+export const updateBattleReplay = async (
+  id: number,
+  updateBattleReplayBody: UpdateBattleReplayBody,
+  options?: RequestInit,
+): Promise<BattleReview> => {
+  return customFetch<BattleReview>(getUpdateBattleReplayUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateBattleReplayBody),
+  });
+};
+
+export const getUpdateBattleReplayMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateBattleReplay>>,
+    TError,
+    { id: number; data: BodyType<UpdateBattleReplayBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateBattleReplay>>,
+  TError,
+  { id: number; data: BodyType<UpdateBattleReplayBody> },
+  TContext
+> => {
+  const mutationKey = ["updateBattleReplay"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateBattleReplay>>,
+    { id: number; data: BodyType<UpdateBattleReplayBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateBattleReplay(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateBattleReplayMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateBattleReplay>>
+>;
+export type UpdateBattleReplayMutationBody = BodyType<UpdateBattleReplayBody>;
+export type UpdateBattleReplayMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Save or publish FC nodes, annotations, and conclusion (FC and above)
+ */
+export const useUpdateBattleReplay = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateBattleReplay>>,
+    TError,
+    { id: number; data: BodyType<UpdateBattleReplayBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateBattleReplay>>,
+  TError,
+  { id: number; data: BodyType<UpdateBattleReplayBody> },
+  TContext
+> => {
+  return useMutation(getUpdateBattleReplayMutationOptions(options));
+};
+
+/**
+ * @summary Run evidence-based AI battle analysis (FC and above)
+ */
+export const getAnalyzeBattleReplayUrl = (id: number) => {
+  return `/api/command/battle-replays/${id}/analyze`;
+};
+
+export const analyzeBattleReplay = async (
+  id: number,
+  options?: RequestInit,
+): Promise<AnalyzeBattleReplay202> => {
+  return customFetch<AnalyzeBattleReplay202>(getAnalyzeBattleReplayUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getAnalyzeBattleReplayMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof analyzeBattleReplay>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof analyzeBattleReplay>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["analyzeBattleReplay"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof analyzeBattleReplay>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return analyzeBattleReplay(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AnalyzeBattleReplayMutationResult = NonNullable<
+  Awaited<ReturnType<typeof analyzeBattleReplay>>
+>;
+
+export type AnalyzeBattleReplayMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Run evidence-based AI battle analysis (FC and above)
+ */
+export const useAnalyzeBattleReplay = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof analyzeBattleReplay>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof analyzeBattleReplay>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getAnalyzeBattleReplayMutationOptions(options));
 };
 
 /**

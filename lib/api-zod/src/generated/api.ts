@@ -336,6 +336,12 @@ export const GetBattleReportParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const getBattleReportResponseTwoPublishedReviewOneManualNodesItemIdMax = 100;
+
+export const getBattleReportResponseTwoPublishedReviewOneManualNodesItemTitleMax = 160;
+
+export const getBattleReportResponseTwoPublishedReviewOneManualNodesItemDescriptionMax = 2000;
+
 export const GetBattleReportResponse = zod
   .object({
     id: zod.number(),
@@ -400,6 +406,130 @@ export const GetBattleReportResponse = zod
           zkillboardUrl: zod.string().nullish(),
         }),
       ),
+      publishedReview: zod
+        .union([
+          zod.object({
+            status: zod.enum(["draft", "published"]),
+            aiStatus: zod.enum([
+              "not_started",
+              "generating",
+              "ready",
+              "failed",
+            ]),
+            aiSource: zod
+              .union([
+                zod.literal("openai"),
+                zod.literal("rules"),
+                zod.literal(null),
+              ])
+              .nullish(),
+            aiModel: zod.string().nullish(),
+            aiError: zod.string().nullish(),
+            aiAnalysis: zod
+              .union([
+                zod.object({
+                  version: zod.literal(1),
+                  source: zod.enum(["openai", "rules"]),
+                  model: zod.string(),
+                  generatedAt: zod.coerce.date(),
+                  summary: zod.string(),
+                  keyShips: zod.array(
+                    zod.object({
+                      killmailId: zod.number(),
+                      occurredAt: zod.coerce.date(),
+                      title: zod.string(),
+                      reason: zod.string(),
+                      confidence: zod.number(),
+                      shipName: zod.string().nullish(),
+                      pilotName: zod.string().nullish(),
+                      friendlyLoss: zod.boolean(),
+                      totalValue: zod.number(),
+                    }),
+                  ),
+                  keyKills: zod.array(
+                    zod.object({
+                      killmailId: zod.number(),
+                      occurredAt: zod.coerce.date(),
+                      title: zod.string(),
+                      reason: zod.string(),
+                      confidence: zod.number(),
+                      shipName: zod.string().nullish(),
+                      pilotName: zod.string().nullish(),
+                      friendlyLoss: zod.boolean(),
+                      totalValue: zod.number(),
+                    }),
+                  ),
+                  lossPeaks: zod.array(
+                    zod.object({
+                      startedAt: zod.coerce.date(),
+                      endedAt: zod.coerce.date(),
+                      title: zod.string(),
+                      reason: zod.string(),
+                      confidence: zod.number(),
+                      killmailIds: zod.array(zod.number()),
+                      friendlyLosses: zod.number(),
+                      hostileLosses: zod.number(),
+                      totalValue: zod.number(),
+                    }),
+                  ),
+                  suggestions: zod.array(
+                    zod.object({
+                      category: zod.enum([
+                        "target_calling",
+                        "logistics",
+                        "positioning",
+                        "extraction",
+                        "fleet_composition",
+                        "tempo",
+                        "other",
+                      ]),
+                      title: zod.string(),
+                      observation: zod.string(),
+                      evidence: zod.string(),
+                      recommendation: zod.string(),
+                      confidence: zod.number(),
+                      relatedKillmailIds: zod.array(zod.number()),
+                    }),
+                  ),
+                }),
+                zod.null(),
+              ])
+              .optional(),
+            manualNodes: zod.array(
+              zod.object({
+                id: zod
+                  .string()
+                  .max(
+                    getBattleReportResponseTwoPublishedReviewOneManualNodesItemIdMax,
+                  ),
+                category: zod.enum([
+                  "key_ship",
+                  "key_kill",
+                  "loss_peak",
+                  "phase",
+                  "note",
+                ]),
+                occurredAt: zod.coerce.date(),
+                title: zod
+                  .string()
+                  .max(
+                    getBattleReportResponseTwoPublishedReviewOneManualNodesItemTitleMax,
+                  ),
+                description: zod
+                  .string()
+                  .max(
+                    getBattleReportResponseTwoPublishedReviewOneManualNodesItemDescriptionMax,
+                  ),
+              }),
+            ),
+            conclusion: zod.string(),
+            aiAnalyzedAt: zod.coerce.date().nullish(),
+            publishedAt: zod.coerce.date().nullish(),
+            updatedAt: zod.coerce.date(),
+          }),
+          zod.null(),
+        ])
+        .optional(),
     }),
   );
 
@@ -407,6 +537,529 @@ export const GetBattleReportResponse = zod
  * @summary Re-sync a fleet battle report (FC and above)
  */
 export const RefreshBattleReportParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary List battle reports with FC review status (FC and above)
+ */
+export const ListBattleReplaysResponseItem = zod
+  .object({
+    id: zod.number(),
+    fleetId: zod.number().nullish(),
+    fleetName: zod.string(),
+    fleetCommander: zod.string(),
+    startedAt: zod.coerce.date(),
+    endedAt: zod.coerce.date(),
+    status: zod.enum(["pending", "generating", "ready", "partial", "failed"]),
+    errorMessage: zod.string().nullish(),
+    totalDestroyed: zod.number(),
+    totalLost: zod.number(),
+    damageDealt: zod.number(),
+    killmailCount: zod.number(),
+    friendlyLosses: zod.number(),
+    hostileLosses: zod.number(),
+    primarySystemId: zod.number().nullish(),
+    primarySystemName: zod.string().nullish(),
+    generatedAt: zod.coerce.date().nullish(),
+    lastSyncedAt: zod.coerce.date().nullish(),
+    createdAt: zod.coerce.date(),
+    participantCount: zod.number(),
+  })
+  .and(
+    zod.object({
+      reviewStatus: zod.enum(["not_started", "draft", "published"]),
+      aiStatus: zod.enum(["not_started", "generating", "ready", "failed"]),
+      reviewUpdatedAt: zod.coerce.date().nullish(),
+    }),
+  );
+export const ListBattleReplaysResponse = zod.array(
+  ListBattleReplaysResponseItem,
+);
+
+/**
+ * @summary Get the complete FC battle-review workbench (FC and above)
+ */
+export const GetBattleReplayParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const getBattleReplayResponseOneTwoPublishedReviewOneManualNodesItemIdMax = 100;
+
+export const getBattleReplayResponseOneTwoPublishedReviewOneManualNodesItemTitleMax = 160;
+
+export const getBattleReplayResponseOneTwoPublishedReviewOneManualNodesItemDescriptionMax = 2000;
+
+export const getBattleReplayResponseTwoReviewOneManualNodesItemIdMax = 100;
+
+export const getBattleReplayResponseTwoReviewOneManualNodesItemTitleMax = 160;
+
+export const getBattleReplayResponseTwoReviewOneManualNodesItemDescriptionMax = 2000;
+
+export const GetBattleReplayResponse = zod
+  .object({
+    id: zod.number(),
+    fleetId: zod.number().nullish(),
+    fleetName: zod.string(),
+    fleetCommander: zod.string(),
+    startedAt: zod.coerce.date(),
+    endedAt: zod.coerce.date(),
+    status: zod.enum(["pending", "generating", "ready", "partial", "failed"]),
+    errorMessage: zod.string().nullish(),
+    totalDestroyed: zod.number(),
+    totalLost: zod.number(),
+    damageDealt: zod.number(),
+    killmailCount: zod.number(),
+    friendlyLosses: zod.number(),
+    hostileLosses: zod.number(),
+    primarySystemId: zod.number().nullish(),
+    primarySystemName: zod.string().nullish(),
+    generatedAt: zod.coerce.date().nullish(),
+    lastSyncedAt: zod.coerce.date().nullish(),
+    createdAt: zod.coerce.date(),
+    participantCount: zod.number(),
+  })
+  .and(
+    zod.object({
+      participants: zod.array(
+        zod.object({
+          id: zod.number(),
+          eveCharacterId: zod.number(),
+          characterName: zod.string(),
+          corporationId: zod.number().nullish(),
+          corporationName: zod.string().nullish(),
+          primaryShipTypeId: zod.number().nullish(),
+          primaryShipName: zod.string().nullish(),
+          damageDealt: zod.number(),
+          killsInvolved: zod.number(),
+          finalBlows: zod.number(),
+          losses: zod.number(),
+        }),
+      ),
+      killmails: zod.array(
+        zod.object({
+          id: zod.number(),
+          killmailId: zod.number(),
+          killmailTime: zod.coerce.date(),
+          solarSystemId: zod.number(),
+          solarSystemName: zod.string().nullish(),
+          victimCharacterId: zod.number().nullish(),
+          victimCharacterName: zod.string().nullish(),
+          victimCorporationId: zod.number().nullish(),
+          victimCorporationName: zod.string().nullish(),
+          victimAllianceId: zod.number().nullish(),
+          victimAllianceName: zod.string().nullish(),
+          victimShipTypeId: zod.number(),
+          victimShipName: zod.string().nullish(),
+          victimIsFleetMember: zod.boolean(),
+          totalValue: zod.number(),
+          damageTaken: zod.number(),
+          friendlyDamage: zod.number(),
+          friendlyAttackers: zod.number(),
+          finalBlowByFleet: zod.boolean(),
+          zkillboardUrl: zod.string().nullish(),
+        }),
+      ),
+      publishedReview: zod
+        .union([
+          zod.object({
+            status: zod.enum(["draft", "published"]),
+            aiStatus: zod.enum([
+              "not_started",
+              "generating",
+              "ready",
+              "failed",
+            ]),
+            aiSource: zod
+              .union([
+                zod.literal("openai"),
+                zod.literal("rules"),
+                zod.literal(null),
+              ])
+              .nullish(),
+            aiModel: zod.string().nullish(),
+            aiError: zod.string().nullish(),
+            aiAnalysis: zod
+              .union([
+                zod.object({
+                  version: zod.literal(1),
+                  source: zod.enum(["openai", "rules"]),
+                  model: zod.string(),
+                  generatedAt: zod.coerce.date(),
+                  summary: zod.string(),
+                  keyShips: zod.array(
+                    zod.object({
+                      killmailId: zod.number(),
+                      occurredAt: zod.coerce.date(),
+                      title: zod.string(),
+                      reason: zod.string(),
+                      confidence: zod.number(),
+                      shipName: zod.string().nullish(),
+                      pilotName: zod.string().nullish(),
+                      friendlyLoss: zod.boolean(),
+                      totalValue: zod.number(),
+                    }),
+                  ),
+                  keyKills: zod.array(
+                    zod.object({
+                      killmailId: zod.number(),
+                      occurredAt: zod.coerce.date(),
+                      title: zod.string(),
+                      reason: zod.string(),
+                      confidence: zod.number(),
+                      shipName: zod.string().nullish(),
+                      pilotName: zod.string().nullish(),
+                      friendlyLoss: zod.boolean(),
+                      totalValue: zod.number(),
+                    }),
+                  ),
+                  lossPeaks: zod.array(
+                    zod.object({
+                      startedAt: zod.coerce.date(),
+                      endedAt: zod.coerce.date(),
+                      title: zod.string(),
+                      reason: zod.string(),
+                      confidence: zod.number(),
+                      killmailIds: zod.array(zod.number()),
+                      friendlyLosses: zod.number(),
+                      hostileLosses: zod.number(),
+                      totalValue: zod.number(),
+                    }),
+                  ),
+                  suggestions: zod.array(
+                    zod.object({
+                      category: zod.enum([
+                        "target_calling",
+                        "logistics",
+                        "positioning",
+                        "extraction",
+                        "fleet_composition",
+                        "tempo",
+                        "other",
+                      ]),
+                      title: zod.string(),
+                      observation: zod.string(),
+                      evidence: zod.string(),
+                      recommendation: zod.string(),
+                      confidence: zod.number(),
+                      relatedKillmailIds: zod.array(zod.number()),
+                    }),
+                  ),
+                }),
+                zod.null(),
+              ])
+              .optional(),
+            manualNodes: zod.array(
+              zod.object({
+                id: zod
+                  .string()
+                  .max(
+                    getBattleReplayResponseOneTwoPublishedReviewOneManualNodesItemIdMax,
+                  ),
+                category: zod.enum([
+                  "key_ship",
+                  "key_kill",
+                  "loss_peak",
+                  "phase",
+                  "note",
+                ]),
+                occurredAt: zod.coerce.date(),
+                title: zod
+                  .string()
+                  .max(
+                    getBattleReplayResponseOneTwoPublishedReviewOneManualNodesItemTitleMax,
+                  ),
+                description: zod
+                  .string()
+                  .max(
+                    getBattleReplayResponseOneTwoPublishedReviewOneManualNodesItemDescriptionMax,
+                  ),
+              }),
+            ),
+            conclusion: zod.string(),
+            aiAnalyzedAt: zod.coerce.date().nullish(),
+            publishedAt: zod.coerce.date().nullish(),
+            updatedAt: zod.coerce.date(),
+          }),
+          zod.null(),
+        ])
+        .optional(),
+    }),
+  )
+  .and(
+    zod.object({
+      review: zod.union([
+        zod.object({
+          status: zod.enum(["draft", "published"]),
+          aiStatus: zod.enum(["not_started", "generating", "ready", "failed"]),
+          aiSource: zod
+            .union([
+              zod.literal("openai"),
+              zod.literal("rules"),
+              zod.literal(null),
+            ])
+            .nullish(),
+          aiModel: zod.string().nullish(),
+          aiError: zod.string().nullish(),
+          aiAnalysis: zod
+            .union([
+              zod.object({
+                version: zod.literal(1),
+                source: zod.enum(["openai", "rules"]),
+                model: zod.string(),
+                generatedAt: zod.coerce.date(),
+                summary: zod.string(),
+                keyShips: zod.array(
+                  zod.object({
+                    killmailId: zod.number(),
+                    occurredAt: zod.coerce.date(),
+                    title: zod.string(),
+                    reason: zod.string(),
+                    confidence: zod.number(),
+                    shipName: zod.string().nullish(),
+                    pilotName: zod.string().nullish(),
+                    friendlyLoss: zod.boolean(),
+                    totalValue: zod.number(),
+                  }),
+                ),
+                keyKills: zod.array(
+                  zod.object({
+                    killmailId: zod.number(),
+                    occurredAt: zod.coerce.date(),
+                    title: zod.string(),
+                    reason: zod.string(),
+                    confidence: zod.number(),
+                    shipName: zod.string().nullish(),
+                    pilotName: zod.string().nullish(),
+                    friendlyLoss: zod.boolean(),
+                    totalValue: zod.number(),
+                  }),
+                ),
+                lossPeaks: zod.array(
+                  zod.object({
+                    startedAt: zod.coerce.date(),
+                    endedAt: zod.coerce.date(),
+                    title: zod.string(),
+                    reason: zod.string(),
+                    confidence: zod.number(),
+                    killmailIds: zod.array(zod.number()),
+                    friendlyLosses: zod.number(),
+                    hostileLosses: zod.number(),
+                    totalValue: zod.number(),
+                  }),
+                ),
+                suggestions: zod.array(
+                  zod.object({
+                    category: zod.enum([
+                      "target_calling",
+                      "logistics",
+                      "positioning",
+                      "extraction",
+                      "fleet_composition",
+                      "tempo",
+                      "other",
+                    ]),
+                    title: zod.string(),
+                    observation: zod.string(),
+                    evidence: zod.string(),
+                    recommendation: zod.string(),
+                    confidence: zod.number(),
+                    relatedKillmailIds: zod.array(zod.number()),
+                  }),
+                ),
+              }),
+              zod.null(),
+            ])
+            .optional(),
+          manualNodes: zod.array(
+            zod.object({
+              id: zod
+                .string()
+                .max(getBattleReplayResponseTwoReviewOneManualNodesItemIdMax),
+              category: zod.enum([
+                "key_ship",
+                "key_kill",
+                "loss_peak",
+                "phase",
+                "note",
+              ]),
+              occurredAt: zod.coerce.date(),
+              title: zod
+                .string()
+                .max(
+                  getBattleReplayResponseTwoReviewOneManualNodesItemTitleMax,
+                ),
+              description: zod
+                .string()
+                .max(
+                  getBattleReplayResponseTwoReviewOneManualNodesItemDescriptionMax,
+                ),
+            }),
+          ),
+          conclusion: zod.string(),
+          aiAnalyzedAt: zod.coerce.date().nullish(),
+          publishedAt: zod.coerce.date().nullish(),
+          updatedAt: zod.coerce.date(),
+        }),
+        zod.null(),
+      ]),
+    }),
+  );
+
+/**
+ * @summary Save or publish FC nodes, annotations, and conclusion (FC and above)
+ */
+export const UpdateBattleReplayParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const updateBattleReplayBodyConclusionMax = 10000;
+
+export const updateBattleReplayBodyManualNodesItemIdMax = 100;
+
+export const updateBattleReplayBodyManualNodesItemTitleMax = 160;
+
+export const updateBattleReplayBodyManualNodesItemDescriptionMax = 2000;
+
+export const updateBattleReplayBodyManualNodesMax = 100;
+
+export const UpdateBattleReplayBody = zod.object({
+  status: zod.enum(["draft", "published"]),
+  conclusion: zod.string().max(updateBattleReplayBodyConclusionMax),
+  manualNodes: zod
+    .array(
+      zod.object({
+        id: zod.string().max(updateBattleReplayBodyManualNodesItemIdMax),
+        category: zod.enum([
+          "key_ship",
+          "key_kill",
+          "loss_peak",
+          "phase",
+          "note",
+        ]),
+        occurredAt: zod.coerce.date(),
+        title: zod.string().max(updateBattleReplayBodyManualNodesItemTitleMax),
+        description: zod
+          .string()
+          .max(updateBattleReplayBodyManualNodesItemDescriptionMax),
+      }),
+    )
+    .max(updateBattleReplayBodyManualNodesMax),
+});
+
+export const updateBattleReplayResponseManualNodesItemIdMax = 100;
+
+export const updateBattleReplayResponseManualNodesItemTitleMax = 160;
+
+export const updateBattleReplayResponseManualNodesItemDescriptionMax = 2000;
+
+export const UpdateBattleReplayResponse = zod.object({
+  status: zod.enum(["draft", "published"]),
+  aiStatus: zod.enum(["not_started", "generating", "ready", "failed"]),
+  aiSource: zod
+    .union([zod.literal("openai"), zod.literal("rules"), zod.literal(null)])
+    .nullish(),
+  aiModel: zod.string().nullish(),
+  aiError: zod.string().nullish(),
+  aiAnalysis: zod
+    .union([
+      zod.object({
+        version: zod.literal(1),
+        source: zod.enum(["openai", "rules"]),
+        model: zod.string(),
+        generatedAt: zod.coerce.date(),
+        summary: zod.string(),
+        keyShips: zod.array(
+          zod.object({
+            killmailId: zod.number(),
+            occurredAt: zod.coerce.date(),
+            title: zod.string(),
+            reason: zod.string(),
+            confidence: zod.number(),
+            shipName: zod.string().nullish(),
+            pilotName: zod.string().nullish(),
+            friendlyLoss: zod.boolean(),
+            totalValue: zod.number(),
+          }),
+        ),
+        keyKills: zod.array(
+          zod.object({
+            killmailId: zod.number(),
+            occurredAt: zod.coerce.date(),
+            title: zod.string(),
+            reason: zod.string(),
+            confidence: zod.number(),
+            shipName: zod.string().nullish(),
+            pilotName: zod.string().nullish(),
+            friendlyLoss: zod.boolean(),
+            totalValue: zod.number(),
+          }),
+        ),
+        lossPeaks: zod.array(
+          zod.object({
+            startedAt: zod.coerce.date(),
+            endedAt: zod.coerce.date(),
+            title: zod.string(),
+            reason: zod.string(),
+            confidence: zod.number(),
+            killmailIds: zod.array(zod.number()),
+            friendlyLosses: zod.number(),
+            hostileLosses: zod.number(),
+            totalValue: zod.number(),
+          }),
+        ),
+        suggestions: zod.array(
+          zod.object({
+            category: zod.enum([
+              "target_calling",
+              "logistics",
+              "positioning",
+              "extraction",
+              "fleet_composition",
+              "tempo",
+              "other",
+            ]),
+            title: zod.string(),
+            observation: zod.string(),
+            evidence: zod.string(),
+            recommendation: zod.string(),
+            confidence: zod.number(),
+            relatedKillmailIds: zod.array(zod.number()),
+          }),
+        ),
+      }),
+      zod.null(),
+    ])
+    .optional(),
+  manualNodes: zod.array(
+    zod.object({
+      id: zod.string().max(updateBattleReplayResponseManualNodesItemIdMax),
+      category: zod.enum([
+        "key_ship",
+        "key_kill",
+        "loss_peak",
+        "phase",
+        "note",
+      ]),
+      occurredAt: zod.coerce.date(),
+      title: zod
+        .string()
+        .max(updateBattleReplayResponseManualNodesItemTitleMax),
+      description: zod
+        .string()
+        .max(updateBattleReplayResponseManualNodesItemDescriptionMax),
+    }),
+  ),
+  conclusion: zod.string(),
+  aiAnalyzedAt: zod.coerce.date().nullish(),
+  publishedAt: zod.coerce.date().nullish(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Run evidence-based AI battle analysis (FC and above)
+ */
+export const AnalyzeBattleReplayParams = zod.object({
   id: zod.coerce.number(),
 });
 

@@ -5,7 +5,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useGetMe } from "@workspace/api-client-react";
 import { Loader2 } from "lucide-react";
 import { useEffect } from "react";
-import { AppErrorBoundary, AppLoadError } from "@/components/app-error-boundary";
+import {
+  AppErrorBoundary,
+  AppLoadError,
+} from "@/components/app-error-boundary";
 import { isUnauthorizedError } from "@/lib/api-error";
 
 import NotFound from "@/pages/not-found";
@@ -25,6 +28,7 @@ import { AdminPap } from "@/pages/admin/pap";
 import { AdminAnnouncements } from "@/pages/admin/announcements";
 import { Characters } from "@/pages/characters";
 import { BattleReportDetail, BattleReports } from "@/pages/battle-reports";
+import { BattleReplayWorkbench, BattleReplays } from "@/pages/battle-replays";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,13 +40,19 @@ const queryClient = new QueryClient({
 });
 
 const ROLE_LEVELS = ["member", "fc", "admin", "controller"] as const;
-type Role = typeof ROLE_LEVELS[number];
+type Role = (typeof ROLE_LEVELS)[number];
 
 function hasRole(userRole: string, minRole: Role): boolean {
   return ROLE_LEVELS.indexOf(userRole as Role) >= ROLE_LEVELS.indexOf(minRole);
 }
 
-function ProtectedRoute({ component: Component, minRole }: { component: any, minRole?: Role }) {
+function ProtectedRoute({
+  component: Component,
+  minRole,
+}: {
+  component: any;
+  minRole?: Role;
+}) {
   const { data: user, isLoading, isError, error } = useGetMe();
   const [, setLocation] = useLocation();
   const isUnauthorized = isUnauthorizedError(error);
@@ -73,7 +83,12 @@ function ProtectedRoute({ component: Component, minRole }: { component: any, min
   }
 
   if (isError && !isUnauthorized) {
-    return <AppLoadError title="Unable to initialize the application" error={error} />;
+    return (
+      <AppLoadError
+        title="Unable to initialize the application"
+        error={error}
+      />
+    );
   }
 
   if (isError || !user || (minRole && !hasRole(user.role, minRole))) {
@@ -112,7 +127,15 @@ function Router() {
       <Route path="/battle-reports">
         {() => <ProtectedRoute component={BattleReports} />}
       </Route>
-      
+      <Route path="/command/battle-replays/:id">
+        {() => (
+          <ProtectedRoute component={BattleReplayWorkbench} minRole="fc" />
+        )}
+      </Route>
+      <Route path="/command/battle-replays">
+        {() => <ProtectedRoute component={BattleReplays} minRole="fc" />}
+      </Route>
+
       {/* Admin Routes - admin & controller only */}
       <Route path="/admin">
         {() => <ProtectedRoute component={AdminDashboard} minRole="admin" />}
@@ -136,7 +159,7 @@ function Router() {
       <Route path="/admin/announcements">
         {() => <ProtectedRoute component={AdminAnnouncements} minRole="fc" />}
       </Route>
-      
+
       <Route component={NotFound} />
     </Switch>
   );

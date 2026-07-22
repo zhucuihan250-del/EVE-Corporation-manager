@@ -20,6 +20,10 @@ const MAX_AUTOMATIC_LOOKBACK_SECONDS = 7 * 24 * 60 * 60;
 const ZKILL_PAGE_SIZE = 1_000;
 const MAX_ZKILL_PAGES_PER_SOURCE = 10;
 const ZKILL_REQUEST_DELAY_MS = 1_000;
+const ZKILL_RETRY_DELAY_MS = 2_500;
+const ZKILL_MAX_ATTEMPTS = 2;
+const MAX_CHARACTER_FALLBACK_PARTICIPANTS = 60;
+const MAX_CHARACTER_FALLBACK_PAGES = 3;
 const activeGenerationJobs = new Set<number>();
 const queuedGenerationJobs = new Set<number>();
 const generationQueue: { reportId: number; force: boolean }[] = [];
@@ -123,6 +127,27 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function fetchZkillPage(url: string): Promise<ZkillEntry[]> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= ZKILL_MAX_ATTEMPTS; attempt++) {
+    try {
+      return await fetchJson<ZkillEntry[]>(url, undefined, 20_000);
+    } catch (error) {
+      lastError = error;
+      if (attempt < ZKILL_MAX_ATTEMPTS) {
+        logger.warn(
+          { error, attempt, url },
+          "zKillboard request failed; retrying battle report page",
+        );
+        await delay(ZKILL_RETRY_DELAY_MS);
+      }
+    }
+  }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("zKillboard request failed");
+}
+
 async function resolveUniverseNames(ids: number[]): Promise<Map<number, UniverseName>> {
   const uniqueIds = [...new Set(ids.filter((id) => Number.isInteger(id) && id > 0))];
   const names = new Map<number, UniverseName>();
@@ -152,6 +177,7 @@ async function fetchZkillCandidates(
   entityId: number,
   pastSeconds: number,
   fetchType: "kills" | "losses",
+  maxPages = MAX_ZKILL_PAGES_PER_SOURCE,
 ): Promise<{
   entries: ZkillEntry[];
   pagesFetched: number;
@@ -160,12 +186,10 @@ async function fetchZkillCandidates(
 }> {
   const entries: ZkillEntry[] = [];
 
-  for (let page = 1; page <= MAX_ZKILL_PAGES_PER_SOURCE; page++) {
+  for (let page = 1; page <= maxPages; page++) {
     try {
-      const pageEntries = await fetchJson<ZkillEntry[]>(
+      const pageEntries = await fetchZkillPage(
         `${ZKILL_BASE}/${fetchType}/${entityType}/${entityId}/pastSeconds/${pastSeconds}/page/${page}/`,
-        undefined,
-        20_000,
       );
       if (!Array.isArray(pageEntries)) {
         throw new Error("zKillboard returned a non-array response");
@@ -200,14 +224,14 @@ async function fetchZkillCandidates(
       };
     }
 
-    if (page < MAX_ZKILL_PAGES_PER_SOURCE) {
+    if (page < maxPages) {
       await delay(ZKILL_REQUEST_DELAY_MS);
     }
   }
 
   return {
     entries,
-    pagesFetched: MAX_ZKILL_PAGES_PER_SOURCE,
+    pagesFetched: maxPages,
     firstPageFailed: false,
     warning: `${fetchType}:${entityType}:${entityId}:page-limit`,
   };
@@ -370,6 +394,19 @@ async function runBattleReportGeneration(reportId: number, force: boolean): Prom
     ]),
   ];
   let zkillPagesFetched = 0;
+  let characterFallbacksUsed = 0;
+
+  const collectCandidates = (entries: ZkillEntry[]) => {
+    for (const entry of entries) {
+      const hash = entry.zkb?.hash;
+      if (!hash || !Number.isInteger(entry.killmail_id)) continue;
+      candidateMap.set(entry.killmail_id, {
+        id: entry.killmail_id,
+        hash,
+        totalValue: Number(entry.zkb?.totalValue ?? 0),
+      });
+    }
+  };
 
   for (const [index, source] of sources.entries()) {
     if (index > 0) await delay(ZKILL_REQUEST_DELAY_MS);
@@ -380,20 +417,66 @@ async function runBattleReportGeneration(reportId: number, force: boolean): Prom
       source.fetchType,
     );
     zkillPagesFetched += result.pagesFetched;
-    if (result.firstPageFailed) {
-      sourceErrors.push(`${source.fetchType}:${source.entityType}:${source.entityId}`);
-    } else if (result.warning) {
-      sourceWarnings.push(result.warning);
+    let recoveredByCharacterFallback = false;
+    if (
+      source.entityType === "corporationID" &&
+      result.warning?.endsWith(":page-limit")
+    ) {
+      const memberIds = participants
+        .filter(
+          (participant) => participant.corporationId === source.entityId,
+        )
+        .map((participant) => participant.eveCharacterId);
+      if (
+        memberIds.length > 0 &&
+        memberIds.length <= MAX_CHARACTER_FALLBACK_PARTICIPANTS
+      ) {
+        let fallbackComplete = true;
+        for (const [memberIndex, memberId] of memberIds.entries()) {
+          if (memberIndex > 0) await delay(ZKILL_REQUEST_DELAY_MS);
+          const fallback = await fetchZkillCandidates(
+            "characterID",
+            memberId,
+            pastSeconds,
+            source.fetchType,
+            MAX_CHARACTER_FALLBACK_PAGES,
+          );
+          zkillPagesFetched += fallback.pagesFetched;
+          collectCandidates(fallback.entries);
+          if (fallback.firstPageFailed || fallback.warning) {
+            fallbackComplete = false;
+          }
+        }
+        if (fallbackComplete) {
+          recoveredByCharacterFallback = true;
+          characterFallbacksUsed++;
+          logger.info(
+            {
+              corporationId: source.entityId,
+              fetchType: source.fetchType,
+              participantCount: memberIds.length,
+            },
+            "Battle report switched high-activity corporation to participant queries",
+          );
+        }
+      }
     }
-    for (const entry of result.entries) {
-      const hash = entry.zkb?.hash;
-      if (!hash || !Number.isInteger(entry.killmail_id)) continue;
-      candidateMap.set(entry.killmail_id, {
-        id: entry.killmail_id,
-        hash,
-        totalValue: Number(entry.zkb?.totalValue ?? 0),
-      });
+
+    if (!recoveredByCharacterFallback) {
+      collectCandidates(result.entries);
+      if (result.firstPageFailed) {
+        sourceErrors.push(`${source.fetchType}:${source.entityType}:${source.entityId}`);
+      } else if (result.warning) {
+        sourceWarnings.push(result.warning);
+      }
     }
+  }
+
+  if (characterFallbacksUsed > 0) {
+    logger.info(
+      { reportId, characterFallbacksUsed, zkillPagesFetched },
+      "Battle report completed high-activity source fallbacks",
+    );
   }
 
   const participantIds = new Set(participants.map((participant) => participant.eveCharacterId));

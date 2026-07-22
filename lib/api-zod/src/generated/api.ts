@@ -459,6 +459,10 @@ export const GetBattleReportResponse = zod
                       pilotName: zod.string().nullish(),
                       friendlyLoss: zod.boolean(),
                       totalValue: zod.number(),
+                      evidenceLevel: zod
+                        .enum(["confirmed", "inferred"])
+                        .optional(),
+                      evidence: zod.string().optional(),
                     }),
                   ),
                   keyKills: zod.array(
@@ -472,6 +476,10 @@ export const GetBattleReportResponse = zod
                       pilotName: zod.string().nullish(),
                       friendlyLoss: zod.boolean(),
                       totalValue: zod.number(),
+                      evidenceLevel: zod
+                        .enum(["confirmed", "inferred"])
+                        .optional(),
+                      evidence: zod.string().optional(),
                     }),
                   ),
                   lossPeaks: zod.array(
@@ -485,6 +493,10 @@ export const GetBattleReportResponse = zod
                       friendlyLosses: zod.number(),
                       hostileLosses: zod.number(),
                       totalValue: zod.number(),
+                      evidenceLevel: zod
+                        .enum(["confirmed", "inferred"])
+                        .optional(),
+                      evidence: zod.string().optional(),
                     }),
                   ),
                   suggestions: zod.array(
@@ -506,6 +518,35 @@ export const GetBattleReportResponse = zod
                       relatedKillmailIds: zod.array(zod.number()),
                     }),
                   ),
+                  phases: zod
+                    .array(
+                      zod.object({
+                        id: zod.string(),
+                        kind: zod.enum([
+                          "contact",
+                          "opening",
+                          "escalation",
+                          "turning_point",
+                          "extraction",
+                        ]),
+                        startedAt: zod.coerce.date(),
+                        endedAt: zod.coerce.date(),
+                        title: zod.string(),
+                        summary: zod.string(),
+                        evidence: zod.string(),
+                        evidenceLevel: zod.enum(["confirmed", "inferred"]),
+                        confidence: zod.number(),
+                        relatedKillmailIds: zod.array(zod.number()),
+                      }),
+                    )
+                    .optional(),
+                  dataQuality: zod
+                    .object({
+                      confirmedEventCount: zod.number(),
+                      inferredEventCount: zod.number(),
+                      limitations: zod.array(zod.string()),
+                    })
+                    .optional(),
                 }),
                 zod.null(),
               ])
@@ -728,6 +769,10 @@ export const GetBattleReplayResponse = zod
                       pilotName: zod.string().nullish(),
                       friendlyLoss: zod.boolean(),
                       totalValue: zod.number(),
+                      evidenceLevel: zod
+                        .enum(["confirmed", "inferred"])
+                        .optional(),
+                      evidence: zod.string().optional(),
                     }),
                   ),
                   keyKills: zod.array(
@@ -741,6 +786,10 @@ export const GetBattleReplayResponse = zod
                       pilotName: zod.string().nullish(),
                       friendlyLoss: zod.boolean(),
                       totalValue: zod.number(),
+                      evidenceLevel: zod
+                        .enum(["confirmed", "inferred"])
+                        .optional(),
+                      evidence: zod.string().optional(),
                     }),
                   ),
                   lossPeaks: zod.array(
@@ -754,6 +803,10 @@ export const GetBattleReplayResponse = zod
                       friendlyLosses: zod.number(),
                       hostileLosses: zod.number(),
                       totalValue: zod.number(),
+                      evidenceLevel: zod
+                        .enum(["confirmed", "inferred"])
+                        .optional(),
+                      evidence: zod.string().optional(),
                     }),
                   ),
                   suggestions: zod.array(
@@ -775,6 +828,35 @@ export const GetBattleReplayResponse = zod
                       relatedKillmailIds: zod.array(zod.number()),
                     }),
                   ),
+                  phases: zod
+                    .array(
+                      zod.object({
+                        id: zod.string(),
+                        kind: zod.enum([
+                          "contact",
+                          "opening",
+                          "escalation",
+                          "turning_point",
+                          "extraction",
+                        ]),
+                        startedAt: zod.coerce.date(),
+                        endedAt: zod.coerce.date(),
+                        title: zod.string(),
+                        summary: zod.string(),
+                        evidence: zod.string(),
+                        evidenceLevel: zod.enum(["confirmed", "inferred"]),
+                        confidence: zod.number(),
+                        relatedKillmailIds: zod.array(zod.number()),
+                      }),
+                    )
+                    .optional(),
+                  dataQuality: zod
+                    .object({
+                      confirmedEventCount: zod.number(),
+                      inferredEventCount: zod.number(),
+                      limitations: zod.array(zod.string()),
+                    })
+                    .optional(),
                 }),
                 zod.null(),
               ])
@@ -850,6 +932,10 @@ export const GetBattleReplayResponse = zod
                     pilotName: zod.string().nullish(),
                     friendlyLoss: zod.boolean(),
                     totalValue: zod.number(),
+                    evidenceLevel: zod
+                      .enum(["confirmed", "inferred"])
+                      .optional(),
+                    evidence: zod.string().optional(),
                   }),
                 ),
                 keyKills: zod.array(
@@ -863,6 +949,10 @@ export const GetBattleReplayResponse = zod
                     pilotName: zod.string().nullish(),
                     friendlyLoss: zod.boolean(),
                     totalValue: zod.number(),
+                    evidenceLevel: zod
+                      .enum(["confirmed", "inferred"])
+                      .optional(),
+                    evidence: zod.string().optional(),
                   }),
                 ),
                 lossPeaks: zod.array(
@@ -876,6 +966,10 @@ export const GetBattleReplayResponse = zod
                     friendlyLosses: zod.number(),
                     hostileLosses: zod.number(),
                     totalValue: zod.number(),
+                    evidenceLevel: zod
+                      .enum(["confirmed", "inferred"])
+                      .optional(),
+                    evidence: zod.string().optional(),
                   }),
                 ),
                 suggestions: zod.array(
@@ -897,6 +991,35 @@ export const GetBattleReplayResponse = zod
                     relatedKillmailIds: zod.array(zod.number()),
                   }),
                 ),
+                phases: zod
+                  .array(
+                    zod.object({
+                      id: zod.string(),
+                      kind: zod.enum([
+                        "contact",
+                        "opening",
+                        "escalation",
+                        "turning_point",
+                        "extraction",
+                      ]),
+                      startedAt: zod.coerce.date(),
+                      endedAt: zod.coerce.date(),
+                      title: zod.string(),
+                      summary: zod.string(),
+                      evidence: zod.string(),
+                      evidenceLevel: zod.enum(["confirmed", "inferred"]),
+                      confidence: zod.number(),
+                      relatedKillmailIds: zod.array(zod.number()),
+                    }),
+                  )
+                  .optional(),
+                dataQuality: zod
+                  .object({
+                    confirmedEventCount: zod.number(),
+                    inferredEventCount: zod.number(),
+                    limitations: zod.array(zod.string()),
+                  })
+                  .optional(),
               }),
               zod.null(),
             ])
@@ -1010,6 +1133,8 @@ export const UpdateBattleReplayResponse = zod.object({
             pilotName: zod.string().nullish(),
             friendlyLoss: zod.boolean(),
             totalValue: zod.number(),
+            evidenceLevel: zod.enum(["confirmed", "inferred"]).optional(),
+            evidence: zod.string().optional(),
           }),
         ),
         keyKills: zod.array(
@@ -1023,6 +1148,8 @@ export const UpdateBattleReplayResponse = zod.object({
             pilotName: zod.string().nullish(),
             friendlyLoss: zod.boolean(),
             totalValue: zod.number(),
+            evidenceLevel: zod.enum(["confirmed", "inferred"]).optional(),
+            evidence: zod.string().optional(),
           }),
         ),
         lossPeaks: zod.array(
@@ -1036,6 +1163,8 @@ export const UpdateBattleReplayResponse = zod.object({
             friendlyLosses: zod.number(),
             hostileLosses: zod.number(),
             totalValue: zod.number(),
+            evidenceLevel: zod.enum(["confirmed", "inferred"]).optional(),
+            evidence: zod.string().optional(),
           }),
         ),
         suggestions: zod.array(
@@ -1057,6 +1186,35 @@ export const UpdateBattleReplayResponse = zod.object({
             relatedKillmailIds: zod.array(zod.number()),
           }),
         ),
+        phases: zod
+          .array(
+            zod.object({
+              id: zod.string(),
+              kind: zod.enum([
+                "contact",
+                "opening",
+                "escalation",
+                "turning_point",
+                "extraction",
+              ]),
+              startedAt: zod.coerce.date(),
+              endedAt: zod.coerce.date(),
+              title: zod.string(),
+              summary: zod.string(),
+              evidence: zod.string(),
+              evidenceLevel: zod.enum(["confirmed", "inferred"]),
+              confidence: zod.number(),
+              relatedKillmailIds: zod.array(zod.number()),
+            }),
+          )
+          .optional(),
+        dataQuality: zod
+          .object({
+            confirmedEventCount: zod.number(),
+            inferredEventCount: zod.number(),
+            limitations: zod.array(zod.string()),
+          })
+          .optional(),
       }),
       zod.null(),
     ])

@@ -412,6 +412,9 @@ export function BattleReplayWorkbench() {
           <CardContent className="p-4">
             <BattleReplayPlayer
               killmails={report.killmails}
+              participants={report.participants}
+              startedAt={report.startedAt}
+              endedAt={report.endedAt}
               analysis={analysis}
               manualNodes={manualNodes}
               onEventChange={setCurrentEventTime}
@@ -475,9 +478,26 @@ export function BattleReplayWorkbench() {
                           <p className="font-mono text-xs font-bold">
                             {suggestion.title}
                           </p>
-                          <p className="text-xs text-muted-foreground mt-2">
-                            {suggestion.recommendation}
-                          </p>
+                          <div className="mt-2 space-y-2 text-xs text-muted-foreground">
+                            <p>
+                              <span className="font-mono text-[10px] text-foreground/70">
+                                {t("battleReplay.observation")}:
+                              </span>{" "}
+                              {suggestion.observation}
+                            </p>
+                            <p>
+                              <span className="font-mono text-[10px] text-emerald-400/80">
+                                {t("battleReplay.evidence")}:
+                              </span>{" "}
+                              {suggestion.evidence}
+                            </p>
+                            <p>
+                              <span className="font-mono text-[10px] text-primary">
+                                {t("battleReplay.recommendation")}:
+                              </span>{" "}
+                              {suggestion.recommendation}
+                            </p>
+                          </div>
                           <p className="font-mono text-[10px] text-primary mt-2">
                             {t("battleReplay.confidence", {
                               value: Math.round(suggestion.confidence * 100),
@@ -487,6 +507,20 @@ export function BattleReplayWorkbench() {
                       ))}
                     </div>
                   </div>
+                  {(analysis.dataQuality?.limitations.length ?? 0) > 0 && (
+                    <div className="border border-amber-500/20 bg-amber-500/5 rounded-sm p-3">
+                      <h3 className="font-mono text-[10px] uppercase text-amber-300 mb-2">
+                        {t("battleReplay.dataBoundaries")}
+                      </h3>
+                      <ul className="space-y-1.5 text-xs text-muted-foreground">
+                        {analysis.dataQuality!.limitations.map(
+                          (limitation, index) => (
+                            <li key={index}>• {limitation}</li>
+                          ),
+                        )}
+                      </ul>
+                    </div>
+                  )}
                 </>
               )}
             </CardContent>
@@ -505,6 +539,8 @@ export function BattleReplayWorkbench() {
               description: event.reason,
               time: event.occurredAt,
               confidence: event.confidence,
+              evidenceLevel: event.evidenceLevel,
+              evidence: event.evidence,
             }))}
           />
           <AnalysisGroup
@@ -516,6 +552,8 @@ export function BattleReplayWorkbench() {
               description: event.reason,
               time: event.occurredAt,
               confidence: event.confidence,
+              evidenceLevel: event.evidenceLevel,
+              evidence: event.evidence,
             }))}
           />
           <AnalysisGroup
@@ -527,6 +565,8 @@ export function BattleReplayWorkbench() {
               description: peak.reason,
               time: peak.startedAt,
               confidence: peak.confidence,
+              evidenceLevel: peak.evidenceLevel,
+              evidence: peak.evidence,
             }))}
           />
         </div>
@@ -700,6 +740,8 @@ function AnalysisGroup({
     description: string;
     time: string;
     confidence: number;
+    evidenceLevel?: "confirmed" | "inferred";
+    evidence?: string;
   }[];
 }) {
   const { t } = useTranslation();
@@ -717,10 +759,29 @@ function AnalysisGroup({
         ) : (
           items.map((item) => (
             <div key={item.id} className="border-l-2 border-primary/40 pl-3">
-              <p className="font-mono text-xs font-bold">{item.title}</p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-mono text-xs font-bold">{item.title}</p>
+                <Badge
+                  variant="outline"
+                  className={
+                    item.evidenceLevel === "inferred"
+                      ? "shrink-0 rounded-sm border-amber-500/30 text-[9px] text-amber-400"
+                      : "shrink-0 rounded-sm border-emerald-500/30 text-[9px] text-emerald-400"
+                  }
+                >
+                  {item.evidenceLevel === "inferred"
+                    ? t("battleReplay.inferred")
+                    : t("battleReplay.confirmed")}
+                </Badge>
+              </div>
               <p className="text-xs text-muted-foreground mt-1">
                 {item.description}
               </p>
+              {item.evidence && (
+                <p className="mt-2 text-[10px] text-emerald-400/75">
+                  {t("battleReplay.evidence")}: {item.evidence}
+                </p>
+              )}
               <p className="font-mono text-[10px] text-primary mt-2">
                 {format(new Date(item.time), "HH:mm:ss")} ·{" "}
                 {t("battleReplay.confidence", {

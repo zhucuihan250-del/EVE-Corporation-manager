@@ -1348,6 +1348,11 @@ components:
           type: boolean
         totalValue:
           type: number
+        evidenceLevel:
+          type: string
+          enum: [confirmed, inferred]
+        evidence:
+          type: string
       required:
         [
           killmailId,
@@ -1384,6 +1389,11 @@ components:
           type: integer
         totalValue:
           type: number
+        evidenceLevel:
+          type: string
+          enum: [confirmed, inferred]
+        evidence:
+          type: string
       required:
         [
           startedAt,
@@ -1396,6 +1406,62 @@ components:
           hostileLosses,
           totalValue,
         ]
+
+    BattleReplayPhase:
+      type: object
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+          enum: [contact, opening, escalation, turning_point, extraction]
+        startedAt:
+          type: string
+          format: date-time
+        endedAt:
+          type: string
+          format: date-time
+        title:
+          type: string
+        summary:
+          type: string
+        evidence:
+          type: string
+        evidenceLevel:
+          type: string
+          enum: [confirmed, inferred]
+        confidence:
+          type: number
+        relatedKillmailIds:
+          type: array
+          items:
+            type: integer
+      required:
+        [
+          id,
+          kind,
+          startedAt,
+          endedAt,
+          title,
+          summary,
+          evidence,
+          evidenceLevel,
+          confidence,
+          relatedKillmailIds,
+        ]
+
+    BattleReplayDataQuality:
+      type: object
+      properties:
+        confirmedEventCount:
+          type: integer
+        inferredEventCount:
+          type: integer
+        limitations:
+          type: array
+          items:
+            type: string
+      required: [confirmedEventCount, inferredEventCount, limitations]
 
     BattleReplaySuggestion:
       type: object
@@ -1469,6 +1535,12 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/BattleReplaySuggestion"
+        phases:
+          type: array
+          items:
+            $ref: "#/components/schemas/BattleReplayPhase"
+        dataQuality:
+          $ref: "#/components/schemas/BattleReplayDataQuality"
       required:
         [
           version,

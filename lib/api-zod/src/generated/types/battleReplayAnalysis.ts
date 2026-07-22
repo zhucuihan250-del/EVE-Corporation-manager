@@ -7,8 +7,10 @@
  */
 import type { BattleReplayAnalysisSource } from "./battleReplayAnalysisSource";
 import type { BattleReplayAnalysisVersion } from "./battleReplayAnalysisVersion";
+import type { BattleReplayDataQuality } from "./battleReplayDataQuality";
 import type { BattleReplayKeyEvent } from "./battleReplayKeyEvent";
 import type { BattleReplayLossPeak } from "./battleReplayLossPeak";
+import type { BattleReplayPhase } from "./battleReplayPhase";
 import type { BattleReplaySuggestion } from "./battleReplaySuggestion";
 
 export interface BattleReplayAnalysis {
@@ -21,4 +23,6 @@ export interface BattleReplayAnalysis {
   keyKills: BattleReplayKeyEvent[];
   lossPeaks: BattleReplayLossPeak[];
   suggestions: BattleReplaySuggestion[];
+  phases?: BattleReplayPhase[];
+  dataQuality?: BattleReplayDataQuality;
 }

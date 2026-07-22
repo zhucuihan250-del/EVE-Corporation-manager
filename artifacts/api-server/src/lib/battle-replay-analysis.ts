@@ -4,6 +4,7 @@ import {
   type BattleReplayAnalysis,
   type BattleReplayKeyEvent,
   type BattleReplayLossPeak,
+  type BattleReplayPhase,
   type BattleReplaySuggestion,
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -123,6 +124,8 @@ function toKeyEvent(
     pilotName: killmail.victimCharacterName,
     friendlyLoss: killmail.victimIsFleetMember,
     totalValue: killmail.totalValue,
+    evidenceLevel: "confirmed",
+    evidence: `击杀邮件 ${killmail.killmailId} 确认 ${killmail.victimShipName ?? "未知舰船"} 于 ${killmail.killmailTime.toISOString()} 被击毁。`,
   };
 }
 
@@ -156,6 +159,8 @@ function detectLossPeaks(killmails: Killmail[]): BattleReplayLossPeak[] {
       friendlyLosses,
       hostileLosses,
       totalValue,
+      evidenceLevel: "confirmed",
+      evidence: `该时间窗口包含击杀邮件 ${events.map((event) => event.killmailId).join("、")}。`,
     });
   }
 
@@ -180,6 +185,113 @@ function detectLossPeaks(killmails: Killmail[]): BattleReplayLossPeak[] {
         new Date(left.startedAt).getTime() -
         new Date(right.startedAt).getTime(),
     );
+}
+
+function buildBattlePhases(
+  report: ReportDetail,
+  peaks: BattleReplayLossPeak[],
+): BattleReplayPhase[] {
+  const chronological = [...report.killmails].sort(
+    (left, right) => left.killmailTime.getTime() - right.killmailTime.getTime(),
+  );
+  if (chronological.length === 0) return [];
+
+  const first = chronological[0];
+  const last = chronological.at(-1)!;
+  const openingEndIndex = Math.min(
+    chronological.length - 1,
+    Math.max(0, Math.ceil(chronological.length * 0.25) - 1),
+  );
+  const openingEvents = chronological.slice(0, openingEndIndex + 1);
+  const escalationEvents = chronological.slice(openingEndIndex + 1);
+  const phases: BattleReplayPhase[] = [];
+
+  if (report.startedAt.getTime() < first.killmailTime.getTime()) {
+    phases.push({
+      id: "contact",
+      kind: "contact",
+      startedAt: report.startedAt.toISOString(),
+      endedAt: first.killmailTime.toISOString(),
+      title: "接敌与首个公开损失",
+      summary: `舰队开始后，首条匹配击杀记录出现在 ${first.killmailTime.toISOString()}。`,
+      evidence:
+        "击杀邮件只能确认首个损失时间，无法证明此前的移动、锁定或指挥过程。",
+      evidenceLevel: "inferred",
+      confidence: 0.55,
+      relatedKillmailIds: [first.killmailId],
+    });
+  }
+
+  phases.push({
+    id: "opening",
+    kind: "opening",
+    startedAt: first.killmailTime.toISOString(),
+    endedAt: openingEvents.at(-1)!.killmailTime.toISOString(),
+    title: "第一轮交火",
+    summary: `开场阶段记录 ${openingEvents.length} 次损失，本方 ${openingEvents.filter((event) => event.victimIsFleetMember).length} 艘、敌方 ${openingEvents.filter((event) => !event.victimIsFleetMember).length} 艘。`,
+    evidence: `关联击杀邮件 ${openingEvents.map((event) => event.killmailId).join("、")}。`,
+    evidenceLevel: "confirmed",
+    confidence: 0.94,
+    relatedKillmailIds: openingEvents.map((event) => event.killmailId),
+  });
+
+  if (escalationEvents.length > 0) {
+    phases.push({
+      id: "escalation",
+      kind: "escalation",
+      startedAt: escalationEvents[0].killmailTime.toISOString(),
+      endedAt: last.killmailTime.toISOString(),
+      title: "持续交火",
+      summary: `后续阶段记录 ${escalationEvents.length} 次损失，本方 ${escalationEvents.filter((event) => event.victimIsFleetMember).length} 艘、敌方 ${escalationEvents.filter((event) => !event.victimIsFleetMember).length} 艘。`,
+      evidence: `关联 ${escalationEvents.length} 条公开击杀邮件。`,
+      evidenceLevel: "confirmed",
+      confidence: 0.92,
+      relatedKillmailIds: escalationEvents.map((event) => event.killmailId),
+    });
+  }
+
+  const primaryPeak = [...peaks].sort(
+    (left, right) =>
+      right.killmailIds.length - left.killmailIds.length ||
+      right.totalValue - left.totalValue,
+  )[0];
+  if (primaryPeak) {
+    phases.push({
+      id: "turning-point",
+      kind: "turning_point",
+      startedAt: primaryPeak.startedAt,
+      endedAt: primaryPeak.endedAt,
+      title: "战损高峰与潜在转折",
+      summary: primaryPeak.reason,
+      evidence:
+        primaryPeak.evidence ??
+        `关联击杀邮件 ${primaryPeak.killmailIds.join("、")}。`,
+      evidenceLevel: "confirmed",
+      confidence: primaryPeak.confidence,
+      relatedKillmailIds: primaryPeak.killmailIds,
+    });
+  }
+
+  if (last.killmailTime.getTime() < report.endedAt.getTime()) {
+    phases.push({
+      id: "extraction",
+      kind: "extraction",
+      startedAt: last.killmailTime.toISOString(),
+      endedAt: report.endedAt.toISOString(),
+      title: "脱离或战斗结束",
+      summary: "最后一条公开损失记录至舰队结束之间没有新的匹配击杀邮件。",
+      evidence:
+        "该阶段可能是撤离、追击或停火；公开击杀数据无法区分具体行动。",
+      evidenceLevel: "inferred",
+      confidence: 0.45,
+      relatedKillmailIds: [last.killmailId],
+    });
+  }
+
+  return phases.sort(
+    (left, right) =>
+      new Date(left.startedAt).getTime() - new Date(right.startedAt).getTime(),
+  );
 }
 
 function buildRuleSuggestions(
@@ -362,6 +474,7 @@ function buildRuleAnalysis(report: ReportDetail): BattleReplayAnalysis {
       ),
     );
   const lossPeaks = detectLossPeaks(chronological);
+  const phases = buildBattlePhases(report, lossPeaks);
   const total = report.totalDestroyed + report.totalLost;
   const efficiency =
     total > 0 ? Math.round((report.totalDestroyed / total) * 1000) / 10 : 0;
@@ -376,6 +489,18 @@ function buildRuleAnalysis(report: ReportDetail): BattleReplayAnalysis {
     keyKills,
     lossPeaks,
     suggestions: buildRuleSuggestions(report, lossPeaks),
+    phases,
+    dataQuality: {
+      confirmedEventCount: report.killmails.length,
+      inferredEventCount: phases.filter(
+        (phase) => phase.evidenceLevel === "inferred",
+      ).length,
+      limitations: [
+        "公开击杀邮件不记录远程维修量，因此未出现在攻击或损失记录中的后勤舰无法确认。",
+        "攻击者伤害只能证明参与和伤害占比，不能还原真实开火顺序、锁定、站位或移动轨迹。",
+        "未造成伤害且未被击毁的敌方舰船不会出现在本次公开证据中。",
+      ],
+    },
   };
 }
 
@@ -643,7 +768,7 @@ async function requestOpenAiAnalysis(
           },
         },
         instructions:
-          "你是 EVE Online 舰队战斗复盘助手。只使用提供的击杀邮件证据，用简体中文输出。识别关键舰船、关键击杀、60 秒战损高峰，并结合 attackerEvidence 与 enemyComposition 分析敌方舰船构成、参与击杀次数、伤害和最后一击集中度，提供可执行建议。keyShips 与 keyKills 必须标注该 killmail 中被击毁的舰船；敌方攻击舰船应写入建议的观察与证据。不能从数据证明的指挥、站位、语音或移动情况必须表述为待复查或推测，禁止指责个人。所有引用的 killmailId 必须来自输入。",
+          "你是 EVE Online 舰队战斗复盘助手。只使用提供的击杀邮件证据，用简体中文输出。识别关键舰船、关键击杀、60 秒战损高峰，并结合 attackerEvidence 与 enemyComposition 分析敌方舰船构成、参与击杀次数、伤害和最后一击集中度，提供可执行建议。keyShips 与 keyKills 必须标注该 killmail 中被击毁的舰船；敌方攻击舰船应写入建议的观察与证据。击杀邮件不记录远程维修量：未攻击且未被击毁的后勤舰不得描述为已确认存在。不能从数据证明的指挥、站位、语音、维修或移动情况必须表述为待复查或推测，禁止指责个人。所有引用的 killmailId 必须来自输入。",
         input: JSON.stringify({
           battle: {
             name: report.fleetName,
@@ -769,6 +894,8 @@ function mergeModelAnalysis(
     keyKills: mapEvents(modelAnalysis.keyKills, fallback.keyKills),
     lossPeaks: lossPeaks.length > 0 ? lossPeaks : fallback.lossPeaks,
     suggestions: suggestions.length > 0 ? suggestions : fallback.suggestions,
+    phases: fallback.phases,
+    dataQuality: fallback.dataQuality,
   };
 }
 

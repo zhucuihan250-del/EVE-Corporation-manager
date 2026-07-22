@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import type {
   BattleReportKillmail,
+  BattleReportParticipant,
   BattleReplayAnalysis,
   BattleReviewManualNode,
 } from "@workspace/api-client-react";
@@ -18,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
+import { BattleReplayStage } from "@/components/battle-replay-stage";
 
 function formatIsk(value: number): string {
   if (value >= 1_000_000_000_000)
@@ -30,11 +32,17 @@ function formatIsk(value: number): string {
 
 export function BattleReplayPlayer({
   killmails,
+  participants,
+  startedAt,
+  endedAt,
   analysis,
   manualNodes = [],
   onEventChange,
 }: {
   killmails: BattleReportKillmail[];
+  participants: BattleReportParticipant[];
+  startedAt: string;
+  endedAt: string;
   analysis?: BattleReplayAnalysis | null;
   manualNodes?: BattleReviewManualNode[];
   onEventChange?: (occurredAt: string) => void;
@@ -64,6 +72,9 @@ export function BattleReplayPlayer({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
+  const [replayMode, setReplayMode] = useState<"cinematic" | "tactical">(
+    "cinematic",
+  );
   const activeEvent = events[currentIndex];
   const relevantAttackers = useMemo(
     () =>
@@ -165,6 +176,34 @@ export function BattleReplayPlayer({
           setIsPlaying(false);
         }}
         t={t}
+      />
+
+      <BattleReplayStage
+        events={events}
+        currentIndex={currentIndex}
+        participants={participants}
+        phases={analysis?.phases ?? []}
+        startedAt={startedAt}
+        endedAt={endedAt}
+        mode={replayMode}
+        onModeChange={setReplayMode}
+        onJumpToKillmail={(killmailId) => {
+          const filteredIndex = events.findIndex(
+            (event) => event.killmailId === killmailId,
+          );
+          if (filteredIndex >= 0) {
+            setCurrentIndex(filteredIndex);
+          } else {
+            const allIndex = allEvents.findIndex(
+              (event) => event.killmailId === killmailId,
+            );
+            if (allIndex >= 0) {
+              setEventFilter("all");
+              setCurrentIndex(allIndex);
+            }
+          }
+          setIsPlaying(false);
+        }}
       />
 
       <Card
@@ -373,7 +412,7 @@ export function BattleReplayPlayer({
             <span className="font-mono text-xs text-muted-foreground">
               {currentIndex + 1} / {events.length}
             </span>
-            {[0.5, 1, 2, 4].map((value) => (
+            {[0.5, 1, 2, 4, 8].map((value) => (
               <Button
                 key={value}
                 variant={speed === value ? "default" : "outline"}

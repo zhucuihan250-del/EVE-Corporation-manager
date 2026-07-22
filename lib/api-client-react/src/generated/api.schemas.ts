@@ -289,6 +289,14 @@ export const BattleReplayAnalysisSource = {
   rules: "rules",
 } as const;
 
+export type BattleReplayKeyEventEvidenceLevel =
+  (typeof BattleReplayKeyEventEvidenceLevel)[keyof typeof BattleReplayKeyEventEvidenceLevel];
+
+export const BattleReplayKeyEventEvidenceLevel = {
+  confirmed: "confirmed",
+  inferred: "inferred",
+} as const;
+
 export interface BattleReplayKeyEvent {
   killmailId: number;
   occurredAt: string;
@@ -301,7 +309,17 @@ export interface BattleReplayKeyEvent {
   pilotName?: string | null;
   friendlyLoss: boolean;
   totalValue: number;
+  evidenceLevel?: BattleReplayKeyEventEvidenceLevel;
+  evidence?: string;
 }
+
+export type BattleReplayLossPeakEvidenceLevel =
+  (typeof BattleReplayLossPeakEvidenceLevel)[keyof typeof BattleReplayLossPeakEvidenceLevel];
+
+export const BattleReplayLossPeakEvidenceLevel = {
+  confirmed: "confirmed",
+  inferred: "inferred",
+} as const;
 
 export interface BattleReplayLossPeak {
   startedAt: string;
@@ -313,6 +331,8 @@ export interface BattleReplayLossPeak {
   friendlyLosses: number;
   hostileLosses: number;
   totalValue: number;
+  evidenceLevel?: BattleReplayLossPeakEvidenceLevel;
+  evidence?: string;
 }
 
 export type BattleReplaySuggestionCategory =
@@ -338,6 +358,44 @@ export interface BattleReplaySuggestion {
   relatedKillmailIds: number[];
 }
 
+export type BattleReplayPhaseKind =
+  (typeof BattleReplayPhaseKind)[keyof typeof BattleReplayPhaseKind];
+
+export const BattleReplayPhaseKind = {
+  contact: "contact",
+  opening: "opening",
+  escalation: "escalation",
+  turning_point: "turning_point",
+  extraction: "extraction",
+} as const;
+
+export type BattleReplayPhaseEvidenceLevel =
+  (typeof BattleReplayPhaseEvidenceLevel)[keyof typeof BattleReplayPhaseEvidenceLevel];
+
+export const BattleReplayPhaseEvidenceLevel = {
+  confirmed: "confirmed",
+  inferred: "inferred",
+} as const;
+
+export interface BattleReplayPhase {
+  id: string;
+  kind: BattleReplayPhaseKind;
+  startedAt: string;
+  endedAt: string;
+  title: string;
+  summary: string;
+  evidence: string;
+  evidenceLevel: BattleReplayPhaseEvidenceLevel;
+  confidence: number;
+  relatedKillmailIds: number[];
+}
+
+export interface BattleReplayDataQuality {
+  confirmedEventCount: number;
+  inferredEventCount: number;
+  limitations: string[];
+}
+
 export interface BattleReplayAnalysis {
   version: BattleReplayAnalysisVersion;
   source: BattleReplayAnalysisSource;
@@ -348,6 +406,8 @@ export interface BattleReplayAnalysis {
   keyKills: BattleReplayKeyEvent[];
   lossPeaks: BattleReplayLossPeak[];
   suggestions: BattleReplaySuggestion[];
+  phases?: BattleReplayPhase[];
+  dataQuality?: BattleReplayDataQuality;
 }
 
 export type BattleReviewManualNodeCategory =

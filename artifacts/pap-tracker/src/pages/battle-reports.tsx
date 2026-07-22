@@ -757,6 +757,9 @@ export function BattleReportDetail() {
             <CardContent className="p-4">
               <BattleReplayPlayer
                 killmails={report.killmails}
+                participants={report.participants}
+                startedAt={report.startedAt}
+                endedAt={report.endedAt}
                 analysis={report.publishedReview?.aiAnalysis}
                 manualNodes={report.publishedReview?.manualNodes}
               />
@@ -962,15 +965,47 @@ export function BattleReportDetail() {
                         <p className="font-mono text-xs font-bold">
                           {suggestion.title}
                         </p>
-                        <p className="text-xs text-muted-foreground mt-2">
-                          {suggestion.recommendation}
-                        </p>
+                        <div className="mt-2 space-y-1.5 text-xs text-muted-foreground">
+                          <p>
+                            <span className="font-mono text-[10px] text-foreground/70">
+                              {t("battleReplay.observation")}:
+                            </span>{" "}
+                            {suggestion.observation}
+                          </p>
+                          <p>
+                            <span className="font-mono text-[10px] text-emerald-400/80">
+                              {t("battleReplay.evidence")}:
+                            </span>{" "}
+                            {suggestion.evidence}
+                          </p>
+                          <p>
+                            <span className="font-mono text-[10px] text-primary">
+                              {t("battleReplay.recommendation")}:
+                            </span>{" "}
+                            {suggestion.recommendation}
+                          </p>
+                        </div>
                       </div>
                     ),
                   )}
                 </div>
               </div>
             ) : null}
+            {(report.publishedReview.aiAnalysis?.dataQuality?.limitations
+              .length ?? 0) > 0 && (
+              <div className="border border-amber-500/20 bg-amber-500/5 rounded-sm p-3">
+                <h3 className="font-mono text-[10px] uppercase text-amber-300 mb-2">
+                  {t("battleReplay.dataBoundaries")}
+                </h3>
+                <ul className="space-y-1.5 text-xs text-muted-foreground">
+                  {report.publishedReview.aiAnalysis!.dataQuality!.limitations.map(
+                    (limitation, index) => (
+                      <li key={index}>• {limitation}</li>
+                    ),
+                  )}
+                </ul>
+              </div>
+            )}
             {report.publishedReview.conclusion && (
               <div className="border border-emerald-500/25 bg-emerald-500/5 rounded-sm p-4">
                 <h3 className="font-mono text-xs uppercase tracking-wider text-emerald-400 mb-2">

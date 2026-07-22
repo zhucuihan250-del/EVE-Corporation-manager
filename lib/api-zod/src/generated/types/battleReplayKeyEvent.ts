@@ -5,6 +5,7 @@
  * EVE Online PAP Tracking System API
  * OpenAPI spec version: 0.1.0
  */
+import type { BattleReplayKeyEventEvidenceLevel } from "./battleReplayKeyEventEvidenceLevel";
 
 export interface BattleReplayKeyEvent {
   killmailId: number;
@@ -18,4 +19,6 @@ export interface BattleReplayKeyEvent {
   pilotName?: string | null;
   friendlyLoss: boolean;
   totalValue: number;
+  evidenceLevel?: BattleReplayKeyEventEvidenceLevel;
+  evidence?: string;
 }

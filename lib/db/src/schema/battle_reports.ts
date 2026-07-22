@@ -160,6 +160,8 @@ export type BattleReplayKeyEvent = {
   pilotName: string | null;
   friendlyLoss: boolean;
   totalValue: number;
+  evidenceLevel?: "confirmed" | "inferred";
+  evidence?: string;
 };
 
 export type BattleReplayLossPeak = {
@@ -172,6 +174,32 @@ export type BattleReplayLossPeak = {
   friendlyLosses: number;
   hostileLosses: number;
   totalValue: number;
+  evidenceLevel?: "confirmed" | "inferred";
+  evidence?: string;
+};
+
+export type BattleReplayPhase = {
+  id: string;
+  kind:
+    | "contact"
+    | "opening"
+    | "escalation"
+    | "turning_point"
+    | "extraction";
+  startedAt: string;
+  endedAt: string;
+  title: string;
+  summary: string;
+  evidence: string;
+  evidenceLevel: "confirmed" | "inferred";
+  confidence: number;
+  relatedKillmailIds: number[];
+};
+
+export type BattleReplayDataQuality = {
+  confirmedEventCount: number;
+  inferredEventCount: number;
+  limitations: string[];
 };
 
 export type BattleReplaySuggestion = {
@@ -201,6 +229,8 @@ export type BattleReplayAnalysis = {
   keyKills: BattleReplayKeyEvent[];
   lossPeaks: BattleReplayLossPeak[];
   suggestions: BattleReplaySuggestion[];
+  phases?: BattleReplayPhase[];
+  dataQuality?: BattleReplayDataQuality;
 };
 
 export const battleReportReviewsTable = pgTable("battle_report_reviews", {

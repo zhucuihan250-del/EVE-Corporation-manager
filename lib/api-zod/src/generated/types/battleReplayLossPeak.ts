@@ -5,6 +5,7 @@
  * EVE Online PAP Tracking System API
  * OpenAPI spec version: 0.1.0
  */
+import type { BattleReplayLossPeakEvidenceLevel } from "./battleReplayLossPeakEvidenceLevel";
 
 export interface BattleReplayLossPeak {
   startedAt: Date;
@@ -16,4 +17,6 @@ export interface BattleReplayLossPeak {
   friendlyLosses: number;
   hostileLosses: number;
   totalValue: number;
+  evidenceLevel?: BattleReplayLossPeakEvidenceLevel;
+  evidence?: string;
 }

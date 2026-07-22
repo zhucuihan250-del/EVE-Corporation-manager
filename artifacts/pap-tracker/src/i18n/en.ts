@@ -287,6 +287,7 @@ const en = {
         "The BR is being generated from public killmail data. This page will update automatically.",
       partialNotice:
         "Some external killmail data is temporarily unavailable. Available results are shown; refresh again later.",
+      syncDetails: "SYNC DETAILS",
       lastSynced: "Last synchronized: {{time}}",
       status: {
         pending: "PENDING",

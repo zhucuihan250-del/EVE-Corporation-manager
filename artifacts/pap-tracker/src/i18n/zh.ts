@@ -273,6 +273,7 @@ const zh = {
       generatingNotice: "正在从公开击杀数据生成 BR，页面会自动更新。",
       partialNotice:
         "部分外部击杀数据暂时不可用；当前已显示成功同步的内容，可稍后重新同步。",
+      syncDetails: "同步详情",
       lastSynced: "最后同步：{{time}}",
       status: {
         pending: "等待生成",

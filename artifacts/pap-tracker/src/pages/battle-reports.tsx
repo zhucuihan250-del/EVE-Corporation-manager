@@ -621,8 +621,13 @@ export function BattleReportDetail() {
         </div>
       )}
       {report.errorMessage && report.status !== "generating" && (
-        <div className="border border-amber-500/25 bg-amber-500/5 rounded-sm p-3 font-mono text-xs text-amber-400">
-          {t("battleReports.partialNotice")}
+        <div className="border border-amber-500/25 bg-amber-500/5 rounded-sm p-3 text-amber-400">
+          <p className="font-mono text-xs">
+            {t("battleReports.partialNotice")}
+          </p>
+          <p className="font-mono text-[10px] text-amber-300/75 mt-2 break-words">
+            {t("battleReports.syncDetails")}: {report.errorMessage}
+          </p>
         </div>
       )}
 

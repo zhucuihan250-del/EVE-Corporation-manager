@@ -1,19 +1,42 @@
-import { useGetAdminSummary, useGetTopContributors } from "@workspace/api-client-react";
+import { useState } from "react";
+import {
+  useGetAdminSummary,
+  useGetTopContributors,
+  useGetTopContributors30Days,
+} from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Swords, Award, Inbox, Trophy } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTranslation } from "react-i18next";
+
+const LEADERBOARD_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 export function AdminDashboard() {
   const { t } = useTranslation();
+  const [leaderboardPeriod, setLeaderboardPeriod] = useState<"all" | "30-days">("all");
   const { data: summary, isLoading: isSummaryLoading } = useGetAdminSummary({
     query: { queryKey: ["adminSummary"] }
   });
   
   const { data: topContributors, isLoading: isContributorsLoading } = useGetTopContributors({
-    query: { queryKey: ["topContributors"] }
+    query: {
+      queryKey: ["topContributors"],
+      refetchInterval: LEADERBOARD_REFRESH_INTERVAL_MS,
+    }
   });
+  const { data: recentTopContributors, isLoading: isRecentContributorsLoading } = useGetTopContributors30Days({
+    query: {
+      queryKey: ["topContributors", "30-days"],
+      refetchInterval: LEADERBOARD_REFRESH_INTERVAL_MS,
+    }
+  });
+
+  const visibleContributors = leaderboardPeriod === "all" ? topContributors : recentTopContributors;
+  const isVisibleLeaderboardLoading = leaderboardPeriod === "all"
+    ? isContributorsLoading
+    : isRecentContributorsLoading;
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -77,19 +100,37 @@ export function AdminDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <Card className="bg-card/40 backdrop-blur border-border/50 rounded-sm col-span-1">
-          <CardHeader className="border-b border-border/30">
-            <CardTitle className="text-sm font-mono tracking-wider uppercase flex items-center gap-2">
-              <Trophy className="w-4 h-4 text-primary" /> {t("admin.topContributors")}
-            </CardTitle>
+          <CardHeader className="border-b border-border/30 gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="text-sm font-mono tracking-wider uppercase flex items-center gap-2">
+                <Trophy className="w-4 h-4 text-primary" /> {t("admin.topContributors")}
+              </CardTitle>
+              <p className="mt-1 text-xs font-mono text-muted-foreground">
+                {t("admin.leaderboardAutoRefresh")}
+              </p>
+            </div>
+            <Tabs
+              value={leaderboardPeriod}
+              onValueChange={(value) => setLeaderboardPeriod(value as "all" | "30-days")}
+            >
+              <TabsList className="rounded-sm">
+                <TabsTrigger value="all" className="rounded-sm font-mono text-xs">
+                  {t("admin.allTimeLeaderboard")}
+                </TabsTrigger>
+                <TabsTrigger value="30-days" className="rounded-sm font-mono text-xs">
+                  {t("admin.thirtyDayLeaderboard")}
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </CardHeader>
           <CardContent className="p-0">
-            {isContributorsLoading ? (
+            {isVisibleLeaderboardLoading ? (
               <div className="p-8 flex flex-col gap-4">
                 <Skeleton className="h-8 w-full" />
                 <Skeleton className="h-8 w-full" />
                 <Skeleton className="h-8 w-full" />
               </div>
-            ) : !topContributors?.length ? (
+            ) : !visibleContributors?.length ? (
               <div className="p-8 text-center text-muted-foreground font-mono text-sm">
                 {t("admin.noActivity")}
               </div>
@@ -103,7 +144,7 @@ export function AdminDashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {topContributors.map((contributor, idx) => (
+                  {visibleContributors.map((contributor, idx) => (
                     <TableRow key={contributor.userId} className="border-border/30 border-b last:border-0 hover:bg-primary/5 transition-colors">
                       <TableCell className="font-mono text-sm text-foreground flex items-center gap-2">
                         <span className="text-muted-foreground w-4">{idx + 1}.</span> {contributor.userName}

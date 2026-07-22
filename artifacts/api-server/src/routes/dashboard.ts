@@ -1,9 +1,39 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, usersTable, fleetsTable, papRecordsTable, redemptionsTable } from "@workspace/db";
-import { eq, desc, count, sql, and, sum } from "drizzle-orm";
+import { eq, desc, asc, count, sql, and, sum, gte } from "drizzle-orm";
 import { requireAuth, hasRole } from "../middlewares/auth";
 
 const router: IRouter = Router();
+
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+async function getTopContributors(since?: Date) {
+  const fleetCount = sql<number>`COUNT(DISTINCT ${papRecordsTable.fleetId})::int`;
+  const totalPap = since
+    ? sql<number>`COALESCE(SUM(${papRecordsTable.amount}), 0)::real`
+    : usersTable.totalPap;
+  const fleetRecordCondition = since
+    ? and(
+        eq(papRecordsTable.userId, usersTable.id),
+        eq(papRecordsTable.type, "fleet"),
+        gte(papRecordsTable.createdAt, since),
+      )
+    : and(eq(papRecordsTable.userId, usersTable.id), eq(papRecordsTable.type, "fleet"));
+
+  return db
+    .select({
+      userId: usersTable.id,
+      userName: usersTable.eveCharacterName,
+      totalPap,
+      fleetCount,
+    })
+    .from(usersTable)
+    .leftJoin(papRecordsTable, fleetRecordCondition)
+    .groupBy(usersTable.id)
+    .having(sql`${fleetCount} > 0`)
+    .orderBy(desc(fleetCount), desc(totalPap), asc(usersTable.eveCharacterName))
+    .limit(10);
+}
 
 // GET /api/dashboard/summary - current user
 router.get("/dashboard/summary", requireAuth, async (req: Request, res: Response): Promise<void> => {
@@ -77,21 +107,14 @@ router.get("/dashboard/admin-summary", requireAuth, async (req: Request, res: Re
 
 // GET /api/dashboard/top-contributors
 router.get("/dashboard/top-contributors", requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const contributors = await db
-    .select({
-      userId: usersTable.id,
-      userName: usersTable.eveCharacterName,
-      totalPap: usersTable.totalPap,
-      fleetCount: sql<number>`COUNT(DISTINCT ${papRecordsTable.fleetId})::int`,
-    })
-    .from(usersTable)
-    .leftJoin(
-      papRecordsTable,
-      and(eq(papRecordsTable.userId, usersTable.id), eq(papRecordsTable.type, "fleet")),
-    )
-    .groupBy(usersTable.id)
-    .orderBy(desc(usersTable.totalPap))
-    .limit(10);
+  const contributors = await getTopContributors();
+
+  res.json(contributors);
+});
+
+// GET /api/dashboard/top-contributors/30-days
+router.get("/dashboard/top-contributors/30-days", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const contributors = await getTopContributors(new Date(Date.now() - THIRTY_DAYS_MS));
 
   res.json(contributors);
 });

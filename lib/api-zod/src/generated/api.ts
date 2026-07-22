@@ -638,7 +638,7 @@ export const GetAdminSummaryResponse = zod.object({
 });
 
 /**
- * @summary Get top PAP contributors
+ * @summary Get top contributors ordered by fleet participation count
  */
 export const GetTopContributorsResponseItem = zod.object({
   userId: zod.number(),
@@ -648,6 +648,19 @@ export const GetTopContributorsResponseItem = zod.object({
 });
 export const GetTopContributorsResponse = zod.array(
   GetTopContributorsResponseItem,
+);
+
+/**
+ * @summary Get top contributors for the rolling last 30 days
+ */
+export const GetTopContributors30DaysResponseItem = zod.object({
+  userId: zod.number(),
+  userName: zod.string().nullish(),
+  totalPap: zod.number(),
+  fleetCount: zod.number(),
+});
+export const GetTopContributors30DaysResponse = zod.array(
+  GetTopContributors30DaysResponseItem,
 );
 
 /**

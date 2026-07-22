@@ -2869,7 +2869,7 @@ export function useGetAdminSummary<
 }
 
 /**
- * @summary Get top PAP contributors
+ * @summary Get top contributors ordered by fleet participation count
  */
 export const getGetTopContributorsUrl = () => {
   return `/api/dashboard/top-contributors`;
@@ -2920,7 +2920,7 @@ export type GetTopContributorsQueryResult = NonNullable<
 export type GetTopContributorsQueryError = ErrorType<unknown>;
 
 /**
- * @summary Get top PAP contributors
+ * @summary Get top contributors ordered by fleet participation count
  */
 
 export function useGetTopContributors<
@@ -2935,6 +2935,82 @@ export function useGetTopContributors<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetTopContributorsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get top contributors for the rolling last 30 days
+ */
+export const getGetTopContributors30DaysUrl = () => {
+  return `/api/dashboard/top-contributors/30-days`;
+};
+
+export const getTopContributors30Days = async (
+  options?: RequestInit,
+): Promise<TopContributor[]> => {
+  return customFetch<TopContributor[]>(getGetTopContributors30DaysUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetTopContributors30DaysQueryKey = () => {
+  return [`/api/dashboard/top-contributors/30-days`] as const;
+};
+
+export const getGetTopContributors30DaysQueryOptions = <
+  TData = Awaited<ReturnType<typeof getTopContributors30Days>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getTopContributors30Days>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetTopContributors30DaysQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getTopContributors30Days>>
+  > = ({ signal }) => getTopContributors30Days({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getTopContributors30Days>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetTopContributors30DaysQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getTopContributors30Days>>
+>;
+export type GetTopContributors30DaysQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get top contributors for the rolling last 30 days
+ */
+
+export function useGetTopContributors30Days<
+  TData = Awaited<ReturnType<typeof getTopContributors30Days>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getTopContributors30Days>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetTopContributors30DaysQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

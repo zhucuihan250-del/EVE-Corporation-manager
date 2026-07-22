@@ -82,14 +82,14 @@ router.get("/dashboard/top-contributors", requireAuth, async (req: Request, res:
       userId: usersTable.id,
       userName: usersTable.eveCharacterName,
       totalPap: usersTable.totalPap,
-      fleetCount: sql<number>`(
-        SELECT COUNT(DISTINCT fleet_id)::int FROM pap_records
-        WHERE user_id = ${usersTable.id}
-          AND type = 'fleet'
-          AND fleet_id IS NOT NULL
-      )`,
+      fleetCount: sql<number>`COUNT(DISTINCT ${papRecordsTable.fleetId})::int`,
     })
     .from(usersTable)
+    .leftJoin(
+      papRecordsTable,
+      and(eq(papRecordsTable.userId, usersTable.id), eq(papRecordsTable.type, "fleet")),
+    )
+    .groupBy(usersTable.id)
     .orderBy(desc(usersTable.totalPap))
     .limit(10);
 

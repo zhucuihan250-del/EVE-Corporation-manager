@@ -17,6 +17,8 @@ const ESI_COMPATIBILITY_DATE = "2026-07-20";
 const USER_AGENT = process.env.EVE_ESI_USER_AGENT
   || `EVE-PAP-Tracker/1.0 (+${process.env.FRONTEND_URL || "https://workspaceapi-server-production-72ec.up.railway.app"})`;
 const MAX_AUTOMATIC_LOOKBACK_SECONDS = 7 * 24 * 60 * 60;
+const MAX_ZKILL_PAGES_PER_SOURCE = 10;
+const ZKILL_REQUEST_DELAY_MS = 1_000;
 const activeGenerationJobs = new Set<number>();
 const queuedGenerationJobs = new Set<number>();
 const generationQueue: { reportId: number; force: boolean }[] = [];
@@ -148,12 +150,58 @@ async function fetchZkillCandidates(
   entityType: "corporationID" | "characterID",
   entityId: number,
   pastSeconds: number,
-): Promise<ZkillEntry[]> {
-  return fetchJson<ZkillEntry[]>(
-    `${ZKILL_BASE}/${entityType}/${entityId}/pastSeconds/${pastSeconds}/`,
-    undefined,
-    20_000,
-  );
+  fetchType: "kills" | "losses",
+): Promise<{
+  entries: ZkillEntry[];
+  pagesFetched: number;
+  firstPageFailed: boolean;
+  warning: string | null;
+}> {
+  const entries: ZkillEntry[] = [];
+
+  for (let page = 1; page <= MAX_ZKILL_PAGES_PER_SOURCE; page++) {
+    try {
+      const pageEntries = await fetchJson<ZkillEntry[]>(
+        `${ZKILL_BASE}/${fetchType}/${entityType}/${entityId}/pastSeconds/${pastSeconds}/page/${page}/`,
+        undefined,
+        20_000,
+      );
+      if (!Array.isArray(pageEntries)) {
+        throw new Error("zKillboard returned a non-array response");
+      }
+      if (pageEntries.length === 0) {
+        return {
+          entries,
+          pagesFetched: page - 1,
+          firstPageFailed: false,
+          warning: null,
+        };
+      }
+      entries.push(...pageEntries);
+    } catch (error) {
+      logger.warn(
+        { error, entityType, entityId, fetchType, page },
+        "zKillboard battle report page failed",
+      );
+      return {
+        entries,
+        pagesFetched: page - 1,
+        firstPageFailed: page === 1,
+        warning: `${fetchType}:${entityType}:${entityId}:page:${page}`,
+      };
+    }
+
+    if (page < MAX_ZKILL_PAGES_PER_SOURCE) {
+      await delay(ZKILL_REQUEST_DELAY_MS);
+    }
+  }
+
+  return {
+    entries,
+    pagesFetched: MAX_ZKILL_PAGES_PER_SOURCE,
+    firstPageFailed: false,
+    warning: `${fetchType}:${entityType}:${entityId}:page-limit`,
+  };
 }
 
 async function fetchKillmailDetails(candidates: KillmailCandidate[]): Promise<{
@@ -297,27 +345,45 @@ async function runBattleReportGeneration(reportId: number, force: boolean): Prom
 
   const candidateMap = new Map<number, KillmailCandidate>();
   const sourceErrors: string[] = [];
-  const sources: { type: "corporationID" | "characterID"; id: number }[] = [
-    ...corporationIds.map((id) => ({ type: "corporationID" as const, id })),
-    ...characterIds.map((id) => ({ type: "characterID" as const, id })),
+  const sourceWarnings: string[] = [];
+  const sources: {
+    entityType: "corporationID" | "characterID";
+    entityId: number;
+    fetchType: "kills" | "losses";
+  }[] = [
+    ...corporationIds.flatMap((entityId) => [
+      { entityType: "corporationID" as const, entityId, fetchType: "losses" as const },
+      { entityType: "corporationID" as const, entityId, fetchType: "kills" as const },
+    ]),
+    ...characterIds.flatMap((entityId) => [
+      { entityType: "characterID" as const, entityId, fetchType: "losses" as const },
+      { entityType: "characterID" as const, entityId, fetchType: "kills" as const },
+    ]),
   ];
+  let zkillPagesFetched = 0;
 
   for (const [index, source] of sources.entries()) {
-    if (index > 0) await delay(400);
-    try {
-      const entries = await fetchZkillCandidates(source.type, source.id, pastSeconds);
-      for (const entry of entries) {
-        const hash = entry.zkb?.hash;
-        if (!hash || !Number.isInteger(entry.killmail_id)) continue;
-        candidateMap.set(entry.killmail_id, {
-          id: entry.killmail_id,
-          hash,
-          totalValue: Number(entry.zkb?.totalValue ?? 0),
-        });
-      }
-    } catch (error) {
-      sourceErrors.push(`${source.type}:${source.id}`);
-      logger.warn({ error, source }, "zKillboard battle report source failed");
+    if (index > 0) await delay(ZKILL_REQUEST_DELAY_MS);
+    const result = await fetchZkillCandidates(
+      source.entityType,
+      source.entityId,
+      pastSeconds,
+      source.fetchType,
+    );
+    zkillPagesFetched += result.pagesFetched;
+    if (result.firstPageFailed) {
+      sourceErrors.push(`${source.fetchType}:${source.entityType}:${source.entityId}`);
+    } else if (result.warning) {
+      sourceWarnings.push(result.warning);
+    }
+    for (const entry of result.entries) {
+      const hash = entry.zkb?.hash;
+      if (!hash || !Number.isInteger(entry.killmail_id)) continue;
+      candidateMap.set(entry.killmail_id, {
+        id: entry.killmail_id,
+        hash,
+        totalValue: Number(entry.zkb?.totalValue ?? 0),
+      });
     }
   }
 
@@ -450,6 +516,9 @@ async function runBattleReportGeneration(reportId: number, force: boolean): Prom
   const [primarySystem] = [...systemCounts.entries()].sort((left, right) => right[1] - left[1])[0] ?? [];
   const warnings: string[] = [];
   if (sourceErrors.length > 0) warnings.push(`${sourceErrors.length} zKillboard source(s) failed`);
+  if (sourceWarnings.length > 0) {
+    warnings.push(`${sourceWarnings.length} zKillboard source(s) were only partially paged`);
+  }
   if (detailFailures > 0) warnings.push(`${detailFailures} ESI killmail(s) failed`);
   const allSourcesFailed = sources.length > 0 && sourceErrors.length === sources.length;
   const finalStatus = allSourcesFailed ? "failed" : warnings.length > 0 ? "partial" : "ready";
@@ -496,7 +565,14 @@ async function runBattleReportGeneration(reportId: number, force: boolean): Prom
   });
 
   logger.info(
-    { reportId, killmailCount: storedKillmails.length, participantCount: participants.length, status: finalStatus },
+    {
+      reportId,
+      killmailCount: storedKillmails.length,
+      participantCount: participants.length,
+      candidateCount: candidateMap.size,
+      zkillPagesFetched,
+      status: finalStatus,
+    },
     "Battle report generation complete",
   );
 }

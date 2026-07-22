@@ -17,6 +17,7 @@ import {
   Languages,
   UserSquare2,
   Radio,
+  Crosshair,
 } from "lucide-react";
 import {
   Sidebar,
@@ -91,6 +92,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       <Link href="/history" className="font-mono flex items-center gap-3">
                         <History className="w-4 h-4" />
                         <span>{t("nav.history")}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={location.startsWith("/battle-reports")}>
+                      <Link href="/battle-reports" className="font-mono flex items-center gap-3">
+                        <Crosshair className="w-4 h-4" />
+                        <span>{t("nav.battleReports")}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

@@ -3,6 +3,7 @@ import { db, fleetsTable, usersTable, papRecordsTable, charactersTable } from "@
 import { eq, desc, sql, inArray, and, count } from "drizzle-orm";
 import { refreshAccessToken } from "../lib/eve-sso";
 import { requireAuth, hasRole } from "../middlewares/auth";
+import { ensureBattleReportForFleet, queueBattleReportGeneration } from "../lib/battle-reports";
 import {
   CreateFleetBody,
   GetFleetParams,
@@ -32,6 +33,11 @@ router.get("/fleets", requireAuth, async (req: Request, res: Response): Promise<
         SELECT COUNT(*)::int FROM "pap_records"
         WHERE "pap_records"."fleet_id" = "fleets"."id"
         AND "pap_records"."type" = 'fleet'
+      )`,
+      battleReportId: sql<number | null>`(
+        SELECT "battle_reports"."id" FROM "battle_reports"
+        WHERE "battle_reports"."fleet_id" = "fleets"."id"
+        LIMIT 1
       )`,
     })
     .from(fleetsTable)
@@ -162,6 +168,11 @@ router.get("/fleets/:id", requireAuth, async (req: Request, res: Response): Prom
         WHERE "pap_records"."fleet_id" = "fleets"."id"
         AND "pap_records"."type" = 'fleet'
       )`,
+      battleReportId: sql<number | null>`(
+        SELECT "battle_reports"."id" FROM "battle_reports"
+        WHERE "battle_reports"."fleet_id" = "fleets"."id"
+        LIMIT 1
+      )`,
     })
     .from(fleetsTable)
     .where(eq(fleetsTable.id, params.data.id));
@@ -200,6 +211,7 @@ router.patch("/fleets/:id", requireAuth, async (req: Request, res: Response): Pr
   if (body.data.papValue !== undefined) updates.papValue = body.data.papValue;
   if (body.data.isActive !== undefined) updates.isActive = body.data.isActive;
   if (body.data.endedAt !== undefined) updates.endedAt = body.data.endedAt ? new Date(body.data.endedAt) : null;
+  if (body.data.isActive === false && body.data.endedAt === undefined) updates.endedAt = new Date();
   if (body.data.eveFleetId !== undefined) updates.eveFleetId = body.data.eveFleetId ?? null;
 
   if (Object.keys(updates).length === 0) {
@@ -218,7 +230,13 @@ router.patch("/fleets/:id", requireAuth, async (req: Request, res: Response): Pr
     return;
   }
 
-  res.json({ ...fleet, participantCount: null });
+  let battleReportId: number | null = null;
+  if (!fleet.isActive && fleet.endedAt) {
+    battleReportId = await ensureBattleReportForFleet(fleet.id);
+    if (battleReportId) queueBattleReportGeneration(battleReportId);
+  }
+
+  res.json({ ...fleet, participantCount: null, battleReportId });
 });
 
 // POST /api/fleets/:id/scan - scan ESI fleet members and auto-award PAP

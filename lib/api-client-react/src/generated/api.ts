@@ -21,6 +21,8 @@ import type {
   AdjustPapBody,
   AdminSummary,
   Announcement,
+  BattleReportDetail,
+  BattleReportSummary,
   Character,
   CreateAnnouncementBody,
   CreateFleetBody,
@@ -34,6 +36,7 @@ import type {
   HealthStatus,
   PapRecord,
   Redemption,
+  RefreshBattleReport202,
   Reward,
   ScanFleetResponse,
   SuccessResponse,
@@ -1578,6 +1581,252 @@ export const useAddFleetParticipant = <
   TContext
 > => {
   return useMutation(getAddFleetParticipantMutationOptions(options));
+};
+
+/**
+ * @summary List fleet battle reports (all authenticated members)
+ */
+export const getListBattleReportsUrl = () => {
+  return `/api/battle-reports`;
+};
+
+export const listBattleReports = async (
+  options?: RequestInit,
+): Promise<BattleReportSummary[]> => {
+  return customFetch<BattleReportSummary[]>(getListBattleReportsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListBattleReportsQueryKey = () => {
+  return [`/api/battle-reports`] as const;
+};
+
+export const getListBattleReportsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listBattleReports>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listBattleReports>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListBattleReportsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listBattleReports>>
+  > = ({ signal }) => listBattleReports({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listBattleReports>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListBattleReportsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listBattleReports>>
+>;
+export type ListBattleReportsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List fleet battle reports (all authenticated members)
+ */
+
+export function useListBattleReports<
+  TData = Awaited<ReturnType<typeof listBattleReports>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listBattleReports>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListBattleReportsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get a fleet battle report (all authenticated members)
+ */
+export const getGetBattleReportUrl = (id: number) => {
+  return `/api/battle-reports/${id}`;
+};
+
+export const getBattleReport = async (
+  id: number,
+  options?: RequestInit,
+): Promise<BattleReportDetail> => {
+  return customFetch<BattleReportDetail>(getGetBattleReportUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetBattleReportQueryKey = (id: number) => {
+  return [`/api/battle-reports/${id}`] as const;
+};
+
+export const getGetBattleReportQueryOptions = <
+  TData = Awaited<ReturnType<typeof getBattleReport>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getBattleReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetBattleReportQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getBattleReport>>> = ({
+    signal,
+  }) => getBattleReport(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getBattleReport>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetBattleReportQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getBattleReport>>
+>;
+export type GetBattleReportQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get a fleet battle report (all authenticated members)
+ */
+
+export function useGetBattleReport<
+  TData = Awaited<ReturnType<typeof getBattleReport>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getBattleReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetBattleReportQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Re-sync a fleet battle report (FC and above)
+ */
+export const getRefreshBattleReportUrl = (id: number) => {
+  return `/api/battle-reports/${id}/refresh`;
+};
+
+export const refreshBattleReport = async (
+  id: number,
+  options?: RequestInit,
+): Promise<RefreshBattleReport202> => {
+  return customFetch<RefreshBattleReport202>(getRefreshBattleReportUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getRefreshBattleReportMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof refreshBattleReport>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof refreshBattleReport>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["refreshBattleReport"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof refreshBattleReport>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return refreshBattleReport(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RefreshBattleReportMutationResult = NonNullable<
+  Awaited<ReturnType<typeof refreshBattleReport>>
+>;
+
+export type RefreshBattleReportMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Re-sync a fleet battle report (FC and above)
+ */
+export const useRefreshBattleReport = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof refreshBattleReport>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof refreshBattleReport>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getRefreshBattleReportMutationOptions(options));
 };
 
 /**

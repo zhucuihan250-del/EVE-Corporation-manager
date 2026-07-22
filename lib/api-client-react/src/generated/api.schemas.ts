@@ -117,6 +117,8 @@ export interface Fleet {
   createdAt: string;
   /** @nullable */
   participantCount?: number | null;
+  /** @nullable */
+  battleReportId?: number | null;
 }
 
 export interface CreateFleetBody {
@@ -128,6 +130,101 @@ export interface CreateFleetBody {
   /** @nullable */
   startedAt?: string | null;
 }
+
+export type BattleReportSummaryStatus =
+  (typeof BattleReportSummaryStatus)[keyof typeof BattleReportSummaryStatus];
+
+export const BattleReportSummaryStatus = {
+  pending: "pending",
+  generating: "generating",
+  ready: "ready",
+  partial: "partial",
+  failed: "failed",
+} as const;
+
+export interface BattleReportSummary {
+  id: number;
+  /** @nullable */
+  fleetId?: number | null;
+  fleetName: string;
+  fleetCommander: string;
+  startedAt: string;
+  endedAt: string;
+  status: BattleReportSummaryStatus;
+  /** @nullable */
+  errorMessage?: string | null;
+  totalDestroyed: number;
+  totalLost: number;
+  damageDealt: number;
+  killmailCount: number;
+  friendlyLosses: number;
+  hostileLosses: number;
+  /** @nullable */
+  primarySystemId?: number | null;
+  /** @nullable */
+  primarySystemName?: string | null;
+  /** @nullable */
+  generatedAt?: string | null;
+  /** @nullable */
+  lastSyncedAt?: string | null;
+  createdAt: string;
+  participantCount: number;
+}
+
+export interface BattleReportParticipant {
+  id: number;
+  eveCharacterId: number;
+  characterName: string;
+  /** @nullable */
+  corporationId?: number | null;
+  /** @nullable */
+  corporationName?: string | null;
+  /** @nullable */
+  primaryShipTypeId?: number | null;
+  /** @nullable */
+  primaryShipName?: string | null;
+  damageDealt: number;
+  killsInvolved: number;
+  finalBlows: number;
+  losses: number;
+}
+
+export interface BattleReportKillmail {
+  id: number;
+  killmailId: number;
+  killmailTime: string;
+  solarSystemId: number;
+  /** @nullable */
+  solarSystemName?: string | null;
+  /** @nullable */
+  victimCharacterId?: number | null;
+  /** @nullable */
+  victimCharacterName?: string | null;
+  /** @nullable */
+  victimCorporationId?: number | null;
+  /** @nullable */
+  victimCorporationName?: string | null;
+  /** @nullable */
+  victimAllianceId?: number | null;
+  /** @nullable */
+  victimAllianceName?: string | null;
+  victimShipTypeId: number;
+  /** @nullable */
+  victimShipName?: string | null;
+  victimIsFleetMember: boolean;
+  totalValue: number;
+  damageTaken: number;
+  friendlyDamage: number;
+  friendlyAttackers: number;
+  finalBlowByFleet: boolean;
+  /** @nullable */
+  zkillboardUrl?: string | null;
+}
+
+export type BattleReportDetail = BattleReportSummary & {
+  participants: BattleReportParticipant[];
+  killmails: BattleReportKillmail[];
+};
 
 export interface UpdateFleetBody {
   name?: string;
@@ -342,3 +439,7 @@ export interface TopContributor {
   totalPap: number;
   fleetCount: number;
 }
+
+export type RefreshBattleReport202 = {
+  status: string;
+};

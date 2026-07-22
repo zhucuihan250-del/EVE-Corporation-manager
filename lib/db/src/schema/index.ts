@@ -5,3 +5,4 @@ export * from "./pap_records";
 export * from "./rewards";
 export * from "./redemptions";
 export * from "./announcements";
+export * from "./battle_reports";

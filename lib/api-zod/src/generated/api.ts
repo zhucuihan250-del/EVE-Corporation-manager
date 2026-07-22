@@ -203,6 +203,7 @@ export const ListFleetsResponseItem = zod.object({
   endedAt: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
   participantCount: zod.number().nullish(),
+  battleReportId: zod.number().nullish(),
 });
 export const ListFleetsResponse = zod.array(ListFleetsResponseItem);
 
@@ -235,6 +236,7 @@ export const GetFleetResponse = zod.object({
   endedAt: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
   participantCount: zod.number().nullish(),
+  battleReportId: zod.number().nullish(),
 });
 
 /**
@@ -264,6 +266,7 @@ export const UpdateFleetResponse = zod.object({
   endedAt: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
   participantCount: zod.number().nullish(),
+  battleReportId: zod.number().nullish(),
 });
 
 /**
@@ -295,6 +298,116 @@ export const AddFleetParticipantParams = zod.object({
 
 export const AddFleetParticipantBody = zod.object({
   characterId: zod.number(),
+});
+
+/**
+ * @summary List fleet battle reports (all authenticated members)
+ */
+export const ListBattleReportsResponseItem = zod.object({
+  id: zod.number(),
+  fleetId: zod.number().nullish(),
+  fleetName: zod.string(),
+  fleetCommander: zod.string(),
+  startedAt: zod.coerce.date(),
+  endedAt: zod.coerce.date(),
+  status: zod.enum(["pending", "generating", "ready", "partial", "failed"]),
+  errorMessage: zod.string().nullish(),
+  totalDestroyed: zod.number(),
+  totalLost: zod.number(),
+  damageDealt: zod.number(),
+  killmailCount: zod.number(),
+  friendlyLosses: zod.number(),
+  hostileLosses: zod.number(),
+  primarySystemId: zod.number().nullish(),
+  primarySystemName: zod.string().nullish(),
+  generatedAt: zod.coerce.date().nullish(),
+  lastSyncedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  participantCount: zod.number(),
+});
+export const ListBattleReportsResponse = zod.array(
+  ListBattleReportsResponseItem,
+);
+
+/**
+ * @summary Get a fleet battle report (all authenticated members)
+ */
+export const GetBattleReportParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetBattleReportResponse = zod
+  .object({
+    id: zod.number(),
+    fleetId: zod.number().nullish(),
+    fleetName: zod.string(),
+    fleetCommander: zod.string(),
+    startedAt: zod.coerce.date(),
+    endedAt: zod.coerce.date(),
+    status: zod.enum(["pending", "generating", "ready", "partial", "failed"]),
+    errorMessage: zod.string().nullish(),
+    totalDestroyed: zod.number(),
+    totalLost: zod.number(),
+    damageDealt: zod.number(),
+    killmailCount: zod.number(),
+    friendlyLosses: zod.number(),
+    hostileLosses: zod.number(),
+    primarySystemId: zod.number().nullish(),
+    primarySystemName: zod.string().nullish(),
+    generatedAt: zod.coerce.date().nullish(),
+    lastSyncedAt: zod.coerce.date().nullish(),
+    createdAt: zod.coerce.date(),
+    participantCount: zod.number(),
+  })
+  .and(
+    zod.object({
+      participants: zod.array(
+        zod.object({
+          id: zod.number(),
+          eveCharacterId: zod.number(),
+          characterName: zod.string(),
+          corporationId: zod.number().nullish(),
+          corporationName: zod.string().nullish(),
+          primaryShipTypeId: zod.number().nullish(),
+          primaryShipName: zod.string().nullish(),
+          damageDealt: zod.number(),
+          killsInvolved: zod.number(),
+          finalBlows: zod.number(),
+          losses: zod.number(),
+        }),
+      ),
+      killmails: zod.array(
+        zod.object({
+          id: zod.number(),
+          killmailId: zod.number(),
+          killmailTime: zod.coerce.date(),
+          solarSystemId: zod.number(),
+          solarSystemName: zod.string().nullish(),
+          victimCharacterId: zod.number().nullish(),
+          victimCharacterName: zod.string().nullish(),
+          victimCorporationId: zod.number().nullish(),
+          victimCorporationName: zod.string().nullish(),
+          victimAllianceId: zod.number().nullish(),
+          victimAllianceName: zod.string().nullish(),
+          victimShipTypeId: zod.number(),
+          victimShipName: zod.string().nullish(),
+          victimIsFleetMember: zod.boolean(),
+          totalValue: zod.number(),
+          damageTaken: zod.number(),
+          friendlyDamage: zod.number(),
+          friendlyAttackers: zod.number(),
+          finalBlowByFleet: zod.boolean(),
+          zkillboardUrl: zod.string().nullish(),
+        }),
+      ),
+    }),
+  );
+
+/**
+ * @summary Re-sync a fleet battle report (FC and above)
+ */
+export const RefreshBattleReportParams = zod.object({
+  id: zod.coerce.number(),
 });
 
 /**
@@ -551,6 +664,7 @@ export const GetRecentFleetsResponseItem = zod.object({
   endedAt: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
   participantCount: zod.number().nullish(),
+  battleReportId: zod.number().nullish(),
 });
 export const GetRecentFleetsResponse = zod.array(GetRecentFleetsResponseItem);
 

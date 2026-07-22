@@ -24,6 +24,7 @@ import { AdminRedemptions } from "@/pages/admin/redemptions";
 import { AdminPap } from "@/pages/admin/pap";
 import { AdminAnnouncements } from "@/pages/admin/announcements";
 import { Characters } from "@/pages/characters";
+import { BattleReportDetail, BattleReports } from "@/pages/battle-reports";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -104,6 +105,12 @@ function Router() {
       </Route>
       <Route path="/characters">
         {() => <ProtectedRoute component={Characters} />}
+      </Route>
+      <Route path="/battle-reports/:id">
+        {() => <ProtectedRoute component={BattleReportDetail} />}
+      </Route>
+      <Route path="/battle-reports">
+        {() => <ProtectedRoute component={BattleReports} />}
       </Route>
       
       {/* Admin Routes - admin & controller only */}

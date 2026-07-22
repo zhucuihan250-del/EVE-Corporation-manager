@@ -393,6 +393,70 @@ paths:
               schema:
                 $ref: "#/components/schemas/PapRecord"
 
+  /battle-reports:
+    get:
+      operationId: listBattleReports
+      tags: [battle-reports]
+      summary: List fleet battle reports (all authenticated members)
+      responses:
+        "200":
+          description: Battle report summaries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BattleReportSummary"
+
+  /battle-reports/{id}:
+    get:
+      operationId: getBattleReport
+      tags: [battle-reports]
+      summary: Get a fleet battle report (all authenticated members)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Battle report with fleet and killmail details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BattleReportDetail"
+        "404":
+          description: Battle report not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /battle-reports/{id}/refresh:
+    post:
+      operationId: refreshBattleReport
+      tags: [battle-reports]
+      summary: Re-sync a fleet battle report (FC and above)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "202":
+          description: Battle report refresh queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                required:
+                  - status
+
   /pap:
     get:
       operationId: listPapRecords
@@ -881,6 +945,8 @@ components:
           format: date-time
         participantCount:
           type: ["integer", "null"]
+        battleReportId:
+          type: ["integer", "null"]
       required:
         - id
         - name
@@ -906,6 +972,179 @@ components:
         - name
         - fleetCommander
         - papValue
+
+    BattleReportSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        fleetId:
+          type: ["integer", "null"]
+        fleetName:
+          type: string
+        fleetCommander:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        endedAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [pending, generating, ready, partial, failed]
+        errorMessage:
+          type: ["string", "null"]
+        totalDestroyed:
+          type: number
+        totalLost:
+          type: number
+        damageDealt:
+          type: number
+        killmailCount:
+          type: integer
+        friendlyLosses:
+          type: integer
+        hostileLosses:
+          type: integer
+        primarySystemId:
+          type: ["integer", "null"]
+        primarySystemName:
+          type: ["string", "null"]
+        generatedAt:
+          type: ["string", "null"]
+          format: date-time
+        lastSyncedAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        participantCount:
+          type: integer
+      required:
+        - id
+        - fleetName
+        - fleetCommander
+        - startedAt
+        - endedAt
+        - status
+        - totalDestroyed
+        - totalLost
+        - damageDealt
+        - killmailCount
+        - friendlyLosses
+        - hostileLosses
+        - createdAt
+        - participantCount
+
+    BattleReportParticipant:
+      type: object
+      properties:
+        id:
+          type: integer
+        eveCharacterId:
+          type: integer
+        characterName:
+          type: string
+        corporationId:
+          type: ["integer", "null"]
+        corporationName:
+          type: ["string", "null"]
+        primaryShipTypeId:
+          type: ["integer", "null"]
+        primaryShipName:
+          type: ["string", "null"]
+        damageDealt:
+          type: number
+        killsInvolved:
+          type: integer
+        finalBlows:
+          type: integer
+        losses:
+          type: integer
+      required:
+        - id
+        - eveCharacterId
+        - characterName
+        - damageDealt
+        - killsInvolved
+        - finalBlows
+        - losses
+
+    BattleReportKillmail:
+      type: object
+      properties:
+        id:
+          type: integer
+        killmailId:
+          type: integer
+        killmailTime:
+          type: string
+          format: date-time
+        solarSystemId:
+          type: integer
+        solarSystemName:
+          type: ["string", "null"]
+        victimCharacterId:
+          type: ["integer", "null"]
+        victimCharacterName:
+          type: ["string", "null"]
+        victimCorporationId:
+          type: ["integer", "null"]
+        victimCorporationName:
+          type: ["string", "null"]
+        victimAllianceId:
+          type: ["integer", "null"]
+        victimAllianceName:
+          type: ["string", "null"]
+        victimShipTypeId:
+          type: integer
+        victimShipName:
+          type: ["string", "null"]
+        victimIsFleetMember:
+          type: boolean
+        totalValue:
+          type: number
+        damageTaken:
+          type: integer
+        friendlyDamage:
+          type: integer
+        friendlyAttackers:
+          type: integer
+        finalBlowByFleet:
+          type: boolean
+        zkillboardUrl:
+          type: ["string", "null"]
+      required:
+        - id
+        - killmailId
+        - killmailTime
+        - solarSystemId
+        - victimShipTypeId
+        - victimIsFleetMember
+        - totalValue
+        - damageTaken
+        - friendlyDamage
+        - friendlyAttackers
+        - finalBlowByFleet
+
+    BattleReportDetail:
+      allOf:
+        - $ref: "#/components/schemas/BattleReportSummary"
+        - type: object
+          properties:
+            participants:
+              type: array
+              items:
+                $ref: "#/components/schemas/BattleReportParticipant"
+            killmails:
+              type: array
+              items:
+                $ref: "#/components/schemas/BattleReportKillmail"
+          required:
+            - participants
+            - killmails
 
     UpdateFleetBody:
       type: object

@@ -21,4 +21,6 @@ export interface Fleet {
   createdAt: Date;
   /** @nullable */
   participantCount?: number | null;
+  /** @nullable */
+  battleReportId?: number | null;
 }

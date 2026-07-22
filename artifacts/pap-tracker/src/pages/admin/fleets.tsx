@@ -19,6 +19,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useTranslation } from "react-i18next";
+import { Link } from "wouter";
 
 async function fetchEsiFleetId(): Promise<{ fleetId: string; role: string }> {
   const resp = await fetch(apiUrl("/api/fleets/esi-my-fleet"), { credentials: "include" });
@@ -269,7 +270,7 @@ export function AdminFleets() {
                         : (fleet.participantCount || 0)}
                     </TableCell>
                     <TableCell className="text-right">
-                      {fleet.isActive && (
+                      {fleet.isActive ? (
                         <div className="flex items-center justify-end gap-2 flex-wrap">
                           <Button
                             variant="outline"
@@ -312,6 +313,15 @@ export function AdminFleets() {
                             {standingDownId === fleet.id ? t("fleets.standingDown") : t("fleets.standDown")}
                           </Button>
                         </div>
+                      ) : fleet.battleReportId ? (
+                        <Link href={`/battle-reports/${fleet.battleReportId}`}>
+                          <Button variant="outline" size="sm" className="h-8 rounded-sm font-mono text-[10px] border-primary/30 text-primary hover:bg-primary/10">
+                            <Crosshair className="w-3 h-3 mr-1" />
+                            {t("fleets.viewBattleReport")}
+                          </Button>
+                        </Link>
+                      ) : (
+                        <span className="font-mono text-[10px] text-muted-foreground">{t("fleets.reportPending")}</span>
                       )}
                     </TableCell>
                   </TableRow>

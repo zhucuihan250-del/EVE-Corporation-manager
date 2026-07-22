@@ -311,6 +311,10 @@ const en = {
       previous: "Previous event",
       next: "Next event",
       restart: "Restart",
+      enableNarration: "Enable voice narration",
+      disableNarration: "Disable voice narration",
+      narrationEvent:
+        "{{side}}. {{ship}}, piloted by {{pilot}}, in {{system}}.",
       friendlyLoss: "FRIENDLY LOSS",
       hostileLoss: "HOSTILE LOSS",
       enemyAttackers: "ENEMY ATTACKERS",

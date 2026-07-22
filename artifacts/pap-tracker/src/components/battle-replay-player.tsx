@@ -7,6 +7,8 @@ import {
   RotateCcw,
   SkipBack,
   SkipForward,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import type {
   BattleReportKillmail,
@@ -47,7 +49,7 @@ export function BattleReplayPlayer({
   manualNodes?: BattleReviewManualNode[];
   onEventChange?: (occurredAt: string) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [eventFilter, setEventFilter] = useState<"all" | "fleet" | "enemy">(
     "all",
   );
@@ -75,6 +77,7 @@ export function BattleReplayPlayer({
   const [replayMode, setReplayMode] = useState<"cinematic" | "tactical">(
     "cinematic",
   );
+  const [narrationEnabled, setNarrationEnabled] = useState(false);
   const activeEvent = events[currentIndex];
   const relevantAttackers = useMemo(
     () =>
@@ -122,6 +125,9 @@ export function BattleReplayPlayer({
 
   useEffect(() => {
     if (!isPlaying || events.length < 2) return;
+    const isKeyMoment = activeEvent
+      ? (markers.get(activeEvent.killmailId)?.length ?? 0) > 0
+      : false;
     const timer = window.setInterval(
       () => {
         setCurrentIndex((index) => {
@@ -132,10 +138,38 @@ export function BattleReplayPlayer({
           return index + 1;
         });
       },
-      Math.max(250, 1_200 / speed),
+      Math.max(250, (isKeyMoment ? 2_200 : 1_200) / speed),
     );
     return () => window.clearInterval(timer);
-  }, [events.length, isPlaying, speed]);
+  }, [activeEvent, events.length, isPlaying, markers, speed]);
+
+  useEffect(() => {
+    if (
+      !narrationEnabled ||
+      !activeEvent ||
+      !("speechSynthesis" in window)
+    ) {
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(
+      t("battleReplay.narrationEvent", {
+        side: activeEvent.victimIsFleetMember
+          ? t("battleReplay.friendlyLoss")
+          : t("battleReplay.hostileLoss"),
+        ship:
+          activeEvent.victimShipName ?? t("battleReplay.unknownShip"),
+        pilot:
+          activeEvent.victimCharacterName ?? t("battleReplay.unknownPilot"),
+        system:
+          activeEvent.solarSystemName ?? String(activeEvent.solarSystemId),
+      }),
+    );
+    utterance.lang = i18n.language.startsWith("zh") ? "zh-CN" : "en-US";
+    utterance.rate = 1.05;
+    window.speechSynthesis.speak(utterance);
+    return () => window.speechSynthesis.cancel();
+  }, [activeEvent, i18n.language, narrationEnabled, t]);
 
   useEffect(() => {
     if (activeEvent) onEventChange?.(activeEvent.killmailTime);
@@ -423,6 +457,24 @@ export function BattleReplayPlayer({
                 {value}×
               </Button>
             ))}
+            <Button
+              type="button"
+              variant={narrationEnabled ? "default" : "outline"}
+              size="sm"
+              className="rounded-sm h-8 px-2 font-mono text-xs"
+              onClick={() => setNarrationEnabled((enabled) => !enabled)}
+              aria-label={
+                narrationEnabled
+                  ? t("battleReplay.disableNarration")
+                  : t("battleReplay.enableNarration")
+              }
+            >
+              {narrationEnabled ? (
+                <Volume2 className="w-3.5 h-3.5" />
+              ) : (
+                <VolumeX className="w-3.5 h-3.5" />
+              )}
+            </Button>
           </div>
         </div>
       </div>

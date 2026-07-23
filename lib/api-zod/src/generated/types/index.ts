@@ -35,6 +35,7 @@ export * from "./battleReportKillmail";
 export * from "./battleReportParticipant";
 export * from "./battleReportSummary";
 export * from "./battleReportSummaryStatus";
+export * from "./battleReportSystem";
 export * from "./battleReview";
 export * from "./battleReviewAiSource";
 export * from "./battleReviewAiStatus";

@@ -169,6 +169,7 @@ export interface BattleReportSummary {
   lastSyncedAt?: string | null;
   createdAt: string;
   participantCount: number;
+  systemCount: number;
 }
 
 export interface BattleReportParticipant {
@@ -187,6 +188,17 @@ export interface BattleReportParticipant {
   killsInvolved: number;
   finalBlows: number;
   losses: number;
+}
+
+export interface BattleReportSystem {
+  solarSystemId: number;
+  /** @nullable */
+  solarSystemName?: string | null;
+  killmailCount: number;
+  friendlyLosses: number;
+  hostileLosses: number;
+  destroyedValue: number;
+  lostValue: number;
 }
 
 export interface BattleReportAttacker {
@@ -454,6 +466,7 @@ export interface BattleReview {
 export type BattleReportDetail = BattleReportSummary & {
   participants: BattleReportParticipant[];
   killmails: BattleReportKillmail[];
+  systems: BattleReportSystem[];
   publishedReview?: BattleReview | null;
 };
 

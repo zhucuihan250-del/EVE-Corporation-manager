@@ -8,10 +8,12 @@
 import type { BattleReportKillmail } from "./battleReportKillmail";
 import type { BattleReportParticipant } from "./battleReportParticipant";
 import type { BattleReportSummary } from "./battleReportSummary";
+import type { BattleReportSystem } from "./battleReportSystem";
 import type { BattleReview } from "./battleReview";
 
 export type BattleReportDetail = BattleReportSummary & {
   participants: BattleReportParticipant[];
   killmails: BattleReportKillmail[];
+  systems: BattleReportSystem[];
   publishedReview?: BattleReview | null;
 };

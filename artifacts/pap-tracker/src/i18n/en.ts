@@ -239,6 +239,7 @@ const en = {
       back: "BACK TO BATTLE REPORTS",
       notFound: "Battle report not found.",
       unknownSystem: "Unknown system",
+      multiSystemCoverage: "AO {{system}} · {{count}} systems",
       unknownVictim: "Unknown target",
       destroyed: "DESTROYED",
       lost: "LOST",
@@ -255,6 +256,9 @@ const en = {
       timeline: "TIMELINE",
       fleetMembers: "FLEET MEMBERS",
       enemyIntel: "ENEMY INTEL",
+      systemCoverage: "AO COVERAGE",
+      systemStats:
+        "{{kills}} record(s) · hostile {{hostile}} / friendly {{friendly}}",
       composition: "FLEET COMPOSITION",
       enemyComposition: "ENEMY SHIP COMPOSITION",
       enemyKills: "ENEMY KILLS",

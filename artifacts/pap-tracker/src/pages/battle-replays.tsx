@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import {
   getGetBattleReplayQueryKey,
   getListBattleReplaysQueryKey,
+  type BattleReportSummary,
   type BattleReviewManualNode,
   useAnalyzeBattleReplay,
   useGetBattleReplay,
@@ -43,6 +44,20 @@ function formatIsk(value: number): string {
   if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(2)}b`;
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}m`;
   return Math.round(value).toLocaleString();
+}
+
+function systemCoverageLabel(
+  report: Pick<BattleReportSummary, "primarySystemName" | "systemCount">,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): string {
+  const primarySystem =
+    report.primarySystemName || t("battleReports.unknownSystem");
+  return report.systemCount > 1
+    ? t("battleReports.multiSystemCoverage", {
+        system: primarySystem,
+        count: report.systemCount,
+      })
+    : primarySystem;
 }
 
 function newNode(occurredAt: string): BattleReviewManualNode {
@@ -129,8 +144,7 @@ export function BattleReplays() {
                     </div>
                     <p className="font-mono text-xs text-muted-foreground mt-2">
                       {format(new Date(report.startedAt), "yyyy-MM-dd HH:mm")} ·{" "}
-                      {report.primarySystemName ||
-                        t("battleReports.unknownSystem")}{" "}
+                      {systemCoverageLabel(report, t)}{" "}
                       · FC {report.fleetCommander}
                     </p>
                   </div>
@@ -317,7 +331,7 @@ export function BattleReplayWorkbench() {
           <p className="font-mono text-xs text-muted-foreground mt-2">
             {format(new Date(report.startedAt), "yyyy-MM-dd HH:mm")} –{" "}
             {format(new Date(report.endedAt), "HH:mm")} ·{" "}
-            {report.primarySystemName || t("battleReports.unknownSystem")} · FC{" "}
+            {systemCoverageLabel(report, t)} · FC{" "}
             {report.fleetCommander}
           </p>
         </div>

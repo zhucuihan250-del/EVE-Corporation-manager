@@ -2,6 +2,7 @@ import {
   getGetBattleReportQueryKey,
   getListBattleReportsQueryKey,
   type BattleReportDetail as BattleReportDetailData,
+  type BattleReportSystem,
   type BattleReportSummary,
   useGetBattleReport,
   useGetMe,
@@ -76,6 +77,20 @@ function durationLabel(startedAt: string, endedAt: string): string {
   const remainder = minutes % 60;
   if (!hours) return `${remainder}m`;
   return remainder ? `${hours}h ${remainder}m` : `${hours}h`;
+}
+
+function systemCoverageLabel(
+  report: Pick<BattleReportSummary, "primarySystemName" | "systemCount">,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): string {
+  const primarySystem =
+    report.primarySystemName || t("battleReports.unknownSystem");
+  return report.systemCount > 1
+    ? t("battleReports.multiSystemCoverage", {
+        system: primarySystem,
+        count: report.systemCount,
+      })
+    : primarySystem;
 }
 
 function statusBadge(status: BattleReportSummary["status"], label: string) {
@@ -167,8 +182,7 @@ export function BattleReports() {
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 font-mono text-xs text-muted-foreground">
                         <span className="inline-flex items-center gap-1.5">
                           <MapPin className="w-3.5 h-3.5 text-primary" />
-                          {report.primarySystemName ||
-                            t("battleReports.unknownSystem")}
+                          {systemCoverageLabel(report, t)}
                         </span>
                         <span className="inline-flex items-center gap-1.5">
                           <Clock3 className="w-3.5 h-3.5" />
@@ -308,6 +322,56 @@ function TeamCard({
           </p>
           <p className="font-mono font-bold mt-1">{pilotCount}</p>
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SystemCoverageCard({ systems }: { systems: BattleReportSystem[] }) {
+  const { t } = useTranslation();
+  if (systems.length === 0) return null;
+
+  return (
+    <Card className="bg-card/35 border-border/50 rounded-sm">
+      <CardHeader className="border-b border-border/30 pb-3">
+        <CardTitle className="font-mono text-sm uppercase flex items-center gap-2">
+          <MapPin className="w-4 h-4 text-primary" />
+          {t("battleReports.systemCoverage")}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+        {systems.map((system) => (
+          <div
+            key={system.solarSystemId}
+            className="border border-border/35 bg-background/25 rounded-sm p-3"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-mono text-sm font-bold truncate">
+                  {system.solarSystemName || t("battleReports.unknownSystem")}
+                </p>
+                <p className="font-mono text-[10px] text-muted-foreground mt-1">
+                  {t("battleReports.systemStats", {
+                    kills: system.killmailCount,
+                    hostile: system.hostileLosses,
+                    friendly: system.friendlyLosses,
+                  })}
+                </p>
+              </div>
+              <Badge variant="secondary" className="font-mono rounded-sm">
+                {system.killmailCount}
+              </Badge>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2 font-mono text-[10px]">
+              <span className="text-emerald-400">
+                +{formatIsk(system.destroyedValue)}
+              </span>
+              <span className="text-right text-red-400">
+                -{formatIsk(system.lostValue)}
+              </span>
+            </div>
+          </div>
+        ))}
       </CardContent>
     </Card>
   );
@@ -576,7 +640,7 @@ export function BattleReportDetail() {
           <div className="flex flex-wrap gap-x-5 gap-y-2 mt-3 font-mono text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1.5">
               <MapPin className="w-3.5 h-3.5 text-primary" />
-              {report.primarySystemName || t("battleReports.unknownSystem")}
+              {systemCoverageLabel(report, t)}
             </span>
             <span className="inline-flex items-center gap-1.5">
               <Clock3 className="w-3.5 h-3.5" />
@@ -675,6 +739,8 @@ export function BattleReportDetail() {
           friendly={false}
         />
       </div>
+
+      <SystemCoverageCard systems={report.systems} />
 
       <Tabs defaultValue="summary" className="space-y-4">
         <TabsList className="bg-card/50 border border-border/50 rounded-sm h-auto flex-wrap">

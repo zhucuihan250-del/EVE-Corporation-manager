@@ -324,6 +324,7 @@ export const ListBattleReportsResponseItem = zod.object({
   lastSyncedAt: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
   participantCount: zod.number(),
+  systemCount: zod.number(),
 });
 export const ListBattleReportsResponse = zod.array(
   ListBattleReportsResponseItem,
@@ -364,6 +365,7 @@ export const GetBattleReportResponse = zod
     lastSyncedAt: zod.coerce.date().nullish(),
     createdAt: zod.coerce.date(),
     participantCount: zod.number(),
+    systemCount: zod.number(),
   })
   .and(
     zod.object({
@@ -419,6 +421,17 @@ export const GetBattleReportResponse = zod
             }),
           ),
           zkillboardUrl: zod.string().nullish(),
+        }),
+      ),
+      systems: zod.array(
+        zod.object({
+          solarSystemId: zod.number(),
+          solarSystemName: zod.string().nullish(),
+          killmailCount: zod.number(),
+          friendlyLosses: zod.number(),
+          hostileLosses: zod.number(),
+          destroyedValue: zod.number(),
+          lostValue: zod.number(),
         }),
       ),
       publishedReview: zod
@@ -621,6 +634,7 @@ export const ListBattleReplaysResponseItem = zod
     lastSyncedAt: zod.coerce.date().nullish(),
     createdAt: zod.coerce.date(),
     participantCount: zod.number(),
+    systemCount: zod.number(),
   })
   .and(
     zod.object({
@@ -674,6 +688,7 @@ export const GetBattleReplayResponse = zod
     lastSyncedAt: zod.coerce.date().nullish(),
     createdAt: zod.coerce.date(),
     participantCount: zod.number(),
+    systemCount: zod.number(),
   })
   .and(
     zod.object({
@@ -729,6 +744,17 @@ export const GetBattleReplayResponse = zod
             }),
           ),
           zkillboardUrl: zod.string().nullish(),
+        }),
+      ),
+      systems: zod.array(
+        zod.object({
+          solarSystemId: zod.number(),
+          solarSystemName: zod.string().nullish(),
+          killmailCount: zod.number(),
+          friendlyLosses: zod.number(),
+          hostileLosses: zod.number(),
+          destroyedValue: zod.number(),
+          lostValue: zod.number(),
         }),
       ),
       publishedReview: zod

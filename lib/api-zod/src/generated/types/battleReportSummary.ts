@@ -34,4 +34,5 @@ export interface BattleReportSummary {
   lastSyncedAt?: Date | null;
   createdAt: Date;
   participantCount: number;
+  systemCount: number;
 }

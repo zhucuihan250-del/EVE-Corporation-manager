@@ -12,6 +12,12 @@ const participantCountSql = sql<number>`(
   WHERE "battle_report_participants"."battle_report_id" = "battle_reports"."id"
 )`;
 
+const systemCountSql = sql<number>`(
+  SELECT COUNT(DISTINCT "battle_report_killmails"."solar_system_id")::int
+  FROM "battle_report_killmails"
+  WHERE "battle_report_killmails"."battle_report_id" = "battle_reports"."id"
+)`;
+
 export function reportSummarySelection() {
   return {
     id: battleReportsTable.id,
@@ -34,6 +40,7 @@ export function reportSummarySelection() {
     lastSyncedAt: battleReportsTable.lastSyncedAt,
     createdAt: battleReportsTable.createdAt,
     participantCount: participantCountSql,
+    systemCount: systemCountSql,
   };
 }
 
@@ -44,7 +51,7 @@ export async function loadBattleReportDetail(reportId: number) {
     .where(eq(battleReportsTable.id, reportId));
   if (!report) return null;
 
-  const [participants, killmails] = await Promise.all([
+  const [participants, killmails, systems] = await Promise.all([
     db
       .select({
         id: battleReportParticipantsTable.id,
@@ -89,7 +96,24 @@ export async function loadBattleReportDetail(reportId: number) {
       .from(battleReportKillmailsTable)
       .where(eq(battleReportKillmailsTable.battleReportId, report.id))
       .orderBy(desc(battleReportKillmailsTable.killmailTime)),
+    db
+      .select({
+        solarSystemId: battleReportKillmailsTable.solarSystemId,
+        solarSystemName: battleReportKillmailsTable.solarSystemName,
+        killmailCount: sql<number>`COUNT(*)::int`,
+        friendlyLosses: sql<number>`COUNT(*) FILTER (WHERE ${battleReportKillmailsTable.victimIsFleetMember})::int`,
+        hostileLosses: sql<number>`COUNT(*) FILTER (WHERE NOT ${battleReportKillmailsTable.victimIsFleetMember})::int`,
+        destroyedValue: sql<number>`COALESCE(SUM(${battleReportKillmailsTable.totalValue}) FILTER (WHERE NOT ${battleReportKillmailsTable.victimIsFleetMember}), 0)::float8`,
+        lostValue: sql<number>`COALESCE(SUM(${battleReportKillmailsTable.totalValue}) FILTER (WHERE ${battleReportKillmailsTable.victimIsFleetMember}), 0)::float8`,
+      })
+      .from(battleReportKillmailsTable)
+      .where(eq(battleReportKillmailsTable.battleReportId, report.id))
+      .groupBy(
+        battleReportKillmailsTable.solarSystemId,
+        battleReportKillmailsTable.solarSystemName,
+      )
+      .orderBy(desc(sql`COUNT(*)`)),
   ]);
 
-  return { ...report, participants, killmails };
+  return { ...report, participants, killmails, systems };
 }

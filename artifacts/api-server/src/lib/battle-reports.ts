@@ -24,6 +24,8 @@ const ZKILL_RETRY_DELAY_MS = 2_500;
 const ZKILL_MAX_ATTEMPTS = 2;
 const MAX_CHARACTER_FALLBACK_PARTICIPANTS = 60;
 const MAX_CHARACTER_FALLBACK_PAGES = 3;
+const MAX_ROAMING_PARTICIPANTS = 40;
+const MAX_ROAMING_CHARACTER_PAGES = 2;
 const activeGenerationJobs = new Set<number>();
 const queuedGenerationJobs = new Set<number>();
 const generationQueue: { reportId: number; force: boolean }[] = [];
@@ -70,6 +72,8 @@ type KillmailCandidate = {
   hash: string;
   totalValue: number;
 };
+
+type ZkillFetchType = "kills" | "losses";
 
 type StoredKillmail = {
   battleReportId: number;
@@ -176,7 +180,7 @@ async function fetchZkillCandidates(
   entityType: "corporationID" | "characterID",
   entityId: number,
   pastSeconds: number,
-  fetchType: "kills" | "losses",
+  fetchType: ZkillFetchType,
   maxPages = MAX_ZKILL_PAGES_PER_SOURCE,
 ): Promise<{
   entries: ZkillEntry[];
@@ -262,6 +266,22 @@ async function fetchKillmailDetails(candidates: KillmailCandidate[]): Promise<{
 
   await Promise.all(Array.from({ length: Math.min(4, candidates.length) }, () => worker()));
   return { details, failures };
+}
+
+function characterSourceKey(fetchType: ZkillFetchType, characterId: number): string {
+  return `${fetchType}:${characterId}`;
+}
+
+function killmailMatchesFleet(
+  killmail: EsiKillmail,
+  participantIds: Set<number>,
+  startedAt: Date,
+  endedAt: Date,
+): boolean {
+  const time = new Date(killmail.killmail_time).getTime();
+  if (time < startedAt.getTime() || time > endedAt.getTime()) return false;
+  if (killmail.victim.character_id && participantIds.has(killmail.victim.character_id)) return true;
+  return killmail.attackers.some((attacker) => attacker.character_id && participantIds.has(attacker.character_id));
 }
 
 export async function ensureBattleReportForFleet(fleetId: number): Promise<number | null> {
@@ -382,7 +402,7 @@ async function runBattleReportGeneration(reportId: number, force: boolean): Prom
   const sources: {
     entityType: "corporationID" | "characterID";
     entityId: number;
-    fetchType: "kills" | "losses";
+    fetchType: ZkillFetchType;
   }[] = [
     ...corporationIds.flatMap((entityId) => [
       { entityType: "corporationID" as const, entityId, fetchType: "losses" as const },
@@ -395,6 +415,8 @@ async function runBattleReportGeneration(reportId: number, force: boolean): Prom
   ];
   let zkillPagesFetched = 0;
   let characterFallbacksUsed = 0;
+  let roamingCharacterSourcesUsed = 0;
+  const fetchedCharacterSources = new Set<string>();
 
   const collectCandidates = (entries: ZkillEntry[]) => {
     for (const entry of entries) {
@@ -417,6 +439,9 @@ async function runBattleReportGeneration(reportId: number, force: boolean): Prom
       source.fetchType,
     );
     zkillPagesFetched += result.pagesFetched;
+    if (source.entityType === "characterID") {
+      fetchedCharacterSources.add(characterSourceKey(source.fetchType, source.entityId));
+    }
     let recoveredByCharacterFallback = false;
     if (
       source.entityType === "corporationID" &&
@@ -441,6 +466,7 @@ async function runBattleReportGeneration(reportId: number, force: boolean): Prom
             source.fetchType,
             MAX_CHARACTER_FALLBACK_PAGES,
           );
+          fetchedCharacterSources.add(characterSourceKey(source.fetchType, memberId));
           zkillPagesFetched += fallback.pagesFetched;
           collectCandidates(fallback.entries);
           if (fallback.firstPageFailed || fallback.warning) {
@@ -472,21 +498,51 @@ async function runBattleReportGeneration(reportId: number, force: boolean): Prom
     }
   }
 
+  if (participants.length <= MAX_ROAMING_PARTICIPANTS) {
+    const roamingSources = [...new Set(participants.map((participant) => participant.eveCharacterId))]
+      .flatMap((entityId) => [
+        { entityId, fetchType: "losses" as const },
+        { entityId, fetchType: "kills" as const },
+      ])
+      .filter((source) => !fetchedCharacterSources.has(characterSourceKey(source.fetchType, source.entityId)));
+
+    for (const [index, source] of roamingSources.entries()) {
+      if (index > 0 || sources.length > 0) await delay(ZKILL_REQUEST_DELAY_MS);
+      const result = await fetchZkillCandidates(
+        "characterID",
+        source.entityId,
+        pastSeconds,
+        source.fetchType,
+        MAX_ROAMING_CHARACTER_PAGES,
+      );
+      fetchedCharacterSources.add(characterSourceKey(source.fetchType, source.entityId));
+      zkillPagesFetched += result.pagesFetched;
+      roamingCharacterSourcesUsed++;
+      collectCandidates(result.entries);
+      if (result.firstPageFailed || result.warning) {
+        sourceWarnings.push(`roaming:${result.warning ?? `${source.fetchType}:characterID:${source.entityId}`}`);
+      }
+    }
+  }
+
   if (characterFallbacksUsed > 0) {
     logger.info(
       { reportId, characterFallbacksUsed, zkillPagesFetched },
       "Battle report completed high-activity source fallbacks",
     );
   }
+  if (roamingCharacterSourcesUsed > 0) {
+    logger.info(
+      { reportId, roamingCharacterSourcesUsed, zkillPagesFetched },
+      "Battle report added roaming participant character coverage",
+    );
+  }
 
   const participantIds = new Set(participants.map((participant) => participant.eveCharacterId));
   const { details, failures: detailFailures } = await fetchKillmailDetails([...candidateMap.values()]);
-  const matching = details.filter(({ killmail }) => {
-    const time = new Date(killmail.killmail_time).getTime();
-    if (time < claimed.startedAt.getTime() || time > claimed.endedAt.getTime()) return false;
-    if (killmail.victim.character_id && participantIds.has(killmail.victim.character_id)) return true;
-    return killmail.attackers.some((attacker) => attacker.character_id && participantIds.has(attacker.character_id));
-  });
+  const matching = details.filter(({ killmail }) =>
+    killmailMatchesFleet(killmail, participantIds, claimed.startedAt, claimed.endedAt),
+  );
 
   const idsToResolve: number[] = [];
   for (const { killmail } of matching) {
@@ -663,6 +719,7 @@ async function runBattleReportGeneration(reportId: number, force: boolean): Prom
       participantCount: participants.length,
       candidateCount: candidateMap.size,
       zkillPagesFetched,
+      systemCount: systemCounts.size,
       status: finalStatus,
     },
     "Battle report generation complete",

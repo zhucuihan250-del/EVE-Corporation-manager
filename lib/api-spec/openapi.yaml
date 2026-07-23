@@ -1143,6 +1143,8 @@ components:
           format: date-time
         participantCount:
           type: integer
+        systemCount:
+          type: integer
       required:
         - id
         - fleetName
@@ -1158,6 +1160,7 @@ components:
         - hostileLosses
         - createdAt
         - participantCount
+        - systemCount
 
     BattleReportParticipant:
       type: object
@@ -1192,6 +1195,31 @@ components:
         - killsInvolved
         - finalBlows
         - losses
+
+    BattleReportSystem:
+      type: object
+      properties:
+        solarSystemId:
+          type: integer
+        solarSystemName:
+          type: ["string", "null"]
+        killmailCount:
+          type: integer
+        friendlyLosses:
+          type: integer
+        hostileLosses:
+          type: integer
+        destroyedValue:
+          type: number
+        lostValue:
+          type: number
+      required:
+        - solarSystemId
+        - killmailCount
+        - friendlyLosses
+        - hostileLosses
+        - destroyedValue
+        - lostValue
 
     BattleReportAttacker:
       type: object
@@ -1298,6 +1326,10 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/BattleReportKillmail"
+            systems:
+              type: array
+              items:
+                $ref: "#/components/schemas/BattleReportSystem"
             publishedReview:
               oneOf:
                 - $ref: "#/components/schemas/BattleReview"
@@ -1305,6 +1337,7 @@ components:
           required:
             - participants
             - killmails
+            - systems
 
     BattleReviewManualNode:
       type: object

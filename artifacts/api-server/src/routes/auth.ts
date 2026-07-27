@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, usersTable, charactersTable, papRecordsTable } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNotNull, isNull, sql } from "drizzle-orm";
 import { getAuthorizationUrl, getLinkAltAuthorizationUrl, exchangeCode, getCharacterInfo, getCorporationName } from "../lib/eve-sso";
 import { requireAuth } from "../middlewares/auth";
 import { logger } from "../lib/logger";
@@ -25,11 +25,65 @@ async function mergeOrphanUser(
     }).where(eq(usersTable.id, mainUserId));
   }
   // Reassign all of orphan's character records to main user (all as alts)
-  await db.update(charactersTable).set({ userId: mainUserId, isMain: false })
-    .where(eq(charactersTable.userId, orphan.id));
+  await db.update(charactersTable).set({
+    userId: mainUserId,
+    isMain: false,
+    deletedAt: null,
+    retainedUntil: null,
+  }).where(and(eq(charactersTable.userId, orphan.id), isNull(charactersTable.deletedAt)));
   // Delete orphan user row
   await db.delete(usersTable).where(eq(usersTable.id, orphan.id));
   log.info({ orphanId: orphan.id, mainUserId, orphanPap: orphan.totalPap }, "Orphan user merged into main account");
+}
+
+async function findActiveCharacterByEveId(characterId: number) {
+  const [character] = await db
+    .select()
+    .from(charactersTable)
+    .where(and(eq(charactersTable.eveCharacterId, characterId), isNull(charactersTable.deletedAt)))
+    .limit(1);
+
+  return character ?? null;
+}
+
+async function findRetainedDeletedCharacterByEveId(characterId: number) {
+  const [character] = await db
+    .select()
+    .from(charactersTable)
+    .where(and(
+      eq(charactersTable.eveCharacterId, characterId),
+      isNotNull(charactersTable.deletedAt),
+      gt(charactersTable.retainedUntil, new Date()),
+    ))
+    .orderBy(desc(charactersTable.deletedAt))
+    .limit(1);
+
+  return character ?? null;
+}
+
+async function restoreDeletedCharacter(
+  character: typeof charactersTable.$inferSelect,
+  userId: number,
+  isMain: boolean,
+  characterName: string,
+  corporationId: number | null,
+  corporationName: string | null,
+) {
+  const [restored] = await db
+    .update(charactersTable)
+    .set({
+      userId,
+      eveCharacterName: characterName,
+      corporationId,
+      corporationName,
+      isMain,
+      deletedAt: null,
+      retainedUntil: null,
+    })
+    .where(eq(charactersTable.id, character.id))
+    .returning();
+
+  return restored;
 }
 
 function getCallbackUrl(req: Request): string {
@@ -102,11 +156,8 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
       const mainUserId = req.session.linkingUserId;
       req.session.linkingUserId = undefined;
 
-      // Check if this character is already in the characters table
-      const [existingChar] = await db
-        .select()
-        .from(charactersTable)
-        .where(eq(charactersTable.eveCharacterId, characterId));
+      // Check if this character is already actively linked.
+      const existingChar = await findActiveCharacterByEveId(characterId);
 
       if (existingChar) {
         if (existingChar.userId === mainUserId) {
@@ -117,6 +168,19 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
             corporationName,
           }).where(eq(charactersTable.id, existingChar.id));
           req.log.info({ charId: characterId, mainUserId }, "Re-linked character updated");
+          req.session.save(() => {});
+          redirectToFrontend(res, "/characters?linked=true");
+          return;
+        }
+        if (!existingChar.userId) {
+          await db.update(charactersTable).set({
+            userId: mainUserId,
+            eveCharacterName: characterName,
+            corporationId,
+            corporationName,
+            isMain: false,
+          }).where(eq(charactersTable.id, existingChar.id));
+          req.log.info({ charId: characterId, mainUserId }, "Reclaimed unowned active character on alt link");
           req.session.save(() => {});
           redirectToFrontend(res, "/characters?linked=true");
           return;
@@ -132,6 +196,22 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
         // Orphan account: merge its PAP into the main account then delete it
         await mergeOrphanUser(charOwner ?? null, mainUserId, req.log);
         req.log.info({ orphanId: existingChar.userId, mainUserId, charId: characterId }, "Merged orphan (from chars table) into main account on alt link");
+        req.session.save(() => {});
+        redirectToFrontend(res, "/characters?linked=true");
+        return;
+      }
+
+      const deletedChar = await findRetainedDeletedCharacterByEveId(characterId);
+      if (deletedChar) {
+        await restoreDeletedCharacter(
+          deletedChar,
+          mainUserId,
+          false,
+          characterName,
+          corporationId,
+          corporationName,
+        );
+        req.log.info({ charId: characterId, mainUserId, previousCharId: deletedChar.id }, "Restored deleted character on alt link");
         req.session.save(() => {});
         redirectToFrontend(res, "/characters?linked=true");
         return;
@@ -193,12 +273,9 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
 
     if (!user) {
       // Character may be a linked alt — look it up in the characters table
-      const [linkedChar] = await db
-        .select()
-        .from(charactersTable)
-        .where(eq(charactersTable.eveCharacterId, characterId));
+      const linkedChar = await findActiveCharacterByEveId(characterId);
 
-      if (linkedChar) {
+      if (linkedChar?.userId) {
         // Log in as the owning main account instead of creating a new user
         const [mainUser] = await db
           .select()
@@ -246,15 +323,28 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
         })
         .returning();
 
-      // Create the character record
-      await db.insert(charactersTable).values({
-        userId: user.id,
-        eveCharacterId: characterId,
-        eveCharacterName: characterName,
-        corporationId,
-        corporationName,
-        isMain: true,
-      });
+      const deletedChar = await findRetainedDeletedCharacterByEveId(characterId);
+      if (deletedChar) {
+        await restoreDeletedCharacter(
+          deletedChar,
+          user.id,
+          true,
+          characterName,
+          corporationId,
+          corporationName,
+        );
+        req.log.info({ charId: characterId, userId: user.id, previousCharId: deletedChar.id }, "Restored deleted character on main login");
+      } else {
+        // Create the character record
+        await db.insert(charactersTable).values({
+          userId: user.id,
+          eveCharacterId: characterId,
+          eveCharacterName: characterName,
+          corporationId,
+          corporationName,
+          isMain: true,
+        });
+      }
     } else {
       // Update tokens and character info
       [user] = await db
@@ -273,20 +363,30 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
         .returning();
 
       // Upsert character
-      const [existingChar] = await db
-        .select()
-        .from(charactersTable)
-        .where(eq(charactersTable.eveCharacterId, characterId));
+      const existingChar = await findActiveCharacterByEveId(characterId);
 
       if (!existingChar) {
-        await db.insert(charactersTable).values({
-          userId: user.id,
-          eveCharacterId: characterId,
-          eveCharacterName: characterName,
-          corporationId,
-          corporationName,
-          isMain: true,
-        });
+        const deletedChar = await findRetainedDeletedCharacterByEveId(characterId);
+        if (deletedChar) {
+          await restoreDeletedCharacter(
+            deletedChar,
+            user.id,
+            true,
+            characterName,
+            corporationId,
+            corporationName,
+          );
+          req.log.info({ charId: characterId, userId: user.id, previousCharId: deletedChar.id }, "Restored deleted character for existing main login");
+        } else {
+          await db.insert(charactersTable).values({
+            userId: user.id,
+            eveCharacterId: characterId,
+            eveCharacterName: characterName,
+            corporationId,
+            corporationName,
+            isMain: true,
+          });
+        }
       }
     }
 

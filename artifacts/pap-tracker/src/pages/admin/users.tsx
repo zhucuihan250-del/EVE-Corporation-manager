@@ -385,7 +385,8 @@ export function AdminUsers() {
                           size="sm"
                           className="h-7 px-2 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-sm"
                           onClick={() => handleDeleteChar(char.id)}
-                          disabled={deleteCharacter.isPending}
+                          disabled={char.isMain || deleteCharacter.isPending}
+                          title={char.isMain ? t("personnel.mainCharLocked") : t("personnel.removeChar")}
                         >
                           <Trash2 className="w-3.5 h-3.5 mr-1" />
                           {t("personnel.removeChar")}

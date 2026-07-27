@@ -36,6 +36,9 @@ import type {
   CurrentUser,
   DashboardSummary,
   ErrorResponse,
+  FittingCatalogResponse,
+  FittingSimulationBody,
+  FittingSimulationResult,
   Fleet,
   HealthStatus,
   PapRecord,
@@ -43,6 +46,7 @@ import type {
   RefreshBattleReport202,
   Reward,
   ScanFleetResponse,
+  SearchFittingCatalogParams,
   SuccessResponse,
   TopContributor,
   UpdateBattleReplayBody,
@@ -832,7 +836,7 @@ export function useListAllCharacters<
 }
 
 /**
- * @summary Delete a character record (admin only)
+ * @summary Unlink a non-main character and retain site data for up to 3 months
  */
 export const getDeleteCharacterUrl = (id: number) => {
   return `/api/characters/${id}`;
@@ -849,7 +853,7 @@ export const deleteCharacter = async (
 };
 
 export const getDeleteCharacterMutationOptions = <
-  TError = ErrorType<unknown>,
+  TError = ErrorType<void>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -890,13 +894,13 @@ export type DeleteCharacterMutationResult = NonNullable<
   Awaited<ReturnType<typeof deleteCharacter>>
 >;
 
-export type DeleteCharacterMutationError = ErrorType<unknown>;
+export type DeleteCharacterMutationError = ErrorType<void>;
 
 /**
- * @summary Delete a character record (admin only)
+ * @summary Unlink a non-main character and retain site data for up to 3 months
  */
 export const useDeleteCharacter = <
-  TError = ErrorType<unknown>,
+  TError = ErrorType<void>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -1001,6 +1005,195 @@ export function useGetUserCharacters<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Search EVE ship fitting catalog
+ */
+export const getSearchFittingCatalogUrl = (
+  params?: SearchFittingCatalogParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/fitting/catalog?${stringifiedParams}`
+    : `/api/fitting/catalog`;
+};
+
+export const searchFittingCatalog = async (
+  params?: SearchFittingCatalogParams,
+  options?: RequestInit,
+): Promise<FittingCatalogResponse> => {
+  return customFetch<FittingCatalogResponse>(
+    getSearchFittingCatalogUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getSearchFittingCatalogQueryKey = (
+  params?: SearchFittingCatalogParams,
+) => {
+  return [`/api/fitting/catalog`, ...(params ? [params] : [])] as const;
+};
+
+export const getSearchFittingCatalogQueryOptions = <
+  TData = Awaited<ReturnType<typeof searchFittingCatalog>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: SearchFittingCatalogParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof searchFittingCatalog>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getSearchFittingCatalogQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof searchFittingCatalog>>
+  > = ({ signal }) =>
+    searchFittingCatalog(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof searchFittingCatalog>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type SearchFittingCatalogQueryResult = NonNullable<
+  Awaited<ReturnType<typeof searchFittingCatalog>>
+>;
+export type SearchFittingCatalogQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Search EVE ship fitting catalog
+ */
+
+export function useSearchFittingCatalog<
+  TData = Awaited<ReturnType<typeof searchFittingCatalog>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: SearchFittingCatalogParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof searchFittingCatalog>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getSearchFittingCatalogQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Simulate a ship fitting and return approximate PVP/PVE guidance
+ */
+export const getSimulateFittingUrl = () => {
+  return `/api/fitting/simulate`;
+};
+
+export const simulateFitting = async (
+  fittingSimulationBody: FittingSimulationBody,
+  options?: RequestInit,
+): Promise<FittingSimulationResult> => {
+  return customFetch<FittingSimulationResult>(getSimulateFittingUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(fittingSimulationBody),
+  });
+};
+
+export const getSimulateFittingMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof simulateFitting>>,
+    TError,
+    { data: BodyType<FittingSimulationBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof simulateFitting>>,
+  TError,
+  { data: BodyType<FittingSimulationBody> },
+  TContext
+> => {
+  const mutationKey = ["simulateFitting"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof simulateFitting>>,
+    { data: BodyType<FittingSimulationBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return simulateFitting(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SimulateFittingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof simulateFitting>>
+>;
+export type SimulateFittingMutationBody = BodyType<FittingSimulationBody>;
+export type SimulateFittingMutationError = ErrorType<void>;
+
+/**
+ * @summary Simulate a ship fitting and return approximate PVP/PVE guidance
+ */
+export const useSimulateFitting = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof simulateFitting>>,
+    TError,
+    { data: BodyType<FittingSimulationBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof simulateFitting>>,
+  TError,
+  { data: BodyType<FittingSimulationBody> },
+  TContext
+> => {
+  return useMutation(getSimulateFittingMutationOptions(options));
+};
 
 /**
  * @summary List all fleets

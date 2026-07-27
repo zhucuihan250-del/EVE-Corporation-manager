@@ -91,7 +91,8 @@ export interface AdjustPapBody {
 
 export interface Character {
   id: number;
-  userId: number;
+  /** @nullable */
+  userId: number | null;
   eveCharacterId: number;
   eveCharacterName: string;
   /** @nullable */
@@ -99,7 +100,184 @@ export interface Character {
   /** @nullable */
   corporationName?: string | null;
   isMain: boolean;
+  /** @nullable */
+  deletedAt?: string | null;
+  /** @nullable */
+  retainedUntil?: string | null;
   createdAt: string;
+}
+
+export type FittingCategory =
+  (typeof FittingCategory)[keyof typeof FittingCategory];
+
+export const FittingCategory = {
+  ship: "ship",
+  module: "module",
+  charge: "charge",
+  drone: "drone",
+} as const;
+
+export type FittingSlot = (typeof FittingSlot)[keyof typeof FittingSlot];
+
+export const FittingSlot = {
+  high: "high",
+  medium: "medium",
+  low: "low",
+  rig: "rig",
+  subsystem: "subsystem",
+  charge: "charge",
+  drone: "drone",
+  other: "other",
+} as const;
+
+/**
+ * @nullable
+ */
+export type FittingCatalogItemHardpoint =
+  | (typeof FittingCatalogItemHardpoint)[keyof typeof FittingCatalogItemHardpoint]
+  | null;
+
+export const FittingCatalogItemHardpoint = {
+  turret: "turret",
+  launcher: "launcher",
+} as const;
+
+export interface FittingCatalogItem {
+  typeId: number;
+  category: FittingCategory;
+  groupId: number;
+  slot: FittingSlot;
+  /** @nullable */
+  hardpoint: FittingCatalogItemHardpoint;
+  name: string;
+  nameEn: string;
+  nameZh: string;
+  groupName: string;
+  categoryName: string;
+}
+
+export interface FittingCatalogResponse {
+  /** @nullable */
+  sdeBuildNumber: number | null;
+  generatedAt: string;
+  items: FittingCatalogItem[];
+}
+
+export interface FittingSimulationModuleInput {
+  typeId: number;
+  /** @minimum 1 */
+  quantity?: number;
+}
+
+export type FittingSimulationBodyMode =
+  (typeof FittingSimulationBodyMode)[keyof typeof FittingSimulationBodyMode];
+
+export const FittingSimulationBodyMode = {
+  pvp: "pvp",
+  pve: "pve",
+} as const;
+
+export type FittingSimulationBodyLanguage =
+  (typeof FittingSimulationBodyLanguage)[keyof typeof FittingSimulationBodyLanguage];
+
+export const FittingSimulationBodyLanguage = {
+  en: "en",
+  zh: "zh",
+} as const;
+
+export interface FittingSimulationBody {
+  shipId: number;
+  modules: FittingSimulationModuleInput[];
+  mode: FittingSimulationBodyMode;
+  language: FittingSimulationBodyLanguage;
+}
+
+export interface FittingSlotMetric {
+  used: number;
+  limit: number;
+  overloaded: boolean;
+}
+
+export interface FittingResourceMetric {
+  used: number;
+  limit: number;
+  percent: number;
+  overloaded: boolean;
+}
+
+export type FittingSimulatedModule = FittingCatalogItem & {
+  quantity: number;
+  cpu: number;
+  powergrid: number;
+};
+
+export type FittingSimulationResultPrecision =
+  (typeof FittingSimulationResultPrecision)[keyof typeof FittingSimulationResultPrecision];
+
+export const FittingSimulationResultPrecision = {
+  approximate: "approximate",
+} as const;
+
+export type FittingSimulationResultSlots = {
+  high: FittingSlotMetric;
+  medium: FittingSlotMetric;
+  low: FittingSlotMetric;
+  rig: FittingSlotMetric;
+  subsystem: FittingSlotMetric;
+};
+
+export type FittingSimulationResultResources = {
+  cpu: FittingResourceMetric;
+  powergrid: FittingResourceMetric;
+  calibration: FittingResourceMetric;
+};
+
+export type FittingSimulationResultHardpoints = {
+  turret: FittingSlotMetric;
+  launcher: FittingSlotMetric;
+};
+
+export type FittingSimulationResultDefense = {
+  shieldHp: number;
+  armorHp: number;
+  hullHp: number;
+  estimatedEhp: number;
+};
+
+export type FittingSimulationResultMobility = {
+  maxVelocity: number;
+  mass: number;
+  signatureRadius: number;
+};
+
+export type FittingSimulationResultCapacitor = {
+  capacity: number;
+  /** @nullable */
+  rechargeTime: number | null;
+  activeCapUsePerSecond: number;
+};
+
+export type FittingSimulationResultOffense = {
+  weaponCount: number;
+  /** @nullable */
+  estimatedDps: number | null;
+};
+
+export interface FittingSimulationResult {
+  precision: FittingSimulationResultPrecision;
+  /** @nullable */
+  sdeBuildNumber: number | null;
+  ship: FittingCatalogItem;
+  modules: FittingSimulatedModule[];
+  slots: FittingSimulationResultSlots;
+  resources: FittingSimulationResultResources;
+  hardpoints: FittingSimulationResultHardpoints;
+  defense: FittingSimulationResultDefense;
+  mobility: FittingSimulationResultMobility;
+  capacitor: FittingSimulationResultCapacitor;
+  offense: FittingSimulationResultOffense;
+  recommendations: string[];
+  limitations: string[];
 }
 
 export interface Fleet {
@@ -729,6 +907,48 @@ export interface TopContributor {
   totalPap: number;
   fleetCount: number;
 }
+
+export type SearchFittingCatalogParams = {
+  q?: string;
+  category?: SearchFittingCatalogCategory;
+  slot?: SearchFittingCatalogSlot;
+  language?: SearchFittingCatalogLanguage;
+  limit?: number;
+};
+
+export type SearchFittingCatalogCategory =
+  (typeof SearchFittingCatalogCategory)[keyof typeof SearchFittingCatalogCategory];
+
+export const SearchFittingCatalogCategory = {
+  all: "all",
+  ship: "ship",
+  module: "module",
+  charge: "charge",
+  drone: "drone",
+} as const;
+
+export type SearchFittingCatalogSlot =
+  (typeof SearchFittingCatalogSlot)[keyof typeof SearchFittingCatalogSlot];
+
+export const SearchFittingCatalogSlot = {
+  all: "all",
+  high: "high",
+  medium: "medium",
+  low: "low",
+  rig: "rig",
+  subsystem: "subsystem",
+  charge: "charge",
+  drone: "drone",
+  other: "other",
+} as const;
+
+export type SearchFittingCatalogLanguage =
+  (typeof SearchFittingCatalogLanguage)[keyof typeof SearchFittingCatalogLanguage];
+
+export const SearchFittingCatalogLanguage = {
+  en: "en",
+  zh: "zh",
+} as const;
 
 export type RefreshBattleReport202 = {
   status: string;

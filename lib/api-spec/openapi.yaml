@@ -26,6 +26,8 @@ tags:
     description: Redemption management
   - name: dashboard
     description: Dashboard summary endpoints
+  - name: fitting
+    description: Ship fitting simulation and catalog endpoints
 
 paths:
   /healthz:
@@ -214,7 +216,7 @@ paths:
     delete:
       operationId: deleteCharacter
       tags: [characters]
-      summary: Delete a character record (admin only)
+      summary: Unlink a non-main character and retain site data for up to 3 months
       parameters:
         - in: path
           name: id
@@ -223,11 +225,15 @@ paths:
             type: integer
       responses:
         "200":
-          description: Character deleted
+          description: Character unlinked
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: Invalid request or main character cannot be unlinked
+        "403":
+          description: Forbidden
 
   /admin/users/{id}/characters:
     get:
@@ -249,6 +255,66 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Character"
+
+  /fitting/catalog:
+    get:
+      operationId: searchFittingCatalog
+      tags: [fitting]
+      summary: Search EVE ship fitting catalog
+      parameters:
+        - in: query
+          name: q
+          schema:
+            type: string
+        - in: query
+          name: category
+          schema:
+            type: string
+            enum: [all, ship, module, charge, drone]
+        - in: query
+          name: slot
+          schema:
+            type: string
+            enum: [all, high, medium, low, rig, subsystem, charge, drone, other]
+        - in: query
+          name: language
+          schema:
+            type: string
+            enum: [en, zh]
+        - in: query
+          name: limit
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Matching fitting catalog items
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FittingCatalogResponse"
+
+  /fitting/simulate:
+    post:
+      operationId: simulateFitting
+      tags: [fitting]
+      summary: Simulate a ship fitting and return approximate PVP/PVE guidance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FittingSimulationBody"
+      responses:
+        "200":
+          description: Fitting simulation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FittingSimulationResult"
+        "400":
+          description: Invalid fitting
+        "404":
+          description: Ship not found
 
   /fleets:
     get:
@@ -1018,7 +1084,7 @@ components:
         id:
           type: integer
         userId:
-          type: integer
+          type: ["integer", "null"]
         eveCharacterId:
           type: integer
         eveCharacterName:
@@ -1029,6 +1095,12 @@ components:
           type: ["string", "null"]
         isMain:
           type: boolean
+        deletedAt:
+          type: ["string", "null"]
+          format: date-time
+        retainedUntil:
+          type: ["string", "null"]
+          format: date-time
         createdAt:
           type: string
           format: date-time
@@ -1039,6 +1111,277 @@ components:
         - eveCharacterName
         - isMain
         - createdAt
+
+    FittingCategory:
+      type: string
+      enum: [ship, module, charge, drone]
+
+    FittingSlot:
+      type: string
+      enum: [high, medium, low, rig, subsystem, charge, drone, other]
+
+    FittingCatalogItem:
+      type: object
+      properties:
+        typeId:
+          type: integer
+        category:
+          $ref: "#/components/schemas/FittingCategory"
+        groupId:
+          type: integer
+        slot:
+          $ref: "#/components/schemas/FittingSlot"
+        hardpoint:
+          type: ["string", "null"]
+          enum: [turret, launcher, null]
+        name:
+          type: string
+        nameEn:
+          type: string
+        nameZh:
+          type: string
+        groupName:
+          type: string
+        categoryName:
+          type: string
+      required:
+        - typeId
+        - category
+        - groupId
+        - slot
+        - hardpoint
+        - name
+        - nameEn
+        - nameZh
+        - groupName
+        - categoryName
+
+    FittingCatalogResponse:
+      type: object
+      properties:
+        sdeBuildNumber:
+          type: ["integer", "null"]
+        generatedAt:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/FittingCatalogItem"
+      required:
+        - sdeBuildNumber
+        - generatedAt
+        - items
+
+    FittingSimulationModuleInput:
+      type: object
+      properties:
+        typeId:
+          type: integer
+        quantity:
+          type: integer
+          minimum: 1
+      required:
+        - typeId
+
+    FittingSimulationBody:
+      type: object
+      properties:
+        shipId:
+          type: integer
+        modules:
+          type: array
+          items:
+            $ref: "#/components/schemas/FittingSimulationModuleInput"
+        mode:
+          type: string
+          enum: [pvp, pve]
+        language:
+          type: string
+          enum: [en, zh]
+      required:
+        - shipId
+        - modules
+        - mode
+        - language
+
+    FittingSlotMetric:
+      type: object
+      properties:
+        used:
+          type: integer
+        limit:
+          type: number
+        overloaded:
+          type: boolean
+      required:
+        - used
+        - limit
+        - overloaded
+
+    FittingResourceMetric:
+      type: object
+      properties:
+        used:
+          type: number
+        limit:
+          type: number
+        percent:
+          type: number
+        overloaded:
+          type: boolean
+      required:
+        - used
+        - limit
+        - percent
+        - overloaded
+
+    FittingSimulatedModule:
+      allOf:
+        - $ref: "#/components/schemas/FittingCatalogItem"
+        - type: object
+          properties:
+            quantity:
+              type: integer
+            cpu:
+              type: number
+            powergrid:
+              type: number
+          required:
+            - quantity
+            - cpu
+            - powergrid
+
+    FittingSimulationResult:
+      type: object
+      properties:
+        precision:
+          type: string
+          enum: [approximate]
+        sdeBuildNumber:
+          type: ["integer", "null"]
+        ship:
+          $ref: "#/components/schemas/FittingCatalogItem"
+        modules:
+          type: array
+          items:
+            $ref: "#/components/schemas/FittingSimulatedModule"
+        slots:
+          type: object
+          properties:
+            high:
+              $ref: "#/components/schemas/FittingSlotMetric"
+            medium:
+              $ref: "#/components/schemas/FittingSlotMetric"
+            low:
+              $ref: "#/components/schemas/FittingSlotMetric"
+            rig:
+              $ref: "#/components/schemas/FittingSlotMetric"
+            subsystem:
+              $ref: "#/components/schemas/FittingSlotMetric"
+          required:
+            - high
+            - medium
+            - low
+            - rig
+            - subsystem
+        resources:
+          type: object
+          properties:
+            cpu:
+              $ref: "#/components/schemas/FittingResourceMetric"
+            powergrid:
+              $ref: "#/components/schemas/FittingResourceMetric"
+            calibration:
+              $ref: "#/components/schemas/FittingResourceMetric"
+          required:
+            - cpu
+            - powergrid
+            - calibration
+        hardpoints:
+          type: object
+          properties:
+            turret:
+              $ref: "#/components/schemas/FittingSlotMetric"
+            launcher:
+              $ref: "#/components/schemas/FittingSlotMetric"
+          required:
+            - turret
+            - launcher
+        defense:
+          type: object
+          properties:
+            shieldHp:
+              type: number
+            armorHp:
+              type: number
+            hullHp:
+              type: number
+            estimatedEhp:
+              type: number
+          required:
+            - shieldHp
+            - armorHp
+            - hullHp
+            - estimatedEhp
+        mobility:
+          type: object
+          properties:
+            maxVelocity:
+              type: number
+            mass:
+              type: number
+            signatureRadius:
+              type: number
+          required:
+            - maxVelocity
+            - mass
+            - signatureRadius
+        capacitor:
+          type: object
+          properties:
+            capacity:
+              type: number
+            rechargeTime:
+              type: ["number", "null"]
+            activeCapUsePerSecond:
+              type: number
+          required:
+            - capacity
+            - rechargeTime
+            - activeCapUsePerSecond
+        offense:
+          type: object
+          properties:
+            weaponCount:
+              type: integer
+            estimatedDps:
+              type: ["number", "null"]
+          required:
+            - weaponCount
+            - estimatedDps
+        recommendations:
+          type: array
+          items:
+            type: string
+        limitations:
+          type: array
+          items:
+            type: string
+      required:
+        - precision
+        - sdeBuildNumber
+        - ship
+        - modules
+        - slots
+        - resources
+        - hardpoints
+        - defense
+        - mobility
+        - capacitor
+        - offense
+        - recommendations
+        - limitations
 
     Fleet:
       type: object

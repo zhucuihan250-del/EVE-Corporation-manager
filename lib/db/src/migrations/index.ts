@@ -5,6 +5,7 @@ import { rewardRedemptionLimitsMigration } from "./0003-reward-redemption-limits
 import { fleetBattleReportsMigration } from "./0004-fleet-battle-reports";
 import { battleReportReviewsMigration } from "./0005-battle-report-reviews";
 import { battleReportAttackersMigration } from "./0006-battle-report-attackers";
+import { characterSoftDeleteRetentionMigration } from "./0007-character-soft-delete-retention";
 
 type Migration = {
   id: string;
@@ -18,6 +19,7 @@ const migrations: Migration[] = [
   fleetBattleReportsMigration,
   battleReportReviewsMigration,
   battleReportAttackersMigration,
+  characterSoftDeleteRetentionMigration,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {

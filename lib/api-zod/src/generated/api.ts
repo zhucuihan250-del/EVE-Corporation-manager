@@ -129,12 +129,14 @@ export const AdjustUserPapResponse = zod.object({
  */
 export const ListCharactersResponseItem = zod.object({
   id: zod.number(),
-  userId: zod.number(),
+  userId: zod.number().nullable(),
   eveCharacterId: zod.number(),
   eveCharacterName: zod.string(),
   corporationId: zod.number().nullish(),
   corporationName: zod.string().nullish(),
   isMain: zod.boolean(),
+  deletedAt: zod.coerce.date().nullish(),
+  retainedUntil: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
 });
 export const ListCharactersResponse = zod.array(ListCharactersResponseItem);
@@ -144,12 +146,14 @@ export const ListCharactersResponse = zod.array(ListCharactersResponseItem);
  */
 export const ListAllCharactersResponseItem = zod.object({
   id: zod.number(),
-  userId: zod.number(),
+  userId: zod.number().nullable(),
   eveCharacterId: zod.number(),
   eveCharacterName: zod.string(),
   corporationId: zod.number().nullish(),
   corporationName: zod.string().nullish(),
   isMain: zod.boolean(),
+  deletedAt: zod.coerce.date().nullish(),
+  retainedUntil: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
 });
 export const ListAllCharactersResponse = zod.array(
@@ -157,7 +161,7 @@ export const ListAllCharactersResponse = zod.array(
 );
 
 /**
- * @summary Delete a character record (admin only)
+ * @summary Unlink a non-main character and retain site data for up to 3 months
  */
 export const DeleteCharacterParams = zod.object({
   id: zod.coerce.number(),
@@ -177,17 +181,242 @@ export const GetUserCharactersParams = zod.object({
 
 export const GetUserCharactersResponseItem = zod.object({
   id: zod.number(),
-  userId: zod.number(),
+  userId: zod.number().nullable(),
   eveCharacterId: zod.number(),
   eveCharacterName: zod.string(),
   corporationId: zod.number().nullish(),
   corporationName: zod.string().nullish(),
   isMain: zod.boolean(),
+  deletedAt: zod.coerce.date().nullish(),
+  retainedUntil: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
 });
 export const GetUserCharactersResponse = zod.array(
   GetUserCharactersResponseItem,
 );
+
+/**
+ * @summary Search EVE ship fitting catalog
+ */
+export const SearchFittingCatalogQueryParams = zod.object({
+  q: zod.coerce.string().optional(),
+  category: zod.enum(["all", "ship", "module", "charge", "drone"]).optional(),
+  slot: zod
+    .enum([
+      "all",
+      "high",
+      "medium",
+      "low",
+      "rig",
+      "subsystem",
+      "charge",
+      "drone",
+      "other",
+    ])
+    .optional(),
+  language: zod.enum(["en", "zh"]).optional(),
+  limit: zod.coerce.number().optional(),
+});
+
+export const SearchFittingCatalogResponse = zod.object({
+  sdeBuildNumber: zod.number().nullable(),
+  generatedAt: zod.coerce.date(),
+  items: zod.array(
+    zod.object({
+      typeId: zod.number(),
+      category: zod.enum(["ship", "module", "charge", "drone"]),
+      groupId: zod.number(),
+      slot: zod.enum([
+        "high",
+        "medium",
+        "low",
+        "rig",
+        "subsystem",
+        "charge",
+        "drone",
+        "other",
+      ]),
+      hardpoint: zod
+        .union([
+          zod.literal("turret"),
+          zod.literal("launcher"),
+          zod.literal(null),
+        ])
+        .nullable(),
+      name: zod.string(),
+      nameEn: zod.string(),
+      nameZh: zod.string(),
+      groupName: zod.string(),
+      categoryName: zod.string(),
+    }),
+  ),
+});
+
+/**
+ * @summary Simulate a ship fitting and return approximate PVP/PVE guidance
+ */
+
+export const SimulateFittingBody = zod.object({
+  shipId: zod.number(),
+  modules: zod.array(
+    zod.object({
+      typeId: zod.number(),
+      quantity: zod.number().min(1).optional(),
+    }),
+  ),
+  mode: zod.enum(["pvp", "pve"]),
+  language: zod.enum(["en", "zh"]),
+});
+
+export const SimulateFittingResponse = zod.object({
+  precision: zod.enum(["approximate"]),
+  sdeBuildNumber: zod.number().nullable(),
+  ship: zod.object({
+    typeId: zod.number(),
+    category: zod.enum(["ship", "module", "charge", "drone"]),
+    groupId: zod.number(),
+    slot: zod.enum([
+      "high",
+      "medium",
+      "low",
+      "rig",
+      "subsystem",
+      "charge",
+      "drone",
+      "other",
+    ]),
+    hardpoint: zod
+      .union([
+        zod.literal("turret"),
+        zod.literal("launcher"),
+        zod.literal(null),
+      ])
+      .nullable(),
+    name: zod.string(),
+    nameEn: zod.string(),
+    nameZh: zod.string(),
+    groupName: zod.string(),
+    categoryName: zod.string(),
+  }),
+  modules: zod.array(
+    zod
+      .object({
+        typeId: zod.number(),
+        category: zod.enum(["ship", "module", "charge", "drone"]),
+        groupId: zod.number(),
+        slot: zod.enum([
+          "high",
+          "medium",
+          "low",
+          "rig",
+          "subsystem",
+          "charge",
+          "drone",
+          "other",
+        ]),
+        hardpoint: zod
+          .union([
+            zod.literal("turret"),
+            zod.literal("launcher"),
+            zod.literal(null),
+          ])
+          .nullable(),
+        name: zod.string(),
+        nameEn: zod.string(),
+        nameZh: zod.string(),
+        groupName: zod.string(),
+        categoryName: zod.string(),
+      })
+      .and(
+        zod.object({
+          quantity: zod.number(),
+          cpu: zod.number(),
+          powergrid: zod.number(),
+        }),
+      ),
+  ),
+  slots: zod.object({
+    high: zod.object({
+      used: zod.number(),
+      limit: zod.number(),
+      overloaded: zod.boolean(),
+    }),
+    medium: zod.object({
+      used: zod.number(),
+      limit: zod.number(),
+      overloaded: zod.boolean(),
+    }),
+    low: zod.object({
+      used: zod.number(),
+      limit: zod.number(),
+      overloaded: zod.boolean(),
+    }),
+    rig: zod.object({
+      used: zod.number(),
+      limit: zod.number(),
+      overloaded: zod.boolean(),
+    }),
+    subsystem: zod.object({
+      used: zod.number(),
+      limit: zod.number(),
+      overloaded: zod.boolean(),
+    }),
+  }),
+  resources: zod.object({
+    cpu: zod.object({
+      used: zod.number(),
+      limit: zod.number(),
+      percent: zod.number(),
+      overloaded: zod.boolean(),
+    }),
+    powergrid: zod.object({
+      used: zod.number(),
+      limit: zod.number(),
+      percent: zod.number(),
+      overloaded: zod.boolean(),
+    }),
+    calibration: zod.object({
+      used: zod.number(),
+      limit: zod.number(),
+      percent: zod.number(),
+      overloaded: zod.boolean(),
+    }),
+  }),
+  hardpoints: zod.object({
+    turret: zod.object({
+      used: zod.number(),
+      limit: zod.number(),
+      overloaded: zod.boolean(),
+    }),
+    launcher: zod.object({
+      used: zod.number(),
+      limit: zod.number(),
+      overloaded: zod.boolean(),
+    }),
+  }),
+  defense: zod.object({
+    shieldHp: zod.number(),
+    armorHp: zod.number(),
+    hullHp: zod.number(),
+    estimatedEhp: zod.number(),
+  }),
+  mobility: zod.object({
+    maxVelocity: zod.number(),
+    mass: zod.number(),
+    signatureRadius: zod.number(),
+  }),
+  capacitor: zod.object({
+    capacity: zod.number(),
+    rechargeTime: zod.number().nullable(),
+    activeCapUsePerSecond: zod.number(),
+  }),
+  offense: zod.object({
+    weaponCount: zod.number(),
+    estimatedDps: zod.number().nullable(),
+  }),
+  recommendations: zod.array(zod.string()),
+  limitations: zod.array(zod.string()),
+});
 
 /**
  * @summary List all fleets

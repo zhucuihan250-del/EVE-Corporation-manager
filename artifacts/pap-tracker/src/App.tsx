@@ -27,6 +27,7 @@ import { AdminRedemptions } from "@/pages/admin/redemptions";
 import { AdminPap } from "@/pages/admin/pap";
 import { AdminAnnouncements } from "@/pages/admin/announcements";
 import { Characters } from "@/pages/characters";
+import { Fitting } from "@/pages/fitting";
 import { BattleReportDetail, BattleReports } from "@/pages/battle-reports";
 import { BattleReplayWorkbench, BattleReplays } from "@/pages/battle-replays";
 
@@ -120,6 +121,9 @@ function Router() {
       </Route>
       <Route path="/characters">
         {() => <ProtectedRoute component={Characters} />}
+      </Route>
+      <Route path="/fitting">
+        {() => <ProtectedRoute component={Fitting} />}
       </Route>
       <Route path="/battle-reports/:id">
         {() => <ProtectedRoute component={BattleReportDetail} />}

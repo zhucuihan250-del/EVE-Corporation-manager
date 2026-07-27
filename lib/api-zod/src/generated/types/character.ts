@@ -8,7 +8,8 @@
 
 export interface Character {
   id: number;
-  userId: number;
+  /** @nullable */
+  userId: number | null;
   eveCharacterId: number;
   eveCharacterName: string;
   /** @nullable */
@@ -16,5 +17,9 @@ export interface Character {
   /** @nullable */
   corporationName?: string | null;
   isMain: boolean;
+  /** @nullable */
+  deletedAt?: Date | null;
+  /** @nullable */
+  retainedUntil?: Date | null;
   createdAt: Date;
 }

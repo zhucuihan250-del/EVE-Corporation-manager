@@ -5,12 +5,14 @@ import { usersTable } from "./users";
 
 export const charactersTable = pgTable("characters", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  userId: integer("user_id").references(() => usersTable.id, { onDelete: "cascade" }),
   eveCharacterId: integer("eve_character_id").notNull(),
   eveCharacterName: text("eve_character_name").notNull(),
   corporationId: integer("corporation_id"),
   corporationName: text("corporation_name"),
   isMain: boolean("is_main").notNull().default(false),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  retainedUntil: timestamp("retained_until", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

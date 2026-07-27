@@ -11,6 +11,7 @@ import dashboardRouter from "./dashboard";
 import announcementsRouter from "./announcements";
 import battleReportsRouter from "./battle-reports";
 import battleReplaysRouter from "./battle-replays";
+import fittingRouter from "./fitting";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,6 @@ router.use(dashboardRouter);
 router.use(announcementsRouter);
 router.use(battleReportsRouter);
 router.use(battleReplaysRouter);
+router.use(fittingRouter);
 
 export default router;

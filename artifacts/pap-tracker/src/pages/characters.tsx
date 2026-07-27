@@ -1,20 +1,34 @@
-import { useListCharacters } from "@workspace/api-client-react";
+import { getListCharactersQueryKey, useDeleteCharacter, useListCharacters } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, UserSquare2, Plus, Star } from "lucide-react";
+import { Loader2, UserSquare2, Plus, Star, Trash2, AlertTriangle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/hooks/use-toast";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSearch } from "wouter";
 import { apiUrl } from "@/lib/api";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export function Characters() {
   const { t } = useTranslation();
-  const { data: characters, isLoading } = useListCharacters({ query: { queryKey: ["characters"] } });
+  const { data: characters, isLoading } = useListCharacters();
+  const deleteCharacter = useDeleteCharacter();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const search = useSearch();
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(search);
@@ -27,6 +41,24 @@ export function Characters() {
 
   const handleLinkAlt = () => {
     window.location.href = apiUrl("/api/auth/eve/link-alt");
+  };
+
+  const handleDeleteCharacter = () => {
+    if (!deleteTarget) return;
+
+    deleteCharacter.mutate(
+      { id: deleteTarget.id },
+      {
+        onSuccess: () => {
+          toast({ title: t("characters.removeSuccess"), description: t("characters.removeSuccessDesc") });
+          queryClient.invalidateQueries({ queryKey: getListCharactersQueryKey() });
+          setDeleteTarget(null);
+        },
+        onError: () => {
+          toast({ title: t("characters.removeFailed"), variant: "destructive" });
+        },
+      },
+    );
   };
 
   return (
@@ -69,6 +101,7 @@ export function Characters() {
                   <TableHead className="font-mono text-xs text-muted-foreground">{t("characters.charName")}</TableHead>
                   <TableHead className="font-mono text-xs text-muted-foreground">{t("characters.corp")}</TableHead>
                   <TableHead className="font-mono text-xs text-muted-foreground text-right">TYPE</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground text-right">{t("characters.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -91,6 +124,26 @@ export function Characters() {
                         {char.isMain ? t("characters.main") : t("characters.alt")}
                       </Badge>
                     </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-sm"
+                        onClick={() => setDeleteTarget({
+                          id: char.id,
+                          name: char.eveCharacterName || `Character #${char.eveCharacterId}`,
+                        })}
+                        disabled={char.isMain || deleteCharacter.isPending}
+                        title={char.isMain ? t("characters.mainLocked") : t("characters.remove")}
+                      >
+                        {deleteCharacter.isPending && deleteTarget?.id === char.id ? (
+                          <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-3.5 h-3.5 mr-1" />
+                        )}
+                        {t("characters.remove")}
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -105,9 +158,34 @@ export function Characters() {
           <div>
             <p className="font-mono text-sm font-semibold text-foreground mb-1">{t("characters.addAltTitle")}</p>
             <p className="font-mono text-xs text-muted-foreground">{t("characters.addAltDesc")}</p>
+            <p className="font-mono text-xs text-muted-foreground mt-2">{t("characters.dataRetention")}</p>
           </div>
         </CardContent>
       </Card>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent className="bg-card border-destructive/40 rounded-sm font-mono">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="tracking-wider uppercase text-destructive flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" />
+              {t("characters.removeTitle", { name: deleteTarget?.name ?? "" })}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground text-xs leading-relaxed">
+              {t("characters.removeDesc")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-sm text-xs">{t("characters.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteCharacter}
+              className="rounded-sm text-xs bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteCharacter.isPending}
+            >
+              {deleteCharacter.isPending ? t("characters.removing") : t("characters.removeConfirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

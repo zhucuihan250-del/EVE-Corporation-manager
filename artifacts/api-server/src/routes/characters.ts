@@ -1,18 +1,13 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { db, charactersTable, usersTable, papRecordsTable } from "@workspace/db";
-import { eq, count, sum, sql } from "drizzle-orm";
-import { requireAuth } from "../middlewares/auth";
+import { db, charactersTable, usersTable } from "@workspace/db";
+import { and, eq, isNull } from "drizzle-orm";
+import { requireAuth, hasRole } from "../middlewares/auth";
+import { getCharacterRetentionDeadline } from "../lib/character-retention";
 
 const router: IRouter = Router();
 
-// GET /api/characters - current user's characters
-router.get("/characters", requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const chars = await db
-    .select()
-    .from(charactersTable)
-    .where(eq(charactersTable.userId, req.session.userId!));
-
-  res.json(chars.map(c => ({
+function formatCharacter(c: typeof charactersTable.$inferSelect) {
+  return {
     id: c.id,
     userId: c.userId,
     eveCharacterId: c.eveCharacterId,
@@ -20,8 +15,20 @@ router.get("/characters", requireAuth, async (req: Request, res: Response): Prom
     corporationId: c.corporationId,
     corporationName: c.corporationName,
     isMain: c.isMain,
+    deletedAt: c.deletedAt,
+    retainedUntil: c.retainedUntil,
     createdAt: c.createdAt,
-  })));
+  };
+}
+
+// GET /api/characters - current user's characters
+router.get("/characters", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const chars = await db
+    .select()
+    .from(charactersTable)
+    .where(and(eq(charactersTable.userId, req.session.userId!), isNull(charactersTable.deletedAt)));
+
+  res.json(chars.map(formatCharacter));
 });
 
 // GET /api/characters/all - admin only
@@ -32,17 +39,12 @@ router.get("/characters/all", requireAuth, async (req: Request, res: Response): 
     return;
   }
 
-  const chars = await db.select().from(charactersTable);
-  res.json(chars.map(c => ({
-    id: c.id,
-    userId: c.userId,
-    eveCharacterId: c.eveCharacterId,
-    eveCharacterName: c.eveCharacterName,
-    corporationId: c.corporationId,
-    corporationName: c.corporationName,
-    isMain: c.isMain,
-    createdAt: c.createdAt,
-  })));
+  const chars = await db
+    .select()
+    .from(charactersTable)
+    .where(isNull(charactersTable.deletedAt));
+
+  res.json(chars.map(formatCharacter));
 });
 
 // GET /api/admin/users/:id/characters - get all characters for a specific user (admin only)
@@ -62,25 +64,16 @@ router.get("/admin/users/:id/characters", requireAuth, async (req: Request, res:
   const chars = await db
     .select()
     .from(charactersTable)
-    .where(eq(charactersTable.userId, targetId));
+    .where(and(eq(charactersTable.userId, targetId), isNull(charactersTable.deletedAt)));
 
-  res.json(chars.map(c => ({
-    id: c.id,
-    userId: c.userId,
-    eveCharacterId: c.eveCharacterId,
-    eveCharacterName: c.eveCharacterName,
-    corporationId: c.corporationId,
-    corporationName: c.corporationName,
-    isMain: c.isMain,
-    createdAt: c.createdAt,
-  })));
+  res.json(chars.map(formatCharacter));
 });
 
-// DELETE /api/characters/:id - admin only, remove a character record
+// DELETE /api/characters/:id - unlink an active non-main character while retaining site data for 3 months
 router.delete("/characters/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || currentUser.role !== "admin") {
-    res.status(403).json({ error: "Forbidden" });
+  if (!currentUser) {
+    res.status(401).json({ error: "Unauthorized" });
     return;
   }
 
@@ -90,43 +83,41 @@ router.delete("/characters/:id", requireAuth, async (req: Request, res: Response
     return;
   }
 
-  const [char] = await db.select().from(charactersTable).where(eq(charactersTable.id, charId));
+  const [char] = await db
+    .select()
+    .from(charactersTable)
+    .where(and(eq(charactersTable.id, charId), isNull(charactersTable.deletedAt)));
+
   if (!char) {
     res.status(404).json({ error: "Character not found" });
     return;
   }
 
-  // Sum PAP earned by this character before deleting
-  const [papSum] = await db
-    .select({ total: sum(papRecordsTable.amount) })
-    .from(papRecordsTable)
-    .where(eq(papRecordsTable.characterId, charId));
-  const papToDeduct = Number(papSum?.total ?? 0);
-
-  // Delete all PAP records for this character
-  await db.delete(papRecordsTable).where(eq(papRecordsTable.characterId, charId));
-
-  // Subtract from user's PAP balance (clamp both values to 0)
-  if (papToDeduct > 0) {
-    await db.update(usersTable).set({
-      totalPap: sql`GREATEST(0, total_pap - ${papToDeduct})`,
-      redeemablePap: sql`GREATEST(0, redeemable_pap - ${papToDeduct})`,
-    }).where(eq(usersTable.id, char.userId));
+  const isOwner = char.userId === req.session.userId;
+  const isAdmin = hasRole(currentUser.role, "admin");
+  if (!isOwner && !isAdmin) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
   }
 
-  // Delete the character record
-  await db.delete(charactersTable).where(eq(charactersTable.id, charId));
-  req.log.info({ charId, eveCharacterId: char.eveCharacterId, userId: char.userId, papDeducted: papToDeduct }, "Admin hard-deleted character and all its PAP records");
-
-  // If user has no characters left and is an orphan (no accessToken), remove from roster
-  const [remaining] = await db.select({ total: count() }).from(charactersTable).where(eq(charactersTable.userId, char.userId));
-  if ((remaining?.total ?? 0) === 0) {
-    const [owner] = await db.select().from(usersTable).where(eq(usersTable.id, char.userId));
-    if (owner && !owner.accessToken) {
-      await db.delete(usersTable).where(eq(usersTable.id, char.userId));
-      req.log.info({ userId: char.userId }, "Removed orphan user after last character was deleted");
-    }
+  if (char.isMain) {
+    res.status(400).json({ error: "Main character cannot be unlinked. Delete the user account instead." });
+    return;
   }
+
+  const deletedAt = new Date();
+  const retainedUntil = getCharacterRetentionDeadline(deletedAt);
+  await db.update(charactersTable).set({
+    userId: null,
+    isMain: false,
+    deletedAt,
+    retainedUntil,
+  }).where(eq(charactersTable.id, charId));
+
+  req.log.info(
+    { charId, eveCharacterId: char.eveCharacterId, previousUserId: char.userId, retainedUntil },
+    "Character unlinked and retained for deletion window",
+  );
 
   res.json({ success: true });
 });

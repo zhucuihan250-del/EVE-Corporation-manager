@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, fleetsTable, usersTable, papRecordsTable, charactersTable } from "@workspace/db";
-import { eq, desc, sql, inArray, and, count } from "drizzle-orm";
+import { eq, desc, sql, inArray, and, isNull } from "drizzle-orm";
 import { refreshAccessToken } from "../lib/eve-sso";
 import { requireAuth, hasRole } from "../middlewares/auth";
 import { ensureBattleReportForFleet, queueBattleReportGeneration } from "../lib/battle-reports";
@@ -355,7 +355,7 @@ router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response)
   const characters = await db
     .select()
     .from(charactersTable)
-    .where(inArray(charactersTable.eveCharacterId, memberCharIds));
+    .where(and(inArray(charactersTable.eveCharacterId, memberCharIds), isNull(charactersTable.deletedAt)));
 
   req.log.info({ found: characters.length, total: memberCharIds.length }, "Characters found in DB");
 
@@ -375,7 +375,11 @@ router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response)
         const [existingChar] = await db
           .select()
           .from(charactersTable)
-          .where(and(eq(charactersTable.userId, existingUser.id), eq(charactersTable.eveCharacterId, charId)));
+          .where(and(
+            eq(charactersTable.userId, existingUser.id),
+            eq(charactersTable.eveCharacterId, charId),
+            isNull(charactersTable.deletedAt),
+          ));
         if (existingChar) {
           autoRegisteredChars.push(existingChar);
         } else {
@@ -463,6 +467,11 @@ router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response)
   const notFound = memberCharIds.length - allCharacters.length;
 
   for (const character of allCharacters) {
+    if (!character.userId) {
+      skipped++;
+      req.log.warn({ characterId: character.id, eveCharacterId: character.eveCharacterId }, "Skipping active character with no linked user");
+      continue;
+    }
     if (alreadyAwardedCharIds.has(character.id)) {
       skipped++;
       continue;
@@ -540,9 +549,9 @@ router.post("/fleets/:id/participants", requireAuth, async (req: Request, res: R
   const [character] = await db
     .select()
     .from(charactersTable)
-    .where(eq(charactersTable.id, body.data.characterId));
+    .where(and(eq(charactersTable.id, body.data.characterId), isNull(charactersTable.deletedAt)));
 
-  if (!character) {
+  if (!character?.userId) {
     res.status(404).json({ error: "Character not found" });
     return;
   }

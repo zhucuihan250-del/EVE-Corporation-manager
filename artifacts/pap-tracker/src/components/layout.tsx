@@ -19,6 +19,7 @@ import {
   Radio,
   Crosshair,
   BrainCircuit,
+  Wrench,
 } from "lucide-react";
 import {
   Sidebar,
@@ -165,6 +166,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       >
                         <UserSquare2 className="w-4 h-4" />
                         <span>{t("nav.characters")}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={location === "/fitting"}
+                    >
+                      <Link
+                        href="/fitting"
+                        className="font-mono flex items-center gap-3"
+                      >
+                        <Wrench className="w-4 h-4" />
+                        <span>{t("nav.fitting")}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

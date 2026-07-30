@@ -15,7 +15,7 @@ const ESI_BASE = "https://esi.evetech.net/latest";
 const ZKILL_BASE = "https://zkillboard.com/api";
 const ESI_COMPATIBILITY_DATE = "2026-07-20";
 const USER_AGENT = process.env.EVE_ESI_USER_AGENT
-  || `EVE-PAP-Tracker/1.0 (+${process.env.FRONTEND_URL || "https://workspaceapi-server-production-72ec.up.railway.app"})`;
+  || `EVE-PAP-Tracker/1.0 (+${process.env.FRONTEND_URL || "https://zephyr-fleet-track-production.up.railway.app"})`;
 const MAX_AUTOMATIC_LOOKBACK_SECONDS = 7 * 24 * 60 * 60;
 const ZKILL_PAGE_SIZE = 1_000;
 const MAX_ZKILL_PAGES_PER_SOURCE = 10;

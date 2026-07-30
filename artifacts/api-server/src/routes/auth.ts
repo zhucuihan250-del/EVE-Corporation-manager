@@ -89,16 +89,26 @@ async function restoreDeletedCharacter(
 function getCallbackUrl(req: Request): string {
   // Use the forwarded host so the callback URL always matches the domain
   // the user is actually visiting (dev preview or published app).
-  const host = req.get("x-forwarded-host") ?? req.get("host") ?? "localhost";
-  const proto = req.get("x-forwarded-proto") ?? req.protocol ?? "https";
+  const host = req.get("x-forwarded-host")?.split(",")[0]?.trim()
+    ?? req.get("host")
+    ?? "localhost";
+  const proto = req.get("x-forwarded-proto")?.split(",")[0]?.trim()
+    ?? req.protocol
+    ?? "https";
   return `${proto}://${host}/api/auth/eve/callback`;
 }
 
 function getFrontendRedirectUrl(path: string): string {
-  const frontendUrl = process.env.FRONTEND_URL?.trim();
-  if (!frontendUrl) return path;
-
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+
+  // Railway serves the frontend and API from the same origin. Relative
+  // redirects keep working when the public domain changes or a custom domain
+  // is introduced, even if an old FRONTEND_URL is still configured.
+  if (process.env.NODE_ENV === "production") return normalizedPath;
+
+  const frontendUrl = process.env.FRONTEND_URL?.trim();
+  if (!frontendUrl) return normalizedPath;
+
   return new URL(normalizedPath, `${frontendUrl.replace(/\/+$/, "")}/`).toString();
 }
 

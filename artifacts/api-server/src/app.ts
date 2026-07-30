@@ -66,17 +66,29 @@ app.use(
 );
 
 app.use(
-  cors({
-    origin(origin, callback) {
-      if (!origin || allowedOrigins.length === 0) {
-        callback(null, true);
-        return;
-      }
+  (req, res, next) => {
+    const forwardedHost = req.get("x-forwarded-host")?.split(",")[0]?.trim();
+    const forwardedProto = req.get("x-forwarded-proto")?.split(",")[0]?.trim();
+    const host = forwardedHost || req.get("host")?.trim();
+    const proto = forwardedProto || req.protocol;
+    const requestOrigin = host ? `${proto}://${host}` : null;
 
-      callback(null, allowedOrigins.includes(origin));
-    },
-    credentials: true,
-  }),
+    cors({
+      origin(origin, callback) {
+        if (
+          !origin
+          || allowedOrigins.length === 0
+          || origin === requestOrigin
+        ) {
+          callback(null, true);
+          return;
+        }
+
+        callback(null, allowedOrigins.includes(origin));
+      },
+      credentials: true,
+    })(req, res, next);
+  },
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

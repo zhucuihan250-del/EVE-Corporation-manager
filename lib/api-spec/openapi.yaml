@@ -216,7 +216,7 @@ paths:
     delete:
       operationId: deleteCharacter
       tags: [characters]
-      summary: Unlink a non-main character and retain site data for up to 3 months
+      summary: Unlink a character and retain site data for up to 3 months
       parameters:
         - in: path
           name: id
@@ -229,9 +229,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SuccessResponse"
+                $ref: "#/components/schemas/DeleteCharacterResponse"
         "400":
-          description: Invalid request or main character cannot be unlinked
+          description: Invalid request
         "403":
           description: Forbidden
 
@@ -1111,6 +1111,26 @@ components:
         - eveCharacterName
         - isMain
         - createdAt
+
+    DeleteCharacterResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        removedMain:
+          type: boolean
+        newMainCharacterId:
+          type: ["integer", "null"]
+        newMainCharacterName:
+          type: ["string", "null"]
+        requiresReauthentication:
+          type: boolean
+      required:
+        - success
+        - removedMain
+        - newMainCharacterId
+        - newMainCharacterName
+        - requiresReauthentication
 
     FittingCategory:
       type: string

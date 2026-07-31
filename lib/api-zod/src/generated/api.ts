@@ -161,7 +161,7 @@ export const ListAllCharactersResponse = zod.array(
 );
 
 /**
- * @summary Unlink a non-main character and retain site data for up to 3 months
+ * @summary Unlink a character and retain site data for up to 3 months
  */
 export const DeleteCharacterParams = zod.object({
   id: zod.coerce.number(),
@@ -169,7 +169,10 @@ export const DeleteCharacterParams = zod.object({
 
 export const DeleteCharacterResponse = zod.object({
   success: zod.boolean(),
-  message: zod.string().optional(),
+  removedMain: zod.boolean(),
+  newMainCharacterId: zod.number().nullable(),
+  newMainCharacterName: zod.string().nullable(),
+  requiresReauthentication: zod.boolean(),
 });
 
 /**

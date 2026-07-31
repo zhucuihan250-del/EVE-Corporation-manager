@@ -1,4 +1,4 @@
-import { getListCharactersQueryKey, useDeleteCharacter, useListCharacters } from "@workspace/api-client-react";
+import { getGetMeQueryKey, getListCharactersQueryKey, useDeleteCharacter, useListCharacters } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -28,7 +28,7 @@ export function Characters() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const search = useSearch();
-  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string; isMain: boolean } | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(search);
@@ -49,9 +49,15 @@ export function Characters() {
     deleteCharacter.mutate(
       { id: deleteTarget.id },
       {
-        onSuccess: () => {
-          toast({ title: t("characters.removeSuccess"), description: t("characters.removeSuccessDesc") });
+        onSuccess: (result) => {
+          const description = result.removedMain
+            ? result.newMainCharacterName
+              ? t("characters.removeMainPromotedDesc", { name: result.newMainCharacterName })
+              : t("characters.removeMainNeedsLinkDesc")
+            : t("characters.removeSuccessDesc");
+          toast({ title: t("characters.removeSuccess"), description });
           queryClient.invalidateQueries({ queryKey: getListCharactersQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
           setDeleteTarget(null);
         },
         onError: () => {
@@ -132,9 +138,10 @@ export function Characters() {
                         onClick={() => setDeleteTarget({
                           id: char.id,
                           name: char.eveCharacterName || `Character #${char.eveCharacterId}`,
+                          isMain: char.isMain,
                         })}
-                        disabled={char.isMain || deleteCharacter.isPending}
-                        title={char.isMain ? t("characters.mainLocked") : t("characters.remove")}
+                        disabled={deleteCharacter.isPending}
+                        title={t("characters.remove")}
                       >
                         {deleteCharacter.isPending && deleteTarget?.id === char.id ? (
                           <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
@@ -171,7 +178,7 @@ export function Characters() {
               {t("characters.removeTitle", { name: deleteTarget?.name ?? "" })}
             </AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground text-xs leading-relaxed">
-              {t("characters.removeDesc")}
+              {deleteTarget?.isMain ? t("characters.removeMainDesc") : t("characters.removeDesc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

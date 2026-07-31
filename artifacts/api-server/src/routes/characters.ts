@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, charactersTable, usersTable } from "@workspace/db";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { requireAuth, hasRole } from "../middlewares/auth";
 import { getCharacterRetentionDeadline } from "../lib/character-retention";
 
@@ -18,6 +18,15 @@ function formatCharacter(c: typeof charactersTable.$inferSelect) {
     deletedAt: c.deletedAt,
     retainedUntil: c.retainedUntil,
     createdAt: c.createdAt,
+  };
+}
+
+function clearUserSsoIdentity() {
+  return {
+    corporationJoinedAt: null,
+    accessToken: null,
+    refreshToken: null,
+    tokenExpiry: null,
   };
 }
 
@@ -69,7 +78,7 @@ router.get("/admin/users/:id/characters", requireAuth, async (req: Request, res:
   res.json(chars.map(formatCharacter));
 });
 
-// DELETE /api/characters/:id - unlink an active non-main character while retaining site data for 3 months
+// DELETE /api/characters/:id - unlink an active character while retaining site data for 3 months
 router.delete("/characters/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
   if (!currentUser) {
@@ -100,26 +109,86 @@ router.delete("/characters/:id", requireAuth, async (req: Request, res: Response
     return;
   }
 
-  if (char.isMain) {
-    res.status(400).json({ error: "Main character cannot be unlinked. Delete the user account instead." });
-    return;
-  }
-
   const deletedAt = new Date();
   const retainedUntil = getCharacterRetentionDeadline(deletedAt);
-  await db.update(charactersTable).set({
-    userId: null,
-    isMain: false,
-    deletedAt,
-    retainedUntil,
-  }).where(eq(charactersTable.id, charId));
+  const previousUserId = char.userId;
+  let newMainCharacterId: number | null = null;
+  let newMainCharacterName: string | null = null;
+  let requiresReauthentication = false;
+
+  await db.transaction(async (tx) => {
+    await tx.update(charactersTable).set({
+      userId: null,
+      isMain: false,
+      deletedAt,
+      retainedUntil,
+    }).where(eq(charactersTable.id, charId));
+
+    if (!char.isMain || !previousUserId) {
+      return;
+    }
+
+    requiresReauthentication = true;
+    const remainingCharacters = await tx
+      .select()
+      .from(charactersTable)
+      .where(and(eq(charactersTable.userId, previousUserId), isNull(charactersTable.deletedAt)))
+      .orderBy(asc(charactersTable.createdAt), asc(charactersTable.id));
+
+    await tx
+      .update(charactersTable)
+      .set({ isMain: false })
+      .where(and(eq(charactersTable.userId, previousUserId), isNull(charactersTable.deletedAt)));
+
+    const replacement = remainingCharacters[0];
+    if (!replacement) {
+      await tx.update(usersTable).set({
+        eveCharacterId: null,
+        eveCharacterName: null,
+        corporationId: null,
+        corporationName: null,
+        ...clearUserSsoIdentity(),
+      }).where(eq(usersTable.id, previousUserId));
+      return;
+    }
+
+    const [promoted] = await tx
+      .update(charactersTable)
+      .set({ isMain: true })
+      .where(eq(charactersTable.id, replacement.id))
+      .returning();
+
+    await tx.update(usersTable).set({
+      eveCharacterId: replacement.eveCharacterId,
+      eveCharacterName: replacement.eveCharacterName,
+      corporationId: replacement.corporationId,
+      corporationName: replacement.corporationName,
+      ...clearUserSsoIdentity(),
+    }).where(eq(usersTable.id, previousUserId));
+
+    newMainCharacterId = promoted?.id ?? replacement.id;
+    newMainCharacterName = promoted?.eveCharacterName ?? replacement.eveCharacterName;
+  });
 
   req.log.info(
-    { charId, eveCharacterId: char.eveCharacterId, previousUserId: char.userId, retainedUntil },
+    {
+      charId,
+      eveCharacterId: char.eveCharacterId,
+      previousUserId,
+      removedMain: char.isMain,
+      newMainCharacterId,
+      retainedUntil,
+    },
     "Character unlinked and retained for deletion window",
   );
 
-  res.json({ success: true });
+  res.json({
+    success: true,
+    removedMain: char.isMain,
+    newMainCharacterId,
+    newMainCharacterName,
+    requiresReauthentication,
+  });
 });
 
 export default router;

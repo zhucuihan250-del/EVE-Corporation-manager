@@ -1,6 +1,6 @@
 import {
   useListUsers, useUpdateUserRole, useAdjustUserPap, getListUsersQueryKey,
-  useGetUserCharacters, useDeleteCharacter, useDeleteUser, useGetMe,
+  useGetUserCharacters, useDeleteCharacter, useDeleteUser, useGetMe, getGetMeQueryKey,
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -131,10 +131,18 @@ export function AdminUsers() {
     deleteCharacter.mutate(
       { id: charId },
       {
-        onSuccess: () => {
-          toast({ title: t("personnel.charRemoved"), description: t("personnel.charRemovedDesc") });
+        onSuccess: (result) => {
+          const description = result.removedMain
+            ? result.newMainCharacterName
+              ? t("personnel.mainCharPromotedDesc", { name: result.newMainCharacterName })
+              : t("personnel.mainCharNeedsLinkDesc")
+            : t("personnel.charRemovedDesc");
+          toast({ title: t("personnel.charRemoved"), description });
           queryClient.invalidateQueries({ queryKey: ["userCharacters", charsUserId] });
           queryClient.invalidateQueries({ queryKey: getListUsersQueryKey() });
+          if (charsUserId === me?.id) {
+            queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
+          }
         },
         onError: () => {
           toast({ title: t("personnel.charRemoveFailed"), variant: "destructive" });
@@ -385,8 +393,8 @@ export function AdminUsers() {
                           size="sm"
                           className="h-7 px-2 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-sm"
                           onClick={() => handleDeleteChar(char.id)}
-                          disabled={char.isMain || deleteCharacter.isPending}
-                          title={char.isMain ? t("personnel.mainCharLocked") : t("personnel.removeChar")}
+                          disabled={deleteCharacter.isPending}
+                          title={char.isMain ? t("personnel.removeMainChar") : t("personnel.removeChar")}
                         >
                           <Trash2 className="w-3.5 h-3.5 mr-1" />
                           {t("personnel.removeChar")}

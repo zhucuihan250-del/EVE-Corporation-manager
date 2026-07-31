@@ -107,6 +107,16 @@ export interface Character {
   createdAt: string;
 }
 
+export interface DeleteCharacterResponse {
+  success: boolean;
+  removedMain: boolean;
+  /** @nullable */
+  newMainCharacterId: number | null;
+  /** @nullable */
+  newMainCharacterName: string | null;
+  requiresReauthentication: boolean;
+}
+
 export type FittingCategory =
   (typeof FittingCategory)[keyof typeof FittingCategory];
 

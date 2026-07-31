@@ -51,6 +51,7 @@ export * from "./createRewardBody";
 export * from "./currentUser";
 export * from "./currentUserRole";
 export * from "./dashboardSummary";
+export * from "./deleteCharacterResponse";
 export * from "./errorResponse";
 export * from "./fittingCatalogItem";
 export * from "./fittingCatalogItemHardpoint";

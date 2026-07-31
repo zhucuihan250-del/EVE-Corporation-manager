@@ -35,6 +35,7 @@ import type {
   CreateRewardBody,
   CurrentUser,
   DashboardSummary,
+  DeleteCharacterResponse,
   ErrorResponse,
   FittingCatalogResponse,
   FittingSimulationBody,
@@ -836,7 +837,7 @@ export function useListAllCharacters<
 }
 
 /**
- * @summary Unlink a non-main character and retain site data for up to 3 months
+ * @summary Unlink a character and retain site data for up to 3 months
  */
 export const getDeleteCharacterUrl = (id: number) => {
   return `/api/characters/${id}`;
@@ -845,8 +846,8 @@ export const getDeleteCharacterUrl = (id: number) => {
 export const deleteCharacter = async (
   id: number,
   options?: RequestInit,
-): Promise<SuccessResponse> => {
-  return customFetch<SuccessResponse>(getDeleteCharacterUrl(id), {
+): Promise<DeleteCharacterResponse> => {
+  return customFetch<DeleteCharacterResponse>(getDeleteCharacterUrl(id), {
     ...options,
     method: "DELETE",
   });
@@ -897,7 +898,7 @@ export type DeleteCharacterMutationResult = NonNullable<
 export type DeleteCharacterMutationError = ErrorType<void>;
 
 /**
- * @summary Unlink a non-main character and retain site data for up to 3 months
+ * @summary Unlink a character and retain site data for up to 3 months
  */
 export const useDeleteCharacter = <
   TError = ErrorType<void>,

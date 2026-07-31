@@ -86,6 +86,58 @@ async function restoreDeletedCharacter(
   return restored;
 }
 
+async function accountNeedsMainCharacter(userId: number, user?: typeof usersTable.$inferSelect | null): Promise<boolean> {
+  if (!user) {
+    [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+  }
+
+  if (!user?.eveCharacterId) return true;
+
+  const [activeMain] = await db
+    .select({ id: charactersTable.id })
+    .from(charactersTable)
+    .where(and(
+      eq(charactersTable.userId, userId),
+      eq(charactersTable.isMain, true),
+      isNull(charactersTable.deletedAt),
+    ))
+    .limit(1);
+
+  return !activeMain;
+}
+
+async function setCharacterAsAccountMain(
+  userId: number,
+  character: Pick<typeof charactersTable.$inferSelect, "id" | "eveCharacterId" | "eveCharacterName" | "corporationId" | "corporationName">,
+  tokens: {
+    accessToken: string;
+    refreshToken: string;
+    tokenExpiry: Date;
+    corporationJoinedAt: Date | null;
+  },
+): Promise<void> {
+  await db.update(charactersTable).set({ isMain: false }).where(and(
+    eq(charactersTable.userId, userId),
+    isNull(charactersTable.deletedAt),
+  ));
+  await db.update(charactersTable).set({
+    userId,
+    isMain: true,
+    deletedAt: null,
+    retainedUntil: null,
+  }).where(eq(charactersTable.id, character.id));
+  await db.update(usersTable).set({
+    eveCharacterId: character.eveCharacterId,
+    eveCharacterName: character.eveCharacterName,
+    corporationId: character.corporationId,
+    corporationName: character.corporationName,
+    corporationJoinedAt: tokens.corporationJoinedAt,
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
+    tokenExpiry: tokens.tokenExpiry,
+  }).where(eq(usersTable.id, userId));
+}
+
 function getCallbackUrl(req: Request): string {
   // Use the forwarded host so the callback URL always matches the domain
   // the user is actually visiting (dev preview or published app).
@@ -160,11 +212,17 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
     }
 
     const tokenExpiry = new Date(Date.now() + expiresIn * 1000);
+    const corporationJoinedAt = corporationId
+      ? await getCorporationJoinDate(characterId, corporationId)
+      : null;
+    const mainCharacterTokens = { accessToken, refreshToken, tokenExpiry, corporationJoinedAt };
 
     // Alt character linking flow
     if (req.session.linkingUserId) {
       const mainUserId = req.session.linkingUserId;
       req.session.linkingUserId = undefined;
+      const [mainUser] = await db.select().from(usersTable).where(eq(usersTable.id, mainUserId));
+      const shouldBecomeMain = await accountNeedsMainCharacter(mainUserId, mainUser ?? null);
 
       // Check if this character is already actively linked.
       const existingChar = await findActiveCharacterByEveId(characterId);
@@ -172,24 +230,30 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
       if (existingChar) {
         if (existingChar.userId === mainUserId) {
           // Already linked to this account — overwrite name/corp in case it changed
-          await db.update(charactersTable).set({
+          const [updatedChar] = await db.update(charactersTable).set({
             eveCharacterName: characterName,
             corporationId,
             corporationName,
-          }).where(eq(charactersTable.id, existingChar.id));
+          }).where(eq(charactersTable.id, existingChar.id)).returning();
+          if (shouldBecomeMain && updatedChar) {
+            await setCharacterAsAccountMain(mainUserId, updatedChar, mainCharacterTokens);
+          }
           req.log.info({ charId: characterId, mainUserId }, "Re-linked character updated");
           req.session.save(() => {});
           redirectToFrontend(res, "/characters?linked=true");
           return;
         }
         if (!existingChar.userId) {
-          await db.update(charactersTable).set({
+          const [reclaimedChar] = await db.update(charactersTable).set({
             userId: mainUserId,
             eveCharacterName: characterName,
             corporationId,
             corporationName,
-            isMain: false,
-          }).where(eq(charactersTable.id, existingChar.id));
+            isMain: shouldBecomeMain,
+          }).where(eq(charactersTable.id, existingChar.id)).returning();
+          if (shouldBecomeMain && reclaimedChar) {
+            await setCharacterAsAccountMain(mainUserId, reclaimedChar, mainCharacterTokens);
+          }
           req.log.info({ charId: characterId, mainUserId }, "Reclaimed unowned active character on alt link");
           req.session.save(() => {});
           redirectToFrontend(res, "/characters?linked=true");
@@ -205,6 +269,19 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
         }
         // Orphan account: merge its PAP into the main account then delete it
         await mergeOrphanUser(charOwner ?? null, mainUserId, req.log);
+        if (shouldBecomeMain) {
+          const [mergedChar] = await db
+            .select()
+            .from(charactersTable)
+            .where(and(
+              eq(charactersTable.id, existingChar.id),
+              eq(charactersTable.userId, mainUserId),
+              isNull(charactersTable.deletedAt),
+            ));
+          if (mergedChar) {
+            await setCharacterAsAccountMain(mainUserId, mergedChar, mainCharacterTokens);
+          }
+        }
         req.log.info({ orphanId: existingChar.userId, mainUserId, charId: characterId }, "Merged orphan (from chars table) into main account on alt link");
         req.session.save(() => {});
         redirectToFrontend(res, "/characters?linked=true");
@@ -213,14 +290,17 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
 
       const deletedChar = await findRetainedDeletedCharacterByEveId(characterId);
       if (deletedChar) {
-        await restoreDeletedCharacter(
+        const restoredChar = await restoreDeletedCharacter(
           deletedChar,
           mainUserId,
-          false,
+          shouldBecomeMain,
           characterName,
           corporationId,
           corporationName,
         );
+        if (shouldBecomeMain) {
+          await setCharacterAsAccountMain(mainUserId, restoredChar, mainCharacterTokens);
+        }
         req.log.info({ charId: characterId, mainUserId, previousCharId: deletedChar.id }, "Restored deleted character on alt link");
         req.session.save(() => {});
         redirectToFrontend(res, "/characters?linked=true");
@@ -250,6 +330,20 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
           isMain: true,
         });
         await mergeOrphanUser(orphanByMain, mainUserId, req.log);
+        if (shouldBecomeMain) {
+          const [mergedChar] = await db
+            .select()
+            .from(charactersTable)
+            .where(and(
+              eq(charactersTable.eveCharacterId, characterId),
+              eq(charactersTable.userId, mainUserId),
+              isNull(charactersTable.deletedAt),
+            ))
+            .limit(1);
+          if (mergedChar) {
+            await setCharacterAsAccountMain(mainUserId, mergedChar, mainCharacterTokens);
+          }
+        }
         req.log.info({ orphanId: orphanByMain.id, mainUserId, charId: characterId }, "Merged orphan (from users table) into main account on alt link");
         req.session.save(() => {});
         redirectToFrontend(res, "/characters?linked=true");
@@ -257,14 +351,17 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
       }
 
       // Clean case: no orphan, just insert the characters record
-      await db.insert(charactersTable).values({
+      const [newChar] = await db.insert(charactersTable).values({
         userId: mainUserId,
         eveCharacterId: characterId,
         eveCharacterName: characterName,
         corporationId,
         corporationName,
-        isMain: false,
-      });
+        isMain: shouldBecomeMain,
+      }).returning();
+      if (shouldBecomeMain && newChar) {
+        await setCharacterAsAccountMain(mainUserId, newChar, mainCharacterTokens);
+      }
 
       req.session.save((saveErr) => {
         if (saveErr) req.log.error({ err: saveErr }, "Session save error after alt link");
@@ -292,6 +389,9 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
           .from(usersTable)
           .where(eq(usersTable.id, linkedChar.userId));
         if (mainUser) {
+          if (linkedChar.isMain || !mainUser.eveCharacterId) {
+            await setCharacterAsAccountMain(mainUser.id, linkedChar, mainCharacterTokens);
+          }
           req.session.userId = mainUser.id;
           req.session.save((err) => {
             if (err) {
@@ -306,10 +406,6 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
         }
       }
     }
-
-    const corporationJoinedAt = corporationId
-      ? await getCorporationJoinDate(characterId, corporationId)
-      : null;
 
     if (!user) {
       // Check if there are any users (first user becomes admin)

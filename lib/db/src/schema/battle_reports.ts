@@ -13,9 +13,13 @@ import { sql } from "drizzle-orm";
 import { charactersTable } from "./characters";
 import { fleetsTable } from "./fleets";
 import { usersTable } from "./users";
+import { corporationsTable } from "./corporations";
 
 export const battleReportsTable = pgTable("battle_reports", {
   id: serial("id").primaryKey(),
+  corporationId: integer("corporation_id")
+    .notNull()
+    .references(() => corporationsTable.id, { onDelete: "cascade" }),
   fleetId: integer("fleet_id")
     .unique()
     .references(() => fleetsTable.id, { onDelete: "set null" }),

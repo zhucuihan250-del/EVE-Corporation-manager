@@ -10,8 +10,9 @@ import {
   UpdateBattleReplayBody,
   UpdateBattleReplayParams,
 } from "@workspace/api-zod";
-import { desc, eq, sql } from "drizzle-orm";
-import { requireRole } from "../middlewares/auth";
+import { and, desc, eq, sql } from "drizzle-orm";
+import { requireAuth, requireRoleOrPermission } from "../middlewares/auth";
+import { requireModule, requireTenant } from "../lib/tenant";
 import {
   loadBattleReportDetail,
   reportSummarySelection,
@@ -19,6 +20,7 @@ import {
 import { queueBattleReplayAnalysis } from "../lib/battle-replay-analysis";
 
 const router: IRouter = Router();
+router.use("/command/battle-replays", requireAuth, requireTenant, requireModule("fleet"));
 
 function serializeReview(review: typeof battleReportReviewsTable.$inferSelect) {
   return {
@@ -38,8 +40,8 @@ function serializeReview(review: typeof battleReportReviewsTable.$inferSelect) {
 
 router.get(
   "/command/battle-replays",
-  requireRole("fc"),
-  async (_req: Request, res: Response): Promise<void> => {
+  requireRoleOrPermission("fc", "fleet.manage"),
+  async (req: Request, res: Response): Promise<void> => {
     const reports = await db
       .select({
         ...reportSummarySelection(),
@@ -56,6 +58,7 @@ router.get(
         battleReportReviewsTable,
         eq(battleReportReviewsTable.battleReportId, battleReportsTable.id),
       )
+      .where(eq(battleReportsTable.corporationId, req.tenant!.corporation.id))
       .orderBy(desc(battleReportsTable.endedAt))
       .limit(100);
 
@@ -65,7 +68,7 @@ router.get(
 
 router.get(
   "/command/battle-replays/:id",
-  requireRole("fc"),
+  requireRoleOrPermission("fc", "fleet.manage"),
   async (req: Request, res: Response): Promise<void> => {
     const params = GetBattleReplayParams.safeParse(req.params);
     if (!params.success) {
@@ -73,7 +76,7 @@ router.get(
       return;
     }
 
-    const report = await loadBattleReportDetail(params.data.id);
+    const report = await loadBattleReportDetail(params.data.id, req.tenant!.corporation.id);
     if (!report) {
       res.status(404).json({ error: "Battle report not found" });
       return;
@@ -94,7 +97,7 @@ router.get(
 
 router.put(
   "/command/battle-replays/:id",
-  requireRole("fc"),
+  requireRoleOrPermission("fc", "fleet.manage"),
   async (req: Request, res: Response): Promise<void> => {
     const params = UpdateBattleReplayParams.safeParse(req.params);
     const body = UpdateBattleReplayBody.safeParse(req.body);
@@ -110,7 +113,10 @@ router.put(
     const [report] = await db
       .select({ id: battleReportsTable.id })
       .from(battleReportsTable)
-      .where(eq(battleReportsTable.id, params.data.id));
+      .where(and(
+        eq(battleReportsTable.id, params.data.id),
+        eq(battleReportsTable.corporationId, req.tenant!.corporation.id),
+      ));
     if (!report) {
       res.status(404).json({ error: "Battle report not found" });
       return;
@@ -150,7 +156,7 @@ router.put(
 
 router.post(
   "/command/battle-replays/:id/analyze",
-  requireRole("fc"),
+  requireRoleOrPermission("fc", "fleet.manage"),
   async (req: Request, res: Response): Promise<void> => {
     const params = AnalyzeBattleReplayParams.safeParse(req.params);
     if (!params.success) {
@@ -161,7 +167,10 @@ router.post(
     const [report] = await db
       .select({ id: battleReportsTable.id })
       .from(battleReportsTable)
-      .where(eq(battleReportsTable.id, params.data.id));
+      .where(and(
+        eq(battleReportsTable.id, params.data.id),
+        eq(battleReportsTable.corporationId, req.tenant!.corporation.id),
+      ));
     if (!report) {
       res.status(404).json({ error: "Battle report not found" });
       return;

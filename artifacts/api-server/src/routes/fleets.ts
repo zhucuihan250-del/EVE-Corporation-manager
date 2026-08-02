@@ -4,6 +4,7 @@ import { eq, desc, sql, inArray, and, isNull } from "drizzle-orm";
 import { refreshAccessToken } from "../lib/eve-sso";
 import { requireAuth, hasRole } from "../middlewares/auth";
 import { ensureBattleReportForFleet, queueBattleReportGeneration } from "../lib/battle-reports";
+import { ensureCorporationMembership, hasPermission, requireModule, requireTenant } from "../lib/tenant";
 import {
   CreateFleetBody,
   GetFleetParams,
@@ -15,17 +16,43 @@ import {
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
+router.use("/fleets", requireAuth, requireTenant, requireModule("fleet"));
+
+function canManageFleet(req: Request): boolean {
+  return hasRole(req.tenant!.membership.role, "fc") || hasPermission(req.tenant!, "fleet.manage");
+}
+
+function normalizeReimbursementRule(value: unknown): (typeof fleetsTable.$inferInsert)["reimbursementRule"] {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "object") throw new Error("Invalid reimbursement rule");
+  const input = value as { description?: unknown; maximumAmount?: unknown; eligibleShips?: unknown };
+  const description = typeof input.description === "string" ? input.description.trim().slice(0, 2_000) : "";
+  const maximumAmount = input.maximumAmount === null || input.maximumAmount === undefined
+    ? null
+    : Number(input.maximumAmount);
+  if (maximumAmount !== null && (!Number.isFinite(maximumAmount) || maximumAmount < 0)) {
+    throw new Error("Invalid reimbursement maximum");
+  }
+  const eligibleShips = Array.isArray(input.eligibleShips)
+    ? input.eligibleShips.slice(0, 200).map((ship) => String(ship).trim().slice(0, 120)).filter(Boolean)
+    : [];
+  return { description, maximumAmount, eligibleShips };
+}
 
 // GET /api/fleets
 router.get("/fleets", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const fleets = await db
     .select({
       id: fleetsTable.id,
+      corporationId: fleetsTable.corporationId,
       eveFleetId: fleetsTable.eveFleetId,
       name: fleetsTable.name,
       fleetCommander: fleetsTable.fleetCommander,
       papValue: fleetsTable.papValue,
       isActive: fleetsTable.isActive,
+      fleetFunction: fleetsTable.fleetFunction,
+      reimbursementEnabled: fleetsTable.reimbursementEnabled,
+      reimbursementRule: fleetsTable.reimbursementRule,
       startedAt: fleetsTable.startedAt,
       endedAt: fleetsTable.endedAt,
       createdAt: fleetsTable.createdAt,
@@ -41,6 +68,7 @@ router.get("/fleets", requireAuth, async (req: Request, res: Response): Promise<
       )`,
     })
     .from(fleetsTable)
+    .where(eq(fleetsTable.corporationId, req.tenant!.corporation.id))
     .orderBy(desc(fleetsTable.createdAt));
 
   req.log.info({ fleetParticipantCounts: fleets.map(f => ({ id: f.id, name: f.name, participantCount: f.participantCount })) }, "Fleet list with participant counts");
@@ -50,7 +78,7 @@ router.get("/fleets", requireAuth, async (req: Request, res: Response): Promise<
 // POST /api/fleets - admin only
 router.post("/fleets", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || !hasRole(currentUser.role, "fc")) {
+  if (!currentUser || !canManageFleet(req)) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -61,13 +89,25 @@ router.post("/fleets", requireAuth, async (req: Request, res: Response): Promise
     return;
   }
 
+  let reimbursementRule: (typeof fleetsTable.$inferInsert)["reimbursementRule"];
+  try {
+    reimbursementRule = normalizeReimbursementRule(body.data.reimbursementRule);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Invalid reimbursement rule" });
+    return;
+  }
+
   const [fleet] = await db
     .insert(fleetsTable)
     .values({
+      corporationId: req.tenant!.corporation.id,
       eveFleetId: body.data.eveFleetId ?? null,
       name: body.data.name,
       fleetCommander: body.data.fleetCommander,
       papValue: body.data.papValue,
+      fleetFunction: body.data.fleetFunction?.trim().slice(0, 80) || "general",
+      reimbursementEnabled: body.data.reimbursementEnabled === true,
+      reimbursementRule,
       startedAt: body.data.startedAt ? new Date(body.data.startedAt) : new Date(),
     })
     .returning();
@@ -79,37 +119,37 @@ router.post("/fleets", requireAuth, async (req: Request, res: Response): Promise
 // IMPORTANT: must be declared before /fleets/:id so Express doesn't treat "esi-my-fleet" as an id
 router.get("/fleets/esi-my-fleet", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser) {
+  const currentCharacter = req.tenant!.actorCharacter;
+  if (!currentUser || !currentCharacter) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
 
-  if (!currentUser.eveCharacterId) {
-    res.status(400).json({ error: "No EVE character linked" });
-    return;
-  }
-
-  let accessToken = currentUser.accessToken;
+  let accessToken = currentCharacter.accessToken;
   if (!accessToken) {
     res.status(400).json({ error: "No ESI access token. Please log in again." });
     return;
   }
 
   // Refresh token if needed
-  const tokenExpiry = currentUser.tokenExpiry;
+  const tokenExpiry = currentCharacter.tokenExpiry;
   if (!tokenExpiry || new Date(tokenExpiry.getTime() - 60_000) <= new Date()) {
-    if (!currentUser.refreshToken) {
+    if (!currentCharacter.refreshToken) {
       res.status(400).json({ error: "ESI token expired. Please log in again." });
       return;
     }
     try {
-      const refreshed = await refreshAccessToken(currentUser.refreshToken);
+      const refreshed = await refreshAccessToken(currentCharacter.refreshToken);
       accessToken = refreshed.accessToken;
-      await db.update(usersTable).set({
+      const refreshedValues = {
         accessToken: refreshed.accessToken,
         refreshToken: refreshed.refreshToken,
         tokenExpiry: new Date(Date.now() + refreshed.expiresIn * 1000),
-      }).where(eq(usersTable.id, currentUser.id));
+      };
+      await db.update(charactersTable).set(refreshedValues).where(eq(charactersTable.id, currentCharacter.id));
+      if (currentCharacter.isMain) {
+        await db.update(usersTable).set(refreshedValues).where(eq(usersTable.id, currentUser.id));
+      }
     } catch (err) {
       req.log.error({ err }, "Failed to refresh token for esi-my-fleet");
       res.status(400).json({ error: "Token refresh failed. Please log in again." });
@@ -118,7 +158,7 @@ router.get("/fleets/esi-my-fleet", requireAuth, async (req: Request, res: Respon
   }
 
   const esiResp = await fetch(
-    `https://esi.evetech.net/latest/characters/${currentUser.eveCharacterId}/fleet/?datasource=tranquility`,
+    `https://esi.evetech.net/latest/characters/${currentCharacter.eveCharacterId}/fleet/?datasource=tranquility`,
     { headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" } },
   );
 
@@ -155,11 +195,15 @@ router.get("/fleets/:id", requireAuth, async (req: Request, res: Response): Prom
   const [fleet] = await db
     .select({
       id: fleetsTable.id,
+      corporationId: fleetsTable.corporationId,
       eveFleetId: fleetsTable.eveFleetId,
       name: fleetsTable.name,
       fleetCommander: fleetsTable.fleetCommander,
       papValue: fleetsTable.papValue,
       isActive: fleetsTable.isActive,
+      fleetFunction: fleetsTable.fleetFunction,
+      reimbursementEnabled: fleetsTable.reimbursementEnabled,
+      reimbursementRule: fleetsTable.reimbursementRule,
       startedAt: fleetsTable.startedAt,
       endedAt: fleetsTable.endedAt,
       createdAt: fleetsTable.createdAt,
@@ -175,7 +219,10 @@ router.get("/fleets/:id", requireAuth, async (req: Request, res: Response): Prom
       )`,
     })
     .from(fleetsTable)
-    .where(eq(fleetsTable.id, params.data.id));
+    .where(and(
+      eq(fleetsTable.id, params.data.id),
+      eq(fleetsTable.corporationId, req.tenant!.corporation.id),
+    ));
 
   if (!fleet) {
     res.status(404).json({ error: "Fleet not found" });
@@ -188,7 +235,7 @@ router.get("/fleets/:id", requireAuth, async (req: Request, res: Response): Prom
 // PATCH /api/fleets/:id - admin only
 router.patch("/fleets/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || !hasRole(currentUser.role, "fc")) {
+  if (!currentUser || !canManageFleet(req)) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -213,6 +260,16 @@ router.patch("/fleets/:id", requireAuth, async (req: Request, res: Response): Pr
   if (body.data.endedAt !== undefined) updates.endedAt = body.data.endedAt ? new Date(body.data.endedAt) : null;
   if (body.data.isActive === false && body.data.endedAt === undefined) updates.endedAt = new Date();
   if (body.data.eveFleetId !== undefined) updates.eveFleetId = body.data.eveFleetId ?? null;
+  if (body.data.fleetFunction !== undefined) updates.fleetFunction = body.data.fleetFunction.trim().slice(0, 80) || "general";
+  if (body.data.reimbursementEnabled !== undefined) updates.reimbursementEnabled = body.data.reimbursementEnabled;
+  if (body.data.reimbursementRule !== undefined) {
+    try {
+      updates.reimbursementRule = normalizeReimbursementRule(body.data.reimbursementRule);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : "Invalid reimbursement rule" });
+      return;
+    }
+  }
 
   if (Object.keys(updates).length === 0) {
     res.status(400).json({ error: "No fields to update" });
@@ -222,7 +279,10 @@ router.patch("/fleets/:id", requireAuth, async (req: Request, res: Response): Pr
   const [fleet] = await db
     .update(fleetsTable)
     .set(updates)
-    .where(eq(fleetsTable.id, params.data.id))
+    .where(and(
+      eq(fleetsTable.id, params.data.id),
+      eq(fleetsTable.corporationId, req.tenant!.corporation.id),
+    ))
     .returning();
 
   if (!fleet) {
@@ -246,11 +306,12 @@ router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response)
   const dryRun = req.query.dryRun === "true";
 
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
+  const currentCharacter = req.tenant!.actorCharacter;
   if (!currentUser) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
-  if (!dryRun && !hasRole(currentUser.role, "fc")) {
+  if (!dryRun && !canManageFleet(req)) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -261,7 +322,10 @@ router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response)
     return;
   }
 
-  const [fleet] = await db.select().from(fleetsTable).where(eq(fleetsTable.id, params.data.id));
+  const [fleet] = await db.select().from(fleetsTable).where(and(
+    eq(fleetsTable.id, params.data.id),
+    eq(fleetsTable.corporationId, req.tenant!.corporation.id),
+  ));
   if (!fleet) {
     res.status(404).json({ error: "Fleet not found" });
     return;
@@ -277,31 +341,32 @@ router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response)
     return;
   }
 
-  if (!currentUser.accessToken) {
+  if (!currentCharacter?.accessToken) {
     res.status(400).json({ error: "No ESI access token. Please log in again." });
     return;
   }
 
-  let accessToken = currentUser.accessToken;
+  let accessToken = currentCharacter.accessToken;
 
   // Refresh token if expired or expiring within 60 seconds
-  const tokenExpiry = currentUser.tokenExpiry;
+  const tokenExpiry = currentCharacter.tokenExpiry;
   if (!tokenExpiry || new Date(tokenExpiry.getTime() - 60_000) <= new Date()) {
-    if (!currentUser.refreshToken) {
+    if (!currentCharacter.refreshToken) {
       res.status(400).json({ error: "ESI token expired. Please log in again." });
       return;
     }
     try {
-      const refreshed = await refreshAccessToken(currentUser.refreshToken);
+      const refreshed = await refreshAccessToken(currentCharacter.refreshToken);
       accessToken = refreshed.accessToken;
-      await db
-        .update(usersTable)
-        .set({
-          accessToken: refreshed.accessToken,
-          refreshToken: refreshed.refreshToken,
-          tokenExpiry: new Date(Date.now() + refreshed.expiresIn * 1000),
-        })
-        .where(eq(usersTable.id, currentUser.id));
+      const refreshedValues = {
+        accessToken: refreshed.accessToken,
+        refreshToken: refreshed.refreshToken,
+        tokenExpiry: new Date(Date.now() + refreshed.expiresIn * 1000),
+      };
+      await db.update(charactersTable).set(refreshedValues).where(eq(charactersTable.id, currentCharacter.id));
+      if (currentCharacter.isMain) {
+        await db.update(usersTable).set(refreshedValues).where(eq(usersTable.id, currentUser.id));
+      }
       req.log.info("ESI access token refreshed for fleet scan");
     } catch (refreshErr) {
       req.log.error({ err: refreshErr }, "Failed to refresh ESI token");
@@ -355,7 +420,11 @@ router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response)
   const characters = await db
     .select()
     .from(charactersTable)
-    .where(and(inArray(charactersTable.eveCharacterId, memberCharIds), isNull(charactersTable.deletedAt)));
+    .where(and(
+      inArray(charactersTable.eveCharacterId, memberCharIds),
+      eq(charactersTable.corporationId, req.tenant!.corporation.id),
+      isNull(charactersTable.deletedAt),
+    ));
 
   req.log.info({ found: characters.length, total: memberCharIds.length }, "Characters found in DB");
 
@@ -372,6 +441,7 @@ router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response)
         .from(usersTable)
         .where(eq(usersTable.eveCharacterId, charId));
       if (existingUser) {
+        if (existingUser.corporationId !== req.tenant!.corporation.id) continue;
         const [existingChar] = await db
           .select()
           .from(charactersTable)
@@ -412,6 +482,7 @@ router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response)
         continue;
       }
       const charInfo = (await esiCharResp.json()) as { name: string; corporation_id?: number };
+      if (charInfo.corporation_id !== req.tenant!.corporation.id) continue;
 
       // Fetch corporation name
       let corpName: string | null = null;
@@ -439,6 +510,7 @@ router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response)
           redeemablePap: 0,
         })
         .returning();
+      await ensureCorporationMembership(newUser.id, req.tenant!.corporation.id, "member");
 
       // Create character record
       const [newChar] = await db
@@ -477,6 +549,7 @@ router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response)
       continue;
     }
     await db.insert(papRecordsTable).values({
+      corporationId: req.tenant!.corporation.id,
       userId: character.userId,
       characterId: character.id,
       fleetId: fleet.id,
@@ -500,7 +573,7 @@ router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response)
 // DELETE /api/fleets/:id - admin only
 router.delete("/fleets/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || !hasRole(currentUser.role, "fc")) {
+  if (!currentUser || !canManageFleet(req)) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -511,14 +584,17 @@ router.delete("/fleets/:id", requireAuth, async (req: Request, res: Response): P
     return;
   }
 
-  await db.delete(fleetsTable).where(eq(fleetsTable.id, params.data.id));
+  await db.delete(fleetsTable).where(and(
+    eq(fleetsTable.id, params.data.id),
+    eq(fleetsTable.corporationId, req.tenant!.corporation.id),
+  ));
   res.sendStatus(204);
 });
 
 // POST /api/fleets/:id/participants - add participant and award PAP
 router.post("/fleets/:id/participants", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || !hasRole(currentUser.role, "fc")) {
+  if (!currentUser || !canManageFleet(req)) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -535,7 +611,10 @@ router.post("/fleets/:id/participants", requireAuth, async (req: Request, res: R
     return;
   }
 
-  const [fleet] = await db.select().from(fleetsTable).where(eq(fleetsTable.id, params.data.id));
+  const [fleet] = await db.select().from(fleetsTable).where(and(
+    eq(fleetsTable.id, params.data.id),
+    eq(fleetsTable.corporationId, req.tenant!.corporation.id),
+  ));
   if (!fleet) {
     res.status(404).json({ error: "Fleet not found" });
     return;
@@ -549,7 +628,11 @@ router.post("/fleets/:id/participants", requireAuth, async (req: Request, res: R
   const [character] = await db
     .select()
     .from(charactersTable)
-    .where(and(eq(charactersTable.id, body.data.characterId), isNull(charactersTable.deletedAt)));
+    .where(and(
+      eq(charactersTable.id, body.data.characterId),
+      eq(charactersTable.corporationId, req.tenant!.corporation.id),
+      isNull(charactersTable.deletedAt),
+    ));
 
   if (!character?.userId) {
     res.status(404).json({ error: "Character not found" });
@@ -560,6 +643,7 @@ router.post("/fleets/:id/participants", requireAuth, async (req: Request, res: R
   const [papRecord] = await db
     .insert(papRecordsTable)
     .values({
+      corporationId: req.tenant!.corporation.id,
       userId: character.userId,
       characterId: character.id,
       fleetId: fleet.id,

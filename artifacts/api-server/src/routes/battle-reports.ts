@@ -11,6 +11,7 @@ import {
   RefreshBattleReportParams,
 } from "@workspace/api-zod";
 import { hasRole, requireAuth } from "../middlewares/auth";
+import { requireModule, requireTenant } from "../lib/tenant";
 import { queueBattleReportGeneration } from "../lib/battle-reports";
 import {
   loadBattleReportDetail,
@@ -18,6 +19,7 @@ import {
 } from "../lib/battle-report-data";
 
 const router: IRouter = Router();
+router.use("/battle-reports", requireAuth, requireTenant, requireModule("fleet"));
 
 function scheduleAutomaticRefresh(report: {
   id: number;
@@ -47,10 +49,11 @@ function scheduleAutomaticRefresh(report: {
 router.get(
   "/battle-reports",
   requireAuth,
-  async (_req: Request, res: Response): Promise<void> => {
+  async (req: Request, res: Response): Promise<void> => {
     const reports = await db
       .select(reportSummarySelection())
       .from(battleReportsTable)
+      .where(eq(battleReportsTable.corporationId, req.tenant!.corporation.id))
       .orderBy(desc(battleReportsTable.endedAt))
       .limit(100);
 
@@ -69,7 +72,7 @@ router.get(
       return;
     }
 
-    const report = await loadBattleReportDetail(params.data.id);
+    const report = await loadBattleReportDetail(params.data.id, req.tenant!.corporation.id);
     if (!report) {
       res.status(404).json({ error: "Battle report not found" });
       return;
@@ -110,7 +113,7 @@ router.post(
       .select()
       .from(usersTable)
       .where(eq(usersTable.id, req.session.userId!));
-    if (!currentUser || !hasRole(currentUser.role, "fc")) {
+    if (!currentUser || !hasRole(req.tenant!.membership.role, "fc")) {
       res.status(403).json({ error: "Forbidden" });
       return;
     }
@@ -124,7 +127,10 @@ router.post(
     const [report] = await db
       .select({ id: battleReportsTable.id })
       .from(battleReportsTable)
-      .where(eq(battleReportsTable.id, params.data.id));
+      .where(and(
+        eq(battleReportsTable.id, params.data.id),
+        eq(battleReportsTable.corporationId, req.tenant!.corporation.id),
+      ));
     if (!report) {
       res.status(404).json({ error: "Battle report not found" });
       return;

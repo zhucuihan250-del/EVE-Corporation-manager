@@ -2,11 +2,13 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { db, redemptionsTable, rewardsTable, usersTable } from "@workspace/db";
 import { and, count, desc, eq, ne, sql } from "drizzle-orm";
 import { requireAuth, hasRole } from "../middlewares/auth";
+import { requireModule, requireTenant } from "../lib/tenant";
 import { CreateRedemptionBody } from "@workspace/api-zod";
 import { papRecordsTable } from "@workspace/db";
 import { addCalendarMonths, ensureCorporationJoinedAt } from "../lib/corporation-membership";
 
 const router: IRouter = Router();
+router.use("/redemptions", requireAuth, requireTenant, requireModule("pap"));
 
 class RedemptionRequestError extends Error {
   constructor(
@@ -52,11 +54,19 @@ router.get("/redemptions", requireAuth, async (req: Request, res: Response): Pro
       status: redemptionsTable.status,
       createdAt: redemptionsTable.createdAt,
       rewardName: redemptionsTable.rewardName,
-      userName: usersTable.eveCharacterName,
+      userName: sql<string | null>`(
+        SELECT c."eve_character_name" FROM "characters" c
+        WHERE c."user_id" = ${redemptionsTable.userId}
+          AND c."corporation_id" = ${req.tenant!.corporation.id}
+          AND c."deleted_at" IS NULL
+        ORDER BY c."is_main" DESC, c."created_at" ASC LIMIT 1
+      )`,
     })
     .from(redemptionsTable)
-    .leftJoin(usersTable, eq(redemptionsTable.userId, usersTable.id))
-    .where(eq(redemptionsTable.userId, req.session.userId!))
+    .where(and(
+      eq(redemptionsTable.userId, req.session.userId!),
+      eq(redemptionsTable.corporationId, req.tenant!.corporation.id),
+    ))
     .orderBy(desc(redemptionsTable.createdAt));
 
   res.json(records.map(formatRedemption));
@@ -70,7 +80,10 @@ router.post("/redemptions", requireAuth, async (req: Request, res: Response): Pr
     return;
   }
 
-  const [reward] = await db.select().from(rewardsTable).where(eq(rewardsTable.id, body.data.rewardId));
+  const [reward] = await db.select().from(rewardsTable).where(and(
+    eq(rewardsTable.id, body.data.rewardId),
+    eq(rewardsTable.corporationId, req.tenant!.corporation.id),
+  ));
   if (!reward) {
     res.status(404).json({ error: "Reward not found" });
     return;
@@ -100,7 +113,10 @@ router.post("/redemptions", requireAuth, async (req: Request, res: Response): Pr
       const [currentReward] = await tx
         .select()
         .from(rewardsTable)
-        .where(eq(rewardsTable.id, reward.id))
+        .where(and(
+          eq(rewardsTable.id, reward.id),
+          eq(rewardsTable.corporationId, req.tenant!.corporation.id),
+        ))
         .for("update");
       if (!currentReward) {
         throw new RedemptionRequestError(404, "Reward not found");
@@ -150,6 +166,7 @@ router.post("/redemptions", requireAuth, async (req: Request, res: Response): Pr
           .where(and(
             eq(redemptionsTable.userId, currentUser.id),
             eq(redemptionsTable.rewardId, currentReward.id),
+            eq(redemptionsTable.corporationId, req.tenant!.corporation.id),
             ne(redemptionsTable.status, "cancelled"),
           ));
 
@@ -174,6 +191,7 @@ router.post("/redemptions", requireAuth, async (req: Request, res: Response): Pr
       }).where(eq(usersTable.id, currentUser.id));
 
       await tx.insert(papRecordsTable).values({
+        corporationId: req.tenant!.corporation.id,
         userId: currentUser.id,
         amount: -currentReward.papCost,
         type: "adjustment",
@@ -189,6 +207,7 @@ router.post("/redemptions", requireAuth, async (req: Request, res: Response): Pr
       const [redemption] = await tx
         .insert(redemptionsTable)
         .values({
+          corporationId: req.tenant!.corporation.id,
           userId: currentUser.id,
           rewardId: currentReward.id,
           rewardName: currentReward.name,
@@ -199,7 +218,7 @@ router.post("/redemptions", requireAuth, async (req: Request, res: Response): Pr
 
       return {
         ...redemption,
-        userName: currentUser.eveCharacterName,
+        userName: req.tenant!.actorCharacter?.eveCharacterName ?? null,
       };
     });
 
@@ -220,7 +239,7 @@ router.post("/redemptions", requireAuth, async (req: Request, res: Response): Pr
 // PATCH /api/redemptions/:id - admin only (fulfill/cancel)
 router.patch("/redemptions/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || !hasRole(currentUser.role, "admin")) {
+  if (!currentUser || !hasRole(req.tenant!.membership.role, "admin")) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -237,7 +256,10 @@ router.patch("/redemptions/:id", requireAuth, async (req: Request, res: Response
     return;
   }
 
-  const [existing] = await db.select().from(redemptionsTable).where(eq(redemptionsTable.id, id));
+  const [existing] = await db.select().from(redemptionsTable).where(and(
+    eq(redemptionsTable.id, id),
+    eq(redemptionsTable.corporationId, req.tenant!.corporation.id),
+  ));
   if (!existing) {
     res.status(404).json({ error: "Redemption not found" });
     return;
@@ -246,10 +268,21 @@ router.patch("/redemptions/:id", requireAuth, async (req: Request, res: Response
   const [updated] = await db
     .update(redemptionsTable)
     .set({ status })
-    .where(eq(redemptionsTable.id, id))
+    .where(and(
+      eq(redemptionsTable.id, id),
+      eq(redemptionsTable.corporationId, req.tenant!.corporation.id),
+    ))
     .returning();
 
-  const [member] = await db.select().from(usersTable).where(eq(usersTable.id, updated.userId));
+  const [member] = await db.select({
+    eveCharacterName: sql<string | null>`(
+      SELECT c."eve_character_name" FROM "characters" c
+      WHERE c."user_id" = ${updated.userId}
+        AND c."corporation_id" = ${req.tenant!.corporation.id}
+        AND c."deleted_at" IS NULL
+      ORDER BY c."is_main" DESC, c."created_at" ASC LIMIT 1
+    )`,
+  }).from(usersTable).where(eq(usersTable.id, updated.userId));
 
   res.json(formatRedemption({
     ...updated,
@@ -260,7 +293,7 @@ router.patch("/redemptions/:id", requireAuth, async (req: Request, res: Response
 // GET /api/redemptions/all - admin only
 router.get("/redemptions/all", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || !hasRole(currentUser.role, "admin")) {
+  if (!currentUser || !hasRole(req.tenant!.membership.role, "admin")) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -274,10 +307,16 @@ router.get("/redemptions/all", requireAuth, async (req: Request, res: Response):
       status: redemptionsTable.status,
       createdAt: redemptionsTable.createdAt,
       rewardName: redemptionsTable.rewardName,
-      userName: usersTable.eveCharacterName,
+      userName: sql<string | null>`(
+        SELECT c."eve_character_name" FROM "characters" c
+        WHERE c."user_id" = ${redemptionsTable.userId}
+          AND c."corporation_id" = ${req.tenant!.corporation.id}
+          AND c."deleted_at" IS NULL
+        ORDER BY c."is_main" DESC, c."created_at" ASC LIMIT 1
+      )`,
     })
     .from(redemptionsTable)
-    .leftJoin(usersTable, eq(redemptionsTable.userId, usersTable.id))
+    .where(eq(redemptionsTable.corporationId, req.tenant!.corporation.id))
     .orderBy(desc(redemptionsTable.createdAt));
 
   res.json(records.map(formatRedemption));

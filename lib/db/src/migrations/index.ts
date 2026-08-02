@@ -7,6 +7,7 @@ import { battleReportReviewsMigration } from "./0005-battle-report-reviews";
 import { battleReportAttackersMigration } from "./0006-battle-report-attackers";
 import { characterSoftDeleteRetentionMigration } from "./0007-character-soft-delete-retention";
 import { userMainCharacterNullableMigration } from "./0008-user-main-character-nullable";
+import { corporationPlatformModulesMigration } from "./0009-corporation-platform-modules";
 
 type Migration = {
   id: string;
@@ -22,6 +23,7 @@ const migrations: Migration[] = [
   battleReportAttackersMigration,
   characterSoftDeleteRetentionMigration,
   userMainCharacterNullableMigration,
+  corporationPlatformModulesMigration,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {

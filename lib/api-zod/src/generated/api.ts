@@ -23,7 +23,17 @@ export const GetMeResponse = zod.object({
   eveCharacterName: zod.string().nullish(),
   corporationId: zod.number().nullish(),
   corporationName: zod.string().nullish(),
+  isPrimaryCorporation: zod.boolean(),
   role: zod.enum(["member", "fc", "admin", "controller"]),
+  permissions: zod.array(zod.string()),
+  modules: zod.object({
+    pap: zod.boolean(),
+    identity: zod.boolean(),
+    economy: zod.boolean(),
+    fleet: zod.boolean(),
+    reimbursement: zod.boolean(),
+    diplomacy: zod.boolean(),
+  }),
   totalPap: zod.number(),
   redeemablePap: zod.number(),
   createdAt: zod.coerce.date(),
@@ -426,11 +436,24 @@ export const SimulateFittingResponse = zod.object({
  */
 export const ListFleetsResponseItem = zod.object({
   id: zod.number(),
+  corporationId: zod.number(),
   eveFleetId: zod.string().nullish(),
   name: zod.string(),
   fleetCommander: zod.string(),
   papValue: zod.number(),
   isActive: zod.boolean(),
+  fleetFunction: zod.string(),
+  reimbursementEnabled: zod.boolean(),
+  reimbursementRule: zod
+    .union([
+      zod.object({
+        description: zod.string().optional(),
+        maximumAmount: zod.number().nullish(),
+        eligibleShips: zod.array(zod.string()).optional(),
+      }),
+      zod.null(),
+    ])
+    .optional(),
   startedAt: zod.coerce.date().nullish(),
   endedAt: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
@@ -448,6 +471,18 @@ export const CreateFleetBody = zod.object({
   fleetCommander: zod.string(),
   papValue: zod.number(),
   startedAt: zod.string().nullish(),
+  fleetFunction: zod.string().optional(),
+  reimbursementEnabled: zod.boolean().optional(),
+  reimbursementRule: zod
+    .union([
+      zod.object({
+        description: zod.string().optional(),
+        maximumAmount: zod.number().nullish(),
+        eligibleShips: zod.array(zod.string()).optional(),
+      }),
+      zod.null(),
+    ])
+    .optional(),
 });
 
 /**
@@ -459,11 +494,24 @@ export const GetFleetParams = zod.object({
 
 export const GetFleetResponse = zod.object({
   id: zod.number(),
+  corporationId: zod.number(),
   eveFleetId: zod.string().nullish(),
   name: zod.string(),
   fleetCommander: zod.string(),
   papValue: zod.number(),
   isActive: zod.boolean(),
+  fleetFunction: zod.string(),
+  reimbursementEnabled: zod.boolean(),
+  reimbursementRule: zod
+    .union([
+      zod.object({
+        description: zod.string().optional(),
+        maximumAmount: zod.number().nullish(),
+        eligibleShips: zod.array(zod.string()).optional(),
+      }),
+      zod.null(),
+    ])
+    .optional(),
   startedAt: zod.coerce.date().nullish(),
   endedAt: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
@@ -485,15 +533,40 @@ export const UpdateFleetBody = zod.object({
   isActive: zod.boolean().optional(),
   endedAt: zod.string().nullish(),
   eveFleetId: zod.string().nullish(),
+  fleetFunction: zod.string().optional(),
+  reimbursementEnabled: zod.boolean().optional(),
+  reimbursementRule: zod
+    .union([
+      zod.object({
+        description: zod.string().optional(),
+        maximumAmount: zod.number().nullish(),
+        eligibleShips: zod.array(zod.string()).optional(),
+      }),
+      zod.null(),
+    ])
+    .optional(),
 });
 
 export const UpdateFleetResponse = zod.object({
   id: zod.number(),
+  corporationId: zod.number(),
   eveFleetId: zod.string().nullish(),
   name: zod.string(),
   fleetCommander: zod.string(),
   papValue: zod.number(),
   isActive: zod.boolean(),
+  fleetFunction: zod.string(),
+  reimbursementEnabled: zod.boolean(),
+  reimbursementRule: zod
+    .union([
+      zod.object({
+        description: zod.string().optional(),
+        maximumAmount: zod.number().nullish(),
+        eligibleShips: zod.array(zod.string()).optional(),
+      }),
+      zod.null(),
+    ])
+    .optional(),
   startedAt: zod.coerce.date().nullish(),
   endedAt: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
@@ -1767,11 +1840,24 @@ export const GetTopContributors30DaysResponse = zod.array(
  */
 export const GetRecentFleetsResponseItem = zod.object({
   id: zod.number(),
+  corporationId: zod.number(),
   eveFleetId: zod.string().nullish(),
   name: zod.string(),
   fleetCommander: zod.string(),
   papValue: zod.number(),
   isActive: zod.boolean(),
+  fleetFunction: zod.string(),
+  reimbursementEnabled: zod.boolean(),
+  reimbursementRule: zod
+    .union([
+      zod.object({
+        description: zod.string().optional(),
+        maximumAmount: zod.number().nullish(),
+        eligibleShips: zod.array(zod.string()).optional(),
+      }),
+      zod.null(),
+    ])
+    .optional(),
   startedAt: zod.coerce.date().nullish(),
   endedAt: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
@@ -1812,4 +1898,660 @@ export const CreateAnnouncementBody = zod.object({
  */
 export const DeleteAnnouncementParams = zod.object({
   id: zod.coerce.number(),
+});
+
+export const listIdentityGroupsResponseRequiredSkillsItemLevelMax = 5;
+
+export const listIdentityGroupsResponseLatestApplicationOneSkillAuditOneSkillsItemOneLevelMax = 5;
+
+export const ListIdentityGroupsResponseItem = zod.object({
+  id: zod.number(),
+  corporationId: zod.number(),
+  name: zod.string(),
+  category: zod.enum(["combat", "management"]),
+  description: zod.string(),
+  requiredSkills: zod.array(
+    zod.object({
+      skillId: zod.number(),
+      name: zod.string(),
+      level: zod
+        .number()
+        .min(1)
+        .max(listIdentityGroupsResponseRequiredSkillsItemLevelMax),
+    }),
+  ),
+  permissions: zod.array(zod.string()),
+  isActive: zod.boolean(),
+  isMember: zod.boolean(),
+  latestApplication: zod
+    .union([
+      zod.object({
+        id: zod.number(),
+        corporationId: zod.number(),
+        groupId: zod.number(),
+        groupName: zod.string().optional(),
+        groupCategory: zod.enum(["combat", "management"]).optional(),
+        userId: zod.number(),
+        applicantName: zod.string().nullish(),
+        characterId: zod.number(),
+        characterName: zod.string().optional(),
+        statement: zod.string(),
+        status: zod.enum([
+          "pending_skill_audit",
+          "pending_review",
+          "needs_information",
+          "approved",
+          "rejected",
+          "withdrawn",
+        ]),
+        skillAudit: zod
+          .union([
+            zod.object({
+              checkedAt: zod.coerce.date(),
+              passed: zod.boolean(),
+              skills: zod.array(
+                zod
+                  .object({
+                    skillId: zod.number(),
+                    name: zod.string(),
+                    level: zod
+                      .number()
+                      .min(1)
+                      .max(
+                        listIdentityGroupsResponseLatestApplicationOneSkillAuditOneSkillsItemOneLevelMax,
+                      ),
+                  })
+                  .and(
+                    zod.object({
+                      trainedLevel: zod.number(),
+                      passed: zod.boolean(),
+                    }),
+                  ),
+              ),
+            }),
+            zod.null(),
+          ])
+          .optional(),
+        rejectionReason: zod.string().nullish(),
+        reviewerNotes: zod.string().nullish(),
+        createdAt: zod.coerce.date(),
+        updatedAt: zod.coerce.date(),
+      }),
+      zod.null(),
+    ])
+    .optional(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListIdentityGroupsResponse = zod.array(
+  ListIdentityGroupsResponseItem,
+);
+
+export const createIdentityGroupBodyRequiredSkillsItemLevelMax = 5;
+
+export const CreateIdentityGroupBody = zod.object({
+  name: zod.string(),
+  category: zod.enum(["combat", "management"]),
+  description: zod.string(),
+  requiredSkills: zod.array(
+    zod.object({
+      skillId: zod.number(),
+      name: zod.string(),
+      level: zod
+        .number()
+        .min(1)
+        .max(createIdentityGroupBodyRequiredSkillsItemLevelMax),
+    }),
+  ),
+  isActive: zod.boolean().optional(),
+});
+
+export const UpdateIdentityGroupParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const updateIdentityGroupBodyRequiredSkillsItemLevelMax = 5;
+
+export const UpdateIdentityGroupBody = zod.object({
+  name: zod.string(),
+  category: zod.enum(["combat", "management"]),
+  description: zod.string(),
+  requiredSkills: zod.array(
+    zod.object({
+      skillId: zod.number(),
+      name: zod.string(),
+      level: zod
+        .number()
+        .min(1)
+        .max(updateIdentityGroupBodyRequiredSkillsItemLevelMax),
+    }),
+  ),
+  isActive: zod.boolean().optional(),
+});
+
+export const updateIdentityGroupResponseRequiredSkillsItemLevelMax = 5;
+
+export const updateIdentityGroupResponseLatestApplicationOneSkillAuditOneSkillsItemOneLevelMax = 5;
+
+export const UpdateIdentityGroupResponse = zod.object({
+  id: zod.number(),
+  corporationId: zod.number(),
+  name: zod.string(),
+  category: zod.enum(["combat", "management"]),
+  description: zod.string(),
+  requiredSkills: zod.array(
+    zod.object({
+      skillId: zod.number(),
+      name: zod.string(),
+      level: zod
+        .number()
+        .min(1)
+        .max(updateIdentityGroupResponseRequiredSkillsItemLevelMax),
+    }),
+  ),
+  permissions: zod.array(zod.string()),
+  isActive: zod.boolean(),
+  isMember: zod.boolean(),
+  latestApplication: zod
+    .union([
+      zod.object({
+        id: zod.number(),
+        corporationId: zod.number(),
+        groupId: zod.number(),
+        groupName: zod.string().optional(),
+        groupCategory: zod.enum(["combat", "management"]).optional(),
+        userId: zod.number(),
+        applicantName: zod.string().nullish(),
+        characterId: zod.number(),
+        characterName: zod.string().optional(),
+        statement: zod.string(),
+        status: zod.enum([
+          "pending_skill_audit",
+          "pending_review",
+          "needs_information",
+          "approved",
+          "rejected",
+          "withdrawn",
+        ]),
+        skillAudit: zod
+          .union([
+            zod.object({
+              checkedAt: zod.coerce.date(),
+              passed: zod.boolean(),
+              skills: zod.array(
+                zod
+                  .object({
+                    skillId: zod.number(),
+                    name: zod.string(),
+                    level: zod
+                      .number()
+                      .min(1)
+                      .max(
+                        updateIdentityGroupResponseLatestApplicationOneSkillAuditOneSkillsItemOneLevelMax,
+                      ),
+                  })
+                  .and(
+                    zod.object({
+                      trainedLevel: zod.number(),
+                      passed: zod.boolean(),
+                    }),
+                  ),
+              ),
+            }),
+            zod.null(),
+          ])
+          .optional(),
+        rejectionReason: zod.string().nullish(),
+        reviewerNotes: zod.string().nullish(),
+        createdAt: zod.coerce.date(),
+        updatedAt: zod.coerce.date(),
+      }),
+      zod.null(),
+    ])
+    .optional(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+export const ApplyIdentityGroupParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ApplyIdentityGroupBody = zod.object({
+  characterId: zod.number(),
+  statement: zod.string(),
+});
+
+export const listIdentityApplicationsResponseSkillAuditOneSkillsItemOneLevelMax = 5;
+
+export const ListIdentityApplicationsResponseItem = zod.object({
+  id: zod.number(),
+  corporationId: zod.number(),
+  groupId: zod.number(),
+  groupName: zod.string().optional(),
+  groupCategory: zod.enum(["combat", "management"]).optional(),
+  userId: zod.number(),
+  applicantName: zod.string().nullish(),
+  characterId: zod.number(),
+  characterName: zod.string().optional(),
+  statement: zod.string(),
+  status: zod.enum([
+    "pending_skill_audit",
+    "pending_review",
+    "needs_information",
+    "approved",
+    "rejected",
+    "withdrawn",
+  ]),
+  skillAudit: zod
+    .union([
+      zod.object({
+        checkedAt: zod.coerce.date(),
+        passed: zod.boolean(),
+        skills: zod.array(
+          zod
+            .object({
+              skillId: zod.number(),
+              name: zod.string(),
+              level: zod
+                .number()
+                .min(1)
+                .max(
+                  listIdentityApplicationsResponseSkillAuditOneSkillsItemOneLevelMax,
+                ),
+            })
+            .and(
+              zod.object({
+                trainedLevel: zod.number(),
+                passed: zod.boolean(),
+              }),
+            ),
+        ),
+      }),
+      zod.null(),
+    ])
+    .optional(),
+  rejectionReason: zod.string().nullish(),
+  reviewerNotes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListIdentityApplicationsResponse = zod.array(
+  ListIdentityApplicationsResponseItem,
+);
+
+export const ReviewIdentityApplicationParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ReviewIdentityApplicationBody = zod.object({
+  status: zod.enum([
+    "pending_review",
+    "needs_information",
+    "approved",
+    "rejected",
+  ]),
+  reviewerNotes: zod.string().optional(),
+});
+
+export const reviewIdentityApplicationResponseSkillAuditOneSkillsItemOneLevelMax = 5;
+
+export const ReviewIdentityApplicationResponse = zod.object({
+  id: zod.number(),
+  corporationId: zod.number(),
+  groupId: zod.number(),
+  groupName: zod.string().optional(),
+  groupCategory: zod.enum(["combat", "management"]).optional(),
+  userId: zod.number(),
+  applicantName: zod.string().nullish(),
+  characterId: zod.number(),
+  characterName: zod.string().optional(),
+  statement: zod.string(),
+  status: zod.enum([
+    "pending_skill_audit",
+    "pending_review",
+    "needs_information",
+    "approved",
+    "rejected",
+    "withdrawn",
+  ]),
+  skillAudit: zod
+    .union([
+      zod.object({
+        checkedAt: zod.coerce.date(),
+        passed: zod.boolean(),
+        skills: zod.array(
+          zod
+            .object({
+              skillId: zod.number(),
+              name: zod.string(),
+              level: zod
+                .number()
+                .min(1)
+                .max(
+                  reviewIdentityApplicationResponseSkillAuditOneSkillsItemOneLevelMax,
+                ),
+            })
+            .and(
+              zod.object({
+                trainedLevel: zod.number(),
+                passed: zod.boolean(),
+              }),
+            ),
+        ),
+      }),
+      zod.null(),
+    ])
+    .optional(),
+  rejectionReason: zod.string().nullish(),
+  reviewerNotes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+export const ListDiplomacyCasesResponseItem = zod.object({
+  id: zod.number(),
+  corporationId: zod.number(),
+  submittedBy: zod.number(),
+  submitterCharacterId: zod.number(),
+  submitterName: zod.string(),
+  category: zod.enum([
+    "standings",
+    "conflict",
+    "cooperation",
+    "compensation",
+    "complaint",
+    "other",
+  ]),
+  counterparty: zod.string(),
+  subject: zod.string(),
+  description: zod.string(),
+  evidenceUrl: zod.string().nullish(),
+  urgency: zod.enum(["normal", "high", "urgent"]),
+  status: zod.enum([
+    "submitted",
+    "accepted",
+    "investigating",
+    "waiting",
+    "resolved",
+    "rejected",
+    "closed",
+  ]),
+  internalNotes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListDiplomacyCasesResponse = zod.array(
+  ListDiplomacyCasesResponseItem,
+);
+
+export const CreateDiplomacyCaseBody = zod.object({
+  category: zod.enum([
+    "standings",
+    "conflict",
+    "cooperation",
+    "compensation",
+    "complaint",
+    "other",
+  ]),
+  counterparty: zod.string(),
+  subject: zod.string(),
+  description: zod.string(),
+  evidenceUrl: zod.string().optional(),
+  urgency: zod.enum(["normal", "high", "urgent"]),
+});
+
+export const UpdateDiplomacyCaseParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateDiplomacyCaseBody = zod.object({
+  status: zod.string(),
+  internalNotes: zod.string().optional(),
+});
+
+export const UpdateDiplomacyCaseResponse = zod.object({
+  id: zod.number(),
+  corporationId: zod.number(),
+  submittedBy: zod.number(),
+  submitterCharacterId: zod.number(),
+  submitterName: zod.string(),
+  category: zod.enum([
+    "standings",
+    "conflict",
+    "cooperation",
+    "compensation",
+    "complaint",
+    "other",
+  ]),
+  counterparty: zod.string(),
+  subject: zod.string(),
+  description: zod.string(),
+  evidenceUrl: zod.string().nullish(),
+  urgency: zod.enum(["normal", "high", "urgent"]),
+  status: zod.enum([
+    "submitted",
+    "accepted",
+    "investigating",
+    "waiting",
+    "resolved",
+    "rejected",
+    "closed",
+  ]),
+  internalNotes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+export const ListReimbursementsResponseItem = zod.object({
+  id: zod.number(),
+  corporationId: zod.number(),
+  submittedBy: zod.number(),
+  characterId: zod.number(),
+  characterName: zod.string(),
+  fleetId: zod.number().nullish(),
+  killmailId: zod.number(),
+  killmailUrl: zod.string(),
+  lossOccurredAt: zod.coerce.date(),
+  shipTypeId: zod.number(),
+  shipName: zod.string(),
+  lossValue: zod.number(),
+  requestedAmount: zod.number(),
+  approvedAmount: zod.number().nullish(),
+  description: zod.string(),
+  validation: zod.object({
+    killmailVerified: zod.boolean(),
+    characterVerified: zod.boolean(),
+    fleetVerified: zod.boolean().nullable(),
+    checkedAt: zod.coerce.date(),
+    message: zod.string(),
+  }),
+  status: zod.enum([
+    "submitted",
+    "reviewing",
+    "approved",
+    "partially_approved",
+    "rejected",
+    "pending_payment",
+    "paid",
+  ]),
+  reviewerNotes: zod.string().nullish(),
+  paymentReference: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListReimbursementsResponse = zod.array(
+  ListReimbursementsResponseItem,
+);
+
+export const CreateReimbursementBody = zod.object({
+  characterId: zod.number(),
+  fleetId: zod.number().nullish(),
+  killmailUrl: zod.string(),
+  requestedAmount: zod.number(),
+  description: zod.string(),
+});
+
+export const ListReimbursementFleetsResponseItem = zod.object({
+  id: zod.number(),
+  corporationId: zod.number(),
+  eveFleetId: zod.string().nullish(),
+  name: zod.string(),
+  fleetCommander: zod.string(),
+  papValue: zod.number(),
+  isActive: zod.boolean(),
+  fleetFunction: zod.string(),
+  reimbursementEnabled: zod.boolean(),
+  reimbursementRule: zod
+    .union([
+      zod.object({
+        description: zod.string().optional(),
+        maximumAmount: zod.number().nullish(),
+        eligibleShips: zod.array(zod.string()).optional(),
+      }),
+      zod.null(),
+    ])
+    .optional(),
+  startedAt: zod.coerce.date().nullish(),
+  endedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  participantCount: zod.number().nullish(),
+  battleReportId: zod.number().nullish(),
+});
+export const ListReimbursementFleetsResponse = zod.array(
+  ListReimbursementFleetsResponseItem,
+);
+
+export const UpdateReimbursementParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateReimbursementBody = zod.object({
+  status: zod.enum([
+    "submitted",
+    "reviewing",
+    "approved",
+    "partially_approved",
+    "rejected",
+    "pending_payment",
+    "paid",
+  ]),
+  approvedAmount: zod.number().nullish(),
+  reviewerNotes: zod.string().optional(),
+  paymentReference: zod.string().optional(),
+});
+
+export const UpdateReimbursementResponse = zod.object({
+  id: zod.number(),
+  corporationId: zod.number(),
+  submittedBy: zod.number(),
+  characterId: zod.number(),
+  characterName: zod.string(),
+  fleetId: zod.number().nullish(),
+  killmailId: zod.number(),
+  killmailUrl: zod.string(),
+  lossOccurredAt: zod.coerce.date(),
+  shipTypeId: zod.number(),
+  shipName: zod.string(),
+  lossValue: zod.number(),
+  requestedAmount: zod.number(),
+  approvedAmount: zod.number().nullish(),
+  description: zod.string(),
+  validation: zod.object({
+    killmailVerified: zod.boolean(),
+    characterVerified: zod.boolean(),
+    fleetVerified: zod.boolean().nullable(),
+    checkedAt: zod.coerce.date(),
+    message: zod.string(),
+  }),
+  status: zod.enum([
+    "submitted",
+    "reviewing",
+    "approved",
+    "partially_approved",
+    "rejected",
+    "pending_payment",
+    "paid",
+  ]),
+  reviewerNotes: zod.string().nullish(),
+  paymentReference: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+export const GetEconomySummaryResponse = zod.object({
+  connection: zod.record(zod.string(), zod.unknown()).nullish(),
+  periodStart: zod.coerce.date(),
+  periodEnd: zod.coerce.date(),
+  walletBalance: zod.number(),
+  income: zod.number(),
+  expenses: zod.number(),
+  netGrowth: zod.number(),
+  previousNetGrowth: zod.number(),
+  reimbursementPaid: zod.number(),
+  reimbursementCount: zod.number(),
+  entryCount: zod.number(),
+  incomeSources: zod.array(
+    zod.object({
+      source: zod.string(),
+      amount: zod.number(),
+    }),
+  ),
+  expenseSources: zod.array(
+    zod.object({
+      source: zod.string(),
+      amount: zod.number(),
+    }),
+  ),
+  divisions: zod.array(zod.record(zod.string(), zod.unknown())),
+  analysis: zod
+    .union([
+      zod.object({
+        source: zod.enum(["openai", "rules"]),
+        model: zod.string(),
+        generatedAt: zod.coerce.date(),
+        summary: zod.string(),
+        actions: zod.array(
+          zod.object({
+            title: zod.string(),
+            evidence: zod.string(),
+            owner: zod.string(),
+            steps: zod.array(zod.string()),
+            startupCost: zod.number(),
+            timeToImpactDays: zod.number(),
+            expectedMonthlyGain: zod.number(),
+            kpi: zod.string(),
+            risk: zod.string(),
+            confidence: zod.number(),
+          }),
+        ),
+      }),
+      zod.null(),
+    ])
+    .optional(),
+});
+
+export const SyncCorporationWalletResponse = zod.object({
+  entries: zod.number(),
+});
+
+export const AnalyzeCorporationEconomyResponse = zod.object({
+  source: zod.enum(["openai", "rules"]),
+  model: zod.string(),
+  generatedAt: zod.coerce.date(),
+  summary: zod.string(),
+  actions: zod.array(
+    zod.object({
+      title: zod.string(),
+      evidence: zod.string(),
+      owner: zod.string(),
+      steps: zod.array(zod.string()),
+      startupCost: zod.number(),
+      timeToImpactDays: zod.number(),
+      expectedMonthlyGain: zod.number(),
+      kpi: zod.string(),
+      risk: zod.string(),
+      confidence: zod.number(),
+    }),
+  ),
 });

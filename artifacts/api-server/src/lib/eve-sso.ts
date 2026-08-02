@@ -1,9 +1,10 @@
 import { logger } from "./logger";
+import { randomBytes } from "node:crypto";
 
 const EVE_SSO_BASE = "https://login.eveonline.com";
 const ESI_BASE = "https://esi.evetech.net/latest";
 
-function buildAuthorizationUrl(callbackUrl: string, scopes: string[]): string {
+function buildAuthorizationUrl(callbackUrl: string, scopes: string[], state: string): string {
   const clientId = process.env.EVE_CLIENT_ID;
   if (!clientId) throw new Error("EVE_CLIENT_ID not set");
 
@@ -12,22 +13,34 @@ function buildAuthorizationUrl(callbackUrl: string, scopes: string[]): string {
     redirect_uri: callbackUrl,
     client_id: clientId,
     scope: scopes.join(" "),
-    state: Math.random().toString(36).substring(2),
+    state,
   });
 
   return `${EVE_SSO_BASE}/v2/oauth/authorize?${params.toString()}`;
 }
 
-export function getAuthorizationUrl(callbackUrl: string): string {
-  return buildAuthorizationUrl(callbackUrl, [
-    "publicData",
-    "esi-fleets.read_fleet.v1",
-    "esi-fleets.write_fleet.v1",
-  ]);
+export function generateOauthState(): string {
+  return randomBytes(32).toString("base64url");
 }
 
-export function getLinkAltAuthorizationUrl(callbackUrl: string): string {
-  return buildAuthorizationUrl(callbackUrl, ["publicData"]);
+export function getAuthorizationUrl(callbackUrl: string, state: string): string {
+  return buildAuthorizationUrl(callbackUrl, [
+    "publicData",
+    "esi-skills.read_skills.v1",
+    "esi-fleets.read_fleet.v1",
+    "esi-fleets.write_fleet.v1",
+  ], state);
+}
+
+export function getLinkAltAuthorizationUrl(callbackUrl: string, state: string): string {
+  return buildAuthorizationUrl(callbackUrl, ["publicData", "esi-skills.read_skills.v1"], state);
+}
+
+export function getCorporationWalletAuthorizationUrl(callbackUrl: string, state: string): string {
+  return buildAuthorizationUrl(callbackUrl, [
+    "publicData",
+    "esi-wallet.read_corporation_wallets.v1",
+  ], state);
 }
 
 export async function exchangeCode(code: string, callbackUrl: string): Promise<{

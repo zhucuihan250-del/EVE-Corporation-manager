@@ -2,13 +2,14 @@ import {
   useListFleets, useCreateFleet, useUpdateFleet, useScanFleetMembers,
   getListFleetsQueryKey, getGetRecentFleetsQueryKey, getGetAdminSummaryQueryKey,
   getGetDashboardSummaryQueryKey, getListUsersQueryKey, getListAllPapRecordsQueryKey,
+  type Fleet,
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
-import { Loader2, Swords, Plus, Shield, ScanSearch, Crosshair, Radio } from "lucide-react";
+import { Loader2, Swords, Plus, Shield, ScanSearch, Crosshair, Radio, Settings2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
@@ -17,6 +18,7 @@ import { apiUrl } from "@/lib/api";
 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useTranslation } from "react-i18next";
 import { Link } from "wouter";
@@ -29,7 +31,8 @@ async function fetchEsiFleetId(): Promise<{ fleetId: string; role: string }> {
 }
 
 export function AdminFleets() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const tr = (cn: string, en: string) => i18n.language.startsWith("zh") ? cn : en;
   const { data: fleets, isLoading } = useListFleets();
   const createFleet = useCreateFleet();
   const updateFleet = useUpdateFleet();
@@ -42,10 +45,19 @@ export function AdminFleets() {
   const [fleetCommander, setFleetCommander] = useState("");
   const [papValue, setPapValue] = useState("");
   const [eveFleetId, setEveFleetId] = useState("");
+  const [fleetFunction, setFleetFunction] = useState("general");
+  const [reimbursementEnabled, setReimbursementEnabled] = useState(false);
+  const [reimbursementDescription, setReimbursementDescription] = useState("");
+  const [reimbursementMaximum, setReimbursementMaximum] = useState("");
   const [scanningId, setScanningId] = useState<number | null>(null);
   const [fetchingCreateId, setFetchingCreateId] = useState(false);
   const [updatingFleetId, setUpdatingFleetId] = useState<number | null>(null);
   const [standingDownId, setStandingDownId] = useState<number | null>(null);
+  const [configuringFleet, setConfiguringFleet] = useState<Fleet | null>(null);
+  const [configFunction, setConfigFunction] = useState("");
+  const [configReimbursement, setConfigReimbursement] = useState(false);
+  const [configDescription, setConfigDescription] = useState("");
+  const [configMaximum, setConfigMaximum] = useState("");
   const fleetList = Array.isArray(fleets) ? fleets : [];
 
   const { liveCounts, scanFleet: scanFleetLive } = useLiveFleetCounts(fleetList);
@@ -118,7 +130,18 @@ export function AdminFleets() {
   const handleCreateFleet = () => {
     if (!fleetName || !fleetCommander || !papValue) return;
     createFleet.mutate(
-      { data: { name: fleetName, fleetCommander, papValue: Number(papValue), eveFleetId: eveFleetId || null } },
+      { data: {
+        name: fleetName,
+        fleetCommander,
+        papValue: Number(papValue),
+        eveFleetId: eveFleetId || null,
+        fleetFunction: fleetFunction.trim() || "general",
+        reimbursementEnabled,
+        reimbursementRule: reimbursementEnabled ? {
+          description: reimbursementDescription.trim(),
+          maximumAmount: reimbursementMaximum ? Number(reimbursementMaximum) : null,
+        } : null,
+      } },
       {
         onSuccess: () => {
           toast({ title: t("fleets.fleetCreated"), description: t("fleets.newOperationRegistered") });
@@ -128,6 +151,10 @@ export function AdminFleets() {
           setFleetCommander("");
           setPapValue("");
           setEveFleetId("");
+          setFleetFunction("general");
+          setReimbursementEnabled(false);
+          setReimbursementDescription("");
+          setReimbursementMaximum("");
         }
       }
     );
@@ -191,6 +218,31 @@ export function AdminFleets() {
     }
   };
 
+  const openFleetConfiguration = (fleet: Fleet) => {
+    setConfiguringFleet(fleet);
+    setConfigFunction(fleet.fleetFunction);
+    setConfigReimbursement(fleet.reimbursementEnabled);
+    setConfigDescription(fleet.reimbursementRule?.description ?? "");
+    setConfigMaximum(fleet.reimbursementRule?.maximumAmount?.toString() ?? "");
+  };
+
+  const saveFleetConfiguration = () => {
+    if (!configuringFleet || !configFunction.trim()) return;
+    updateFleet.mutate({ id: configuringFleet.id, data: {
+      fleetFunction: configFunction.trim(),
+      reimbursementEnabled: configReimbursement,
+      reimbursementRule: configReimbursement ? {
+        description: configDescription.trim(),
+        maximumAmount: configMaximum ? Number(configMaximum) : null,
+        eligibleShips: configuringFleet.reimbursementRule?.eligibleShips ?? [],
+      } : null,
+    } }, { onSuccess: () => {
+      setConfiguringFleet(null);
+      queryClient.invalidateQueries({ queryKey: getListFleetsQueryKey() });
+      toast({ title: tr("舰队职能与补损规则已更新", "Fleet function and reimbursement rules updated") });
+    } });
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex justify-between items-start">
@@ -243,6 +295,8 @@ export function AdminFleets() {
                     <TableCell className="font-mono text-sm text-foreground">
                       <div className="flex flex-col">
                         <span>{fleet.name}</span>
+                        <span className="text-[10px] text-primary/80 mt-0.5">{tr("职能", "Function")}: {fleet.fleetFunction}</span>
+                        {fleet.reimbursementEnabled && <Badge variant="outline" className="w-fit mt-1 text-[9px] border-emerald-500/40 text-emerald-400">{tr("可补损", "REIMBURSEMENT")}</Badge>}
                         <span className="text-xs text-muted-foreground">{format(new Date(fleet.createdAt), "MMM dd, HH:mm")}</span>
                         {fleet.eveFleetId ? (
                           <span className="text-[10px] text-muted-foreground/60 font-mono mt-0.5">ID: {fleet.eveFleetId}</span>
@@ -270,6 +324,9 @@ export function AdminFleets() {
                         : (fleet.participantCount || 0)}
                     </TableCell>
                     <TableCell className="text-right">
+                      <Button variant="outline" size="sm" className="h-8 mb-2 ml-2 rounded-sm font-mono text-[10px]" onClick={() => openFleetConfiguration(fleet)}>
+                        <Settings2 className="w-3 h-3 mr-1" />{tr("职能/补损", "FUNCTION/RULES")}
+                      </Button>
                       {fleet.isActive ? (
                         <div className="flex items-center justify-end gap-2 flex-wrap">
                           <Button
@@ -381,6 +438,29 @@ export function AdminFleets() {
               />
             </div>
             <div className="flex flex-col gap-1.5">
+              <Label htmlFor="fleetFunction" className="text-xs tracking-widest">
+                {tr("舰队职能", "FLEET FUNCTION")}
+              </Label>
+              <Input
+                id="fleetFunction"
+                value={fleetFunction}
+                onChange={(e) => setFleetFunction(e.target.value)}
+                className="bg-background/50 border-border/50 rounded-sm"
+                placeholder={tr("例如：值守舰队、战略舰队", "e.g. Standing fleet, strategic fleet")}
+              />
+              <p className="text-[10px] text-muted-foreground">{tr("该职能由创建舰队的 FC/管理员指定，作为补损审核依据。", "Assigned by the creating FC/administrator and recorded for reimbursement review.")}</p>
+            </div>
+            <div className="rounded-sm border border-border/50 p-3 space-y-3">
+              <label className="flex items-center gap-2 text-xs tracking-widest cursor-pointer">
+                <input type="checkbox" checked={reimbursementEnabled} onChange={(e) => setReimbursementEnabled(e.target.checked)} />
+                {tr("允许该舰队提交补损", "ALLOW REIMBURSEMENT FOR THIS FLEET")}
+              </label>
+              {reimbursementEnabled && <>
+                <Input value={reimbursementDescription} onChange={(e) => setReimbursementDescription(e.target.value)} placeholder={tr("补损规则说明", "Reimbursement rule description")} />
+                <Input type="number" min="0" value={reimbursementMaximum} onChange={(e) => setReimbursementMaximum(e.target.value)} placeholder={tr("单笔补损上限（ISK，可选）", "Maximum per claim (ISK, optional)")} />
+              </>}
+            </div>
+            <div className="flex flex-col gap-1.5">
               <Label htmlFor="eveFleetId" className="text-xs tracking-widest">
                 {t("fleets.eveFleetId")}
               </Label>
@@ -416,6 +496,18 @@ export function AdminFleets() {
               {createFleet.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : t("fleets.initialize")}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(configuringFleet)} onOpenChange={(open) => { if (!open) setConfiguringFleet(null); }}>
+        <DialogContent className="sm:max-w-[480px] bg-card border-primary/20 rounded-sm font-mono">
+          <DialogHeader><DialogTitle>{tr("舰队职能与补损设置", "FLEET FUNCTION & REIMBURSEMENT")}</DialogTitle><DialogDescription>{configuringFleet?.name}</DialogDescription></DialogHeader>
+          <div className="space-y-4 py-3">
+            <div className="space-y-2"><Label>{tr("舰队职能", "Fleet function")}</Label><Input value={configFunction} onChange={(event) => setConfigFunction(event.target.value)} placeholder={tr("例如：值守舰队", "e.g. Standing fleet")} /></div>
+            <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={configReimbursement} onChange={(event) => setConfigReimbursement(event.target.checked)} />{tr("允许该舰队补损", "Allow reimbursement for this fleet")}</label>
+            {configReimbursement && <><div className="space-y-2"><Label>{tr("补损规则", "Rule description")}</Label><Textarea value={configDescription} onChange={(event) => setConfigDescription(event.target.value)} /></div><div className="space-y-2"><Label>{tr("单笔上限（ISK）", "Maximum per claim (ISK)")}</Label><Input type="number" min="0" value={configMaximum} onChange={(event) => setConfigMaximum(event.target.value)} /></div></>}
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setConfiguringFleet(null)}>{tr("取消", "Cancel")}</Button><Button onClick={saveFleetConfiguration} disabled={updateFleet.isPending || !configFunction.trim()}>{tr("保存", "Save")}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

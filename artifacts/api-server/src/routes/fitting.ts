@@ -1,8 +1,10 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { requireAuth } from "../middlewares/auth";
+import { requireModule, requireTenant } from "../lib/tenant";
 import { searchFittingCatalog, simulateFitting, type FittingCategory, type FittingLanguage, type FittingMode, type FittingSlot } from "../lib/fitting-data";
 
 const router: IRouter = Router();
+router.use("/fitting", requireAuth, requireTenant, requireModule("fleet"));
 
 const categories = new Set(["all", "ship", "module", "charge", "drone"]);
 const slots = new Set(["all", "high", "medium", "low", "rig", "subsystem", "charge", "drone", "other"]);

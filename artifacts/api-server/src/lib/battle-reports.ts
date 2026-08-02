@@ -291,6 +291,7 @@ export async function ensureBattleReportForFleet(fleetId: number): Promise<numbe
   let [report] = await db
     .insert(battleReportsTable)
     .values({
+      corporationId: fleet.corporationId,
       fleetId: fleet.id,
       fleetName: fleet.name,
       fleetCommander: fleet.fleetCommander,

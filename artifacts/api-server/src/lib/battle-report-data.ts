@@ -4,7 +4,7 @@ import {
   battleReportsTable,
   db,
 } from "@workspace/db";
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 
 const participantCountSql = sql<number>`(
   SELECT COUNT(*)::int
@@ -44,11 +44,14 @@ export function reportSummarySelection() {
   };
 }
 
-export async function loadBattleReportDetail(reportId: number) {
+export async function loadBattleReportDetail(reportId: number, corporationId?: number) {
   const [report] = await db
     .select(reportSummarySelection())
     .from(battleReportsTable)
-    .where(eq(battleReportsTable.id, reportId));
+    .where(and(
+      eq(battleReportsTable.id, reportId),
+      ...(corporationId === undefined ? [] : [eq(battleReportsTable.corporationId, corporationId)]),
+    ));
   if (!report) return null;
 
   const [participants, killmails, systems] = await Promise.all([

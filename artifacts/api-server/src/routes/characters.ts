@@ -2,9 +2,12 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { db, charactersTable, usersTable } from "@workspace/db";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { requireAuth, hasRole } from "../middlewares/auth";
+import { requireModule, requireTenant } from "../lib/tenant";
 import { getCharacterRetentionDeadline } from "../lib/character-retention";
 
 const router: IRouter = Router();
+router.use("/characters", requireAuth, requireTenant);
+router.use("/admin/users", requireAuth, requireTenant, requireModule("pap"));
 
 function formatCharacter(c: typeof charactersTable.$inferSelect) {
   return {
@@ -35,15 +38,19 @@ router.get("/characters", requireAuth, async (req: Request, res: Response): Prom
   const chars = await db
     .select()
     .from(charactersTable)
-    .where(and(eq(charactersTable.userId, req.session.userId!), isNull(charactersTable.deletedAt)));
+    .where(and(
+      eq(charactersTable.userId, req.session.userId!),
+      eq(charactersTable.corporationId, req.tenant!.corporation.id),
+      isNull(charactersTable.deletedAt),
+    ));
 
   res.json(chars.map(formatCharacter));
 });
 
 // GET /api/characters/all - admin only
-router.get("/characters/all", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.get("/characters/all", requireAuth, requireModule("pap"), async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || currentUser.role !== "admin") {
+  if (!currentUser || !hasRole(req.tenant!.membership.role, "admin")) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -51,7 +58,10 @@ router.get("/characters/all", requireAuth, async (req: Request, res: Response): 
   const chars = await db
     .select()
     .from(charactersTable)
-    .where(isNull(charactersTable.deletedAt));
+    .where(and(
+      eq(charactersTable.corporationId, req.tenant!.corporation.id),
+      isNull(charactersTable.deletedAt),
+    ));
 
   res.json(chars.map(formatCharacter));
 });
@@ -59,7 +69,7 @@ router.get("/characters/all", requireAuth, async (req: Request, res: Response): 
 // GET /api/admin/users/:id/characters - get all characters for a specific user (admin only)
 router.get("/admin/users/:id/characters", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || currentUser.role !== "admin") {
+  if (!currentUser || !hasRole(req.tenant!.membership.role, "admin")) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -73,7 +83,11 @@ router.get("/admin/users/:id/characters", requireAuth, async (req: Request, res:
   const chars = await db
     .select()
     .from(charactersTable)
-    .where(and(eq(charactersTable.userId, targetId), isNull(charactersTable.deletedAt)));
+    .where(and(
+      eq(charactersTable.userId, targetId),
+      eq(charactersTable.corporationId, req.tenant!.corporation.id),
+      isNull(charactersTable.deletedAt),
+    ));
 
   res.json(chars.map(formatCharacter));
 });
@@ -95,7 +109,11 @@ router.delete("/characters/:id", requireAuth, async (req: Request, res: Response
   const [char] = await db
     .select()
     .from(charactersTable)
-    .where(and(eq(charactersTable.id, charId), isNull(charactersTable.deletedAt)));
+    .where(and(
+      eq(charactersTable.id, charId),
+      eq(charactersTable.corporationId, req.tenant!.corporation.id),
+      isNull(charactersTable.deletedAt),
+    ));
 
   if (!char) {
     res.status(404).json({ error: "Character not found" });
@@ -103,7 +121,7 @@ router.delete("/characters/:id", requireAuth, async (req: Request, res: Response
   }
 
   const isOwner = char.userId === req.session.userId;
-  const isAdmin = hasRole(currentUser.role, "admin");
+  const isAdmin = hasRole(req.tenant!.membership.role, "admin");
   if (!isOwner && !isAdmin) {
     res.status(403).json({ error: "Forbidden" });
     return;

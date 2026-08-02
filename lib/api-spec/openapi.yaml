@@ -28,6 +28,14 @@ tags:
     description: Dashboard summary endpoints
   - name: fitting
     description: Ship fitting simulation and catalog endpoints
+  - name: identity
+    description: Corporation identity-group applications
+  - name: diplomacy
+    description: Corporation diplomacy cases
+  - name: reimbursements
+    description: Corporation ship reimbursement claims
+  - name: economy
+    description: Director-only corporation economy
 
 paths:
   /healthz:
@@ -968,6 +976,300 @@ paths:
         "403":
           description: Forbidden
 
+  /identity-groups:
+    get:
+      operationId: listIdentityGroups
+      tags: [identity]
+      responses:
+        "200":
+          description: Identity groups for the active corporation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IdentityGroup"
+    post:
+      operationId: createIdentityGroup
+      tags: [identity]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IdentityGroupInput"
+      responses:
+        "201":
+          description: Identity group created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IdentityGroup"
+
+  /identity-groups/{id}:
+    patch:
+      operationId: updateIdentityGroup
+      tags: [identity]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IdentityGroupInput"
+      responses:
+        "200":
+          description: Identity group updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IdentityGroup"
+
+  /identity-groups/{id}/applications:
+    post:
+      operationId: applyIdentityGroup
+      tags: [identity]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                characterId: { type: integer }
+                statement: { type: string }
+              required: [characterId, statement]
+      responses:
+        "201":
+          description: Application submitted and skill-audited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IdentityApplication"
+
+  /identity-applications:
+    get:
+      operationId: listIdentityApplications
+      tags: [identity]
+      responses:
+        "200":
+          description: Visible identity applications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IdentityApplication"
+
+  /identity-applications/{id}:
+    patch:
+      operationId: reviewIdentityApplication
+      tags: [identity]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [pending_review, needs_information, approved, rejected]
+                reviewerNotes: { type: string }
+              required: [status]
+      responses:
+        "200":
+          description: Application reviewed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IdentityApplication"
+
+  /diplomacy:
+    get:
+      operationId: listDiplomacyCases
+      tags: [diplomacy]
+      responses:
+        "200":
+          description: Diplomacy cases visible to the current user
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DiplomacyCase"
+    post:
+      operationId: createDiplomacyCase
+      tags: [diplomacy]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDiplomacyCaseBody"
+      responses:
+        "201":
+          description: Diplomacy case submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiplomacyCase"
+
+  /diplomacy/{id}:
+    patch:
+      operationId: updateDiplomacyCase
+      tags: [diplomacy]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: { type: string }
+                internalNotes: { type: string }
+              required: [status]
+      responses:
+        "200":
+          description: Diplomacy case updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiplomacyCase"
+
+  /reimbursements:
+    get:
+      operationId: listReimbursements
+      tags: [reimbursements]
+      responses:
+        "200":
+          description: Reimbursement claims visible to the current user
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReimbursementClaim"
+    post:
+      operationId: createReimbursement
+      tags: [reimbursements]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReimbursementBody"
+      responses:
+        "201":
+          description: Reimbursement claim submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReimbursementClaim"
+
+  /reimbursements/fleets:
+    get:
+      operationId: listReimbursementFleets
+      tags: [reimbursements]
+      responses:
+        "200":
+          description: Eligible fleets for the active corporation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Fleet"
+
+  /reimbursements/{id}:
+    patch:
+      operationId: updateReimbursement
+      tags: [reimbursements]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateReimbursementBody"
+      responses:
+        "200":
+          description: Reimbursement claim updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReimbursementClaim"
+
+  /economy:
+    get:
+      operationId: getEconomySummary
+      tags: [economy]
+      responses:
+        "200":
+          description: Director-only corporation economy summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EconomySummary"
+
+  /economy/connect:
+    get:
+      operationId: connectCorporationWallet
+      tags: [economy]
+      responses:
+        "302":
+          description: Redirect to EVE SSO wallet authorization
+
+  /economy/sync:
+    post:
+      operationId: syncCorporationWallet
+      tags: [economy]
+      responses:
+        "200":
+          description: Wallet sync completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entries: { type: integer }
+                required: [entries]
+
+  /economy/analyze:
+    post:
+      operationId: analyzeCorporationEconomy
+      tags: [economy]
+      responses:
+        "200":
+          description: Evidence-based AI economy analysis
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EconomyAnalysis"
+
 components:
   schemas:
     HealthStatus:
@@ -1011,9 +1313,16 @@ components:
           type: ["integer", "null"]
         corporationName:
           type: ["string", "null"]
+        isPrimaryCorporation:
+          type: boolean
         role:
           type: string
           enum: [member, fc, admin, controller]
+        permissions:
+          type: array
+          items: { type: string }
+        modules:
+          $ref: "#/components/schemas/CorporationModules"
         totalPap:
           type: number
         redeemablePap:
@@ -1024,6 +1333,9 @@ components:
       required:
         - id
         - role
+        - isPrimaryCorporation
+        - permissions
+        - modules
         - totalPap
         - redeemablePap
         - createdAt
@@ -1408,6 +1720,8 @@ components:
       properties:
         id:
           type: integer
+        corporationId:
+          type: integer
         eveFleetId:
           type: ["string", "null"]
         name:
@@ -1418,6 +1732,14 @@ components:
           type: number
         isActive:
           type: boolean
+        fleetFunction:
+          type: string
+        reimbursementEnabled:
+          type: boolean
+        reimbursementRule:
+          oneOf:
+            - $ref: "#/components/schemas/FleetReimbursementRule"
+            - type: "null"
         startedAt:
           type: ["string", "null"]
           format: date-time
@@ -1433,10 +1755,13 @@ components:
           type: ["integer", "null"]
       required:
         - id
+        - corporationId
         - name
         - fleetCommander
         - papValue
         - isActive
+        - fleetFunction
+        - reimbursementEnabled
         - createdAt
 
     CreateFleetBody:
@@ -1452,6 +1777,14 @@ components:
           type: number
         startedAt:
           type: ["string", "null"]
+        fleetFunction:
+          type: string
+        reimbursementEnabled:
+          type: boolean
+        reimbursementRule:
+          oneOf:
+            - $ref: "#/components/schemas/FleetReimbursementRule"
+            - type: "null"
       required:
         - name
         - fleetCommander
@@ -2045,6 +2378,14 @@ components:
           type: ["string", "null"]
         eveFleetId:
           type: ["string", "null"]
+        fleetFunction:
+          type: string
+        reimbursementEnabled:
+          type: boolean
+        reimbursementRule:
+          oneOf:
+            - $ref: "#/components/schemas/FleetReimbursementRule"
+            - type: "null"
 
     Announcement:
       type: object
@@ -2353,3 +2694,274 @@ components:
         - userId
         - totalPap
         - fleetCount
+
+    CorporationModules:
+      type: object
+      properties:
+        pap: { type: boolean }
+        identity: { type: boolean }
+        economy: { type: boolean }
+        fleet: { type: boolean }
+        reimbursement: { type: boolean }
+        diplomacy: { type: boolean }
+      required: [pap, identity, economy, fleet, reimbursement, diplomacy]
+
+    RequiredSkill:
+      type: object
+      properties:
+        skillId: { type: integer }
+        name: { type: string }
+        level: { type: integer, minimum: 1, maximum: 5 }
+      required: [skillId, name, level]
+
+    SkillAuditItem:
+      allOf:
+        - $ref: "#/components/schemas/RequiredSkill"
+        - type: object
+          properties:
+            trainedLevel: { type: integer }
+            passed: { type: boolean }
+          required: [trainedLevel, passed]
+
+    SkillAuditResult:
+      type: object
+      properties:
+        checkedAt: { type: string, format: date-time }
+        passed: { type: boolean }
+        skills:
+          type: array
+          items:
+            $ref: "#/components/schemas/SkillAuditItem"
+      required: [checkedAt, passed, skills]
+
+    IdentityApplication:
+      type: object
+      properties:
+        id: { type: integer }
+        corporationId: { type: integer }
+        groupId: { type: integer }
+        groupName: { type: string }
+        groupCategory: { type: string, enum: [combat, management] }
+        userId: { type: integer }
+        applicantName: { type: ["string", "null"] }
+        characterId: { type: integer }
+        characterName: { type: string }
+        statement: { type: string }
+        status:
+          type: string
+          enum: [pending_skill_audit, pending_review, needs_information, approved, rejected, withdrawn]
+        skillAudit:
+          oneOf:
+            - $ref: "#/components/schemas/SkillAuditResult"
+            - type: "null"
+        rejectionReason: { type: ["string", "null"] }
+        reviewerNotes: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, corporationId, groupId, userId, characterId, statement, status, createdAt, updatedAt]
+
+    IdentityGroup:
+      type: object
+      properties:
+        id: { type: integer }
+        corporationId: { type: integer }
+        name: { type: string }
+        category: { type: string, enum: [combat, management] }
+        description: { type: string }
+        requiredSkills:
+          type: array
+          items:
+            $ref: "#/components/schemas/RequiredSkill"
+        permissions:
+          type: array
+          items: { type: string }
+        isActive: { type: boolean }
+        isMember: { type: boolean }
+        latestApplication:
+          oneOf:
+            - $ref: "#/components/schemas/IdentityApplication"
+            - type: "null"
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, corporationId, name, category, description, requiredSkills, permissions, isActive, isMember, createdAt, updatedAt]
+
+    IdentityGroupInput:
+      type: object
+      properties:
+        name: { type: string }
+        category: { type: string, enum: [combat, management] }
+        description: { type: string }
+        requiredSkills:
+          type: array
+          items:
+            $ref: "#/components/schemas/RequiredSkill"
+        isActive: { type: boolean }
+      required: [name, category, description, requiredSkills]
+
+    DiplomacyCase:
+      type: object
+      properties:
+        id: { type: integer }
+        corporationId: { type: integer }
+        submittedBy: { type: integer }
+        submitterCharacterId: { type: integer }
+        submitterName: { type: string }
+        category: { type: string, enum: [standings, conflict, cooperation, compensation, complaint, other] }
+        counterparty: { type: string }
+        subject: { type: string }
+        description: { type: string }
+        evidenceUrl: { type: ["string", "null"] }
+        urgency: { type: string, enum: [normal, high, urgent] }
+        status: { type: string, enum: [submitted, accepted, investigating, waiting, resolved, rejected, closed] }
+        internalNotes: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, corporationId, submittedBy, submitterCharacterId, submitterName, category, counterparty, subject, description, urgency, status, createdAt, updatedAt]
+
+    CreateDiplomacyCaseBody:
+      type: object
+      properties:
+        category: { type: string, enum: [standings, conflict, cooperation, compensation, complaint, other] }
+        counterparty: { type: string }
+        subject: { type: string }
+        description: { type: string }
+        evidenceUrl: { type: string }
+        urgency: { type: string, enum: [normal, high, urgent] }
+      required: [category, counterparty, subject, description, urgency]
+
+    FleetReimbursementRule:
+      type: object
+      properties:
+        description: { type: string }
+        maximumAmount: { type: ["number", "null"] }
+        eligibleShips:
+          type: array
+          items: { type: string }
+
+    ReimbursementValidation:
+      type: object
+      properties:
+        killmailVerified: { type: boolean }
+        characterVerified: { type: boolean }
+        fleetVerified: { type: ["boolean", "null"] }
+        checkedAt: { type: string, format: date-time }
+        message: { type: string }
+      required: [killmailVerified, characterVerified, fleetVerified, checkedAt, message]
+
+    ReimbursementClaim:
+      type: object
+      properties:
+        id: { type: integer }
+        corporationId: { type: integer }
+        submittedBy: { type: integer }
+        characterId: { type: integer }
+        characterName: { type: string }
+        fleetId: { type: ["integer", "null"] }
+        killmailId: { type: integer }
+        killmailUrl: { type: string }
+        lossOccurredAt: { type: string, format: date-time }
+        shipTypeId: { type: integer }
+        shipName: { type: string }
+        lossValue: { type: number }
+        requestedAmount: { type: number }
+        approvedAmount: { type: ["number", "null"] }
+        description: { type: string }
+        validation:
+          $ref: "#/components/schemas/ReimbursementValidation"
+        status: { type: string, enum: [submitted, reviewing, approved, partially_approved, rejected, pending_payment, paid] }
+        reviewerNotes: { type: ["string", "null"] }
+        paymentReference: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, corporationId, submittedBy, characterId, characterName, killmailId, killmailUrl, lossOccurredAt, shipTypeId, shipName, lossValue, requestedAmount, description, validation, status, createdAt, updatedAt]
+
+    CreateReimbursementBody:
+      type: object
+      properties:
+        characterId: { type: integer }
+        fleetId: { type: ["integer", "null"] }
+        killmailUrl: { type: string }
+        requestedAmount: { type: number }
+        description: { type: string }
+      required: [characterId, killmailUrl, requestedAmount, description]
+
+    UpdateReimbursementBody:
+      type: object
+      properties:
+        status: { type: string, enum: [submitted, reviewing, approved, partially_approved, rejected, pending_payment, paid] }
+        approvedAmount: { type: ["number", "null"] }
+        reviewerNotes: { type: string }
+        paymentReference: { type: string }
+      required: [status]
+
+    EconomySource:
+      type: object
+      properties:
+        source: { type: string }
+        amount: { type: number }
+      required: [source, amount]
+
+    EconomyAction:
+      type: object
+      properties:
+        title: { type: string }
+        evidence: { type: string }
+        owner: { type: string }
+        steps:
+          type: array
+          items: { type: string }
+        startupCost: { type: number }
+        timeToImpactDays: { type: integer }
+        expectedMonthlyGain: { type: number }
+        kpi: { type: string }
+        risk: { type: string }
+        confidence: { type: number }
+      required: [title, evidence, owner, steps, startupCost, timeToImpactDays, expectedMonthlyGain, kpi, risk, confidence]
+
+    EconomyAnalysis:
+      type: object
+      properties:
+        source: { type: string, enum: [openai, rules] }
+        model: { type: string }
+        generatedAt: { type: string, format: date-time }
+        summary: { type: string }
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/EconomyAction"
+      required: [source, model, generatedAt, summary, actions]
+
+    EconomySummary:
+      type: object
+      properties:
+        connection:
+          type: ["object", "null"]
+          additionalProperties: true
+        periodStart: { type: string, format: date-time }
+        periodEnd: { type: string, format: date-time }
+        walletBalance: { type: number }
+        income: { type: number }
+        expenses: { type: number }
+        netGrowth: { type: number }
+        previousNetGrowth: { type: number }
+        reimbursementPaid: { type: number }
+        reimbursementCount: { type: integer }
+        entryCount: { type: integer }
+        incomeSources:
+          type: array
+          items:
+            $ref: "#/components/schemas/EconomySource"
+        expenseSources:
+          type: array
+          items:
+            $ref: "#/components/schemas/EconomySource"
+        divisions:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        analysis:
+          oneOf:
+            - $ref: "#/components/schemas/EconomyAnalysis"
+            - type: "null"
+      required: [periodStart, periodEnd, walletBalance, income, expenses, netGrowth, previousNetGrowth, reimbursementPaid, reimbursementCount, entryCount, incomeSources, expenseSources, divisions]

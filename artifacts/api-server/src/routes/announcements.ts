@@ -1,10 +1,12 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, announcementsTable, usersTable } from "@workspace/db";
-import { eq, asc } from "drizzle-orm";
+import { and, eq, asc } from "drizzle-orm";
 import { CreateAnnouncementBody, DeleteAnnouncementParams } from "@workspace/api-zod";
 import { requireAuth, hasRole } from "../middlewares/auth";
+import { hasPermission, requireModule, requireTenant } from "../lib/tenant";
 
 const router: IRouter = Router();
+router.use("/announcements", requireAuth, requireTenant, requireModule("fleet"));
 
 function formatAnnouncement(a: typeof announcementsTable.$inferSelect) {
   return {
@@ -23,6 +25,7 @@ router.get("/announcements", requireAuth, async (req: Request, res: Response): P
   const announcements = await db
     .select()
     .from(announcementsTable)
+    .where(eq(announcementsTable.corporationId, req.tenant!.corporation.id))
     .orderBy(asc(announcementsTable.scheduledAt));
   res.json(announcements.map(formatAnnouncement));
 });
@@ -30,7 +33,7 @@ router.get("/announcements", requireAuth, async (req: Request, res: Response): P
 // POST /api/announcements - create announcement (admin only)
 router.post("/announcements", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || !hasRole(currentUser.role, "fc")) {
+  if (!currentUser || (!hasRole(req.tenant!.membership.role, "fc") && !hasPermission(req.tenant!, "fleet.manage"))) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -44,6 +47,7 @@ router.post("/announcements", requireAuth, async (req: Request, res: Response): 
   const [announcement] = await db
     .insert(announcementsTable)
     .values({
+      corporationId: req.tenant!.corporation.id,
       fc: body.data.fc,
       scheduledAt: new Date(body.data.scheduledAt),
       rallyPoint: body.data.rallyPoint,
@@ -58,7 +62,7 @@ router.post("/announcements", requireAuth, async (req: Request, res: Response): 
 // DELETE /api/announcements/:id - delete announcement (admin only)
 router.delete("/announcements/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || !hasRole(currentUser.role, "fc")) {
+  if (!currentUser || (!hasRole(req.tenant!.membership.role, "fc") && !hasPermission(req.tenant!, "fleet.manage"))) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -69,7 +73,10 @@ router.delete("/announcements/:id", requireAuth, async (req: Request, res: Respo
     return;
   }
 
-  await db.delete(announcementsTable).where(eq(announcementsTable.id, params.data.id));
+  await db.delete(announcementsTable).where(and(
+    eq(announcementsTable.id, params.data.id),
+    eq(announcementsTable.corporationId, req.tenant!.corporation.id),
+  ));
   res.status(204).send();
 });
 

@@ -77,7 +77,6 @@ app.use(
       origin(origin, callback) {
         if (
           !origin
-          || allowedOrigins.length === 0
           || origin === requestOrigin
         ) {
           callback(null, true);
@@ -90,6 +89,27 @@ app.use(
     })(req, res, next);
   },
 );
+app.use((req, res, next) => {
+  if (["GET", "HEAD", "OPTIONS"].includes(req.method)) {
+    next();
+    return;
+  }
+  const origin = req.get("origin");
+  if (!origin) {
+    next();
+    return;
+  }
+  const forwardedHost = req.get("x-forwarded-host")?.split(",")[0]?.trim();
+  const forwardedProto = req.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  const host = forwardedHost || req.get("host")?.trim();
+  const proto = forwardedProto || req.protocol;
+  const requestOrigin = host ? `${proto}://${host}` : null;
+  if (origin === requestOrigin || allowedOrigins.includes(origin)) {
+    next();
+    return;
+  }
+  res.status(403).json({ error: "Request origin is not allowed" });
+});
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

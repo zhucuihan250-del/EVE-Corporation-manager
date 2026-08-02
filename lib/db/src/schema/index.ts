@@ -6,3 +6,8 @@ export * from "./rewards";
 export * from "./redemptions";
 export * from "./announcements";
 export * from "./battle_reports";
+export * from "./corporations";
+export * from "./identity_groups";
+export * from "./diplomacy";
+export * from "./reimbursements";
+export * from "./economy";

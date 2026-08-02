@@ -1,10 +1,12 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { db, papRecordsTable, usersTable, fleetsTable, charactersTable } from "@workspace/db";
-import { eq, desc, sql } from "drizzle-orm";
+import { corporationMembershipsTable, db, papRecordsTable, usersTable, fleetsTable, charactersTable } from "@workspace/db";
+import { and, eq, desc, sql } from "drizzle-orm";
 import { requireAuth, hasRole } from "../middlewares/auth";
 import { CreateManualPapBody } from "@workspace/api-zod";
+import { requireModule, requireTenant } from "../lib/tenant";
 
 const router: IRouter = Router();
+router.use("/pap", requireAuth, requireTenant, requireModule("pap"));
 
 function formatRecord(r: {
   id: number;
@@ -48,13 +50,24 @@ router.get("/pap", requireAuth, async (req: Request, res: Response): Promise<voi
       createdAt: papRecordsTable.createdAt,
       fleetName: fleetsTable.name,
       characterName: charactersTable.eveCharacterName,
-      userName: usersTable.eveCharacterName,
+      userName: sql<string | null>`(
+        SELECT c."eve_character_name" FROM "characters" c
+        WHERE c."user_id" = ${papRecordsTable.userId}
+          AND c."corporation_id" = ${req.tenant!.corporation.id}
+          AND c."deleted_at" IS NULL
+        ORDER BY c."is_main" DESC, c."created_at" ASC LIMIT 1
+      )`,
     })
     .from(papRecordsTable)
     .leftJoin(fleetsTable, eq(papRecordsTable.fleetId, fleetsTable.id))
-    .leftJoin(charactersTable, eq(papRecordsTable.characterId, charactersTable.id))
-    .leftJoin(usersTable, eq(papRecordsTable.userId, usersTable.id))
-    .where(eq(papRecordsTable.userId, req.session.userId!))
+    .leftJoin(charactersTable, and(
+      eq(papRecordsTable.characterId, charactersTable.id),
+      eq(charactersTable.corporationId, req.tenant!.corporation.id),
+    ))
+    .where(and(
+      eq(papRecordsTable.userId, req.session.userId!),
+      eq(papRecordsTable.corporationId, req.tenant!.corporation.id),
+    ))
     .orderBy(desc(papRecordsTable.createdAt));
 
   res.json(records.map(formatRecord));
@@ -63,7 +76,7 @@ router.get("/pap", requireAuth, async (req: Request, res: Response): Promise<voi
 // GET /api/pap/all - admin only
 router.get("/pap/all", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || !hasRole(currentUser.role, "admin")) {
+  if (!currentUser || !hasRole(req.tenant!.membership.role, "admin")) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -80,12 +93,21 @@ router.get("/pap/all", requireAuth, async (req: Request, res: Response): Promise
       createdAt: papRecordsTable.createdAt,
       fleetName: fleetsTable.name,
       characterName: charactersTable.eveCharacterName,
-      userName: usersTable.eveCharacterName,
+      userName: sql<string | null>`(
+        SELECT c."eve_character_name" FROM "characters" c
+        WHERE c."user_id" = ${papRecordsTable.userId}
+          AND c."corporation_id" = ${req.tenant!.corporation.id}
+          AND c."deleted_at" IS NULL
+        ORDER BY c."is_main" DESC, c."created_at" ASC LIMIT 1
+      )`,
     })
     .from(papRecordsTable)
     .leftJoin(fleetsTable, eq(papRecordsTable.fleetId, fleetsTable.id))
-    .leftJoin(charactersTable, eq(papRecordsTable.characterId, charactersTable.id))
-    .leftJoin(usersTable, eq(papRecordsTable.userId, usersTable.id))
+    .leftJoin(charactersTable, and(
+      eq(papRecordsTable.characterId, charactersTable.id),
+      eq(charactersTable.corporationId, req.tenant!.corporation.id),
+    ))
+    .where(eq(papRecordsTable.corporationId, req.tenant!.corporation.id))
     .orderBy(desc(papRecordsTable.createdAt));
 
   res.json(records.map(formatRecord));
@@ -94,7 +116,7 @@ router.get("/pap/all", requireAuth, async (req: Request, res: Response): Promise
 // POST /api/pap/manual - admin only
 router.post("/pap/manual", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || !hasRole(currentUser.role, "admin")) {
+  if (!currentUser || !hasRole(req.tenant!.membership.role, "admin")) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -105,7 +127,14 @@ router.post("/pap/manual", requireAuth, async (req: Request, res: Response): Pro
     return;
   }
 
-  const [targetUser] = await db.select().from(usersTable).where(eq(usersTable.id, body.data.userId));
+  const [targetUser] = await db
+    .select({ user: usersTable })
+    .from(corporationMembershipsTable)
+    .innerJoin(usersTable, eq(usersTable.id, corporationMembershipsTable.userId))
+    .where(and(
+      eq(corporationMembershipsTable.corporationId, req.tenant!.corporation.id),
+      eq(corporationMembershipsTable.userId, body.data.userId),
+    ));
   if (!targetUser) {
     res.status(404).json({ error: "User not found" });
     return;
@@ -114,6 +143,7 @@ router.post("/pap/manual", requireAuth, async (req: Request, res: Response): Pro
   const [papRecord] = await db
     .insert(papRecordsTable)
     .values({
+      corporationId: req.tenant!.corporation.id,
       userId: body.data.userId,
       amount: body.data.amount,
       type: "manual",
@@ -130,7 +160,7 @@ router.post("/pap/manual", requireAuth, async (req: Request, res: Response): Pro
     ...papRecord,
     fleetName: null,
     characterName: null,
-    userName: targetUser.eveCharacterName,
+    userName: targetUser.user.eveCharacterName,
   });
 });
 

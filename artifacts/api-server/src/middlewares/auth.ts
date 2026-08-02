@@ -1,11 +1,17 @@
 import { type Request, type Response, type NextFunction } from "express";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { getTenantContext } from "../lib/tenant";
 
 declare module "express-session" {
   interface SessionData {
     userId: number;
     linkingUserId?: number;
+    corporationId?: number;
+    eveCharacterId?: number;
+    eveOauthState?: string;
+    eveOauthFlow?: "login" | "link_alt" | "economy";
+    economyLinkCorporationId?: number;
   }
 }
 
@@ -40,12 +46,35 @@ export function requireRole(minRole: Role) {
     }
 
     try {
-      const [user] = await db
-        .select({ role: usersTable.role })
-        .from(usersTable)
-        .where(eq(usersTable.id, req.session.userId));
-      if (!user || !hasRole(user.role, minRole)) {
+      const tenant = await getTenantContext(req);
+      if (!tenant || !hasRole(tenant.membership.role, minRole)) {
         res.status(403).json({ error: `Forbidden: ${minRole} role required` });
+        return;
+      }
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+}
+
+export function requireRoleOrPermission(minRole: Role, permission: string) {
+  return async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    if (!req.session.userId) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    try {
+      const tenant = await getTenantContext(req);
+      if (
+        !tenant
+        || (!hasRole(tenant.membership.role, minRole) && !tenant.permissions.includes(permission))
+      ) {
+        res.status(403).json({ error: "Forbidden" });
         return;
       }
       next();

@@ -3,9 +3,11 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
 import { rewardsTable } from "./rewards";
+import { corporationsTable } from "./corporations";
 
 export const redemptionsTable = pgTable("redemptions", {
   id: serial("id").primaryKey(),
+  corporationId: integer("corporation_id").notNull().references(() => corporationsTable.id, { onDelete: "cascade" }),
   userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
   rewardId: integer("reward_id").notNull().references(() => rewardsTable.id, { onDelete: "cascade" }),
   rewardName: text("reward_name").notNull(),

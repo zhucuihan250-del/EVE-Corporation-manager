@@ -5,6 +5,7 @@
  * EVE Online PAP Tracking System API
  * OpenAPI spec version: 0.1.0
  */
+import type { CorporationModules } from "./corporationModules";
 import type { CurrentUserRole } from "./currentUserRole";
 
 export interface CurrentUser {
@@ -17,7 +18,10 @@ export interface CurrentUser {
   corporationId?: number | null;
   /** @nullable */
   corporationName?: string | null;
+  isPrimaryCorporation: boolean;
   role: CurrentUserRole;
+  permissions: string[];
+  modules: CorporationModules;
   totalPap: number;
   redeemablePap: number;
   createdAt: Date;

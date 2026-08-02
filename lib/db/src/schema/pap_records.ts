@@ -4,9 +4,13 @@ import { z } from "zod/v4";
 import { usersTable } from "./users";
 import { charactersTable } from "./characters";
 import { fleetsTable } from "./fleets";
+import { corporationsTable } from "./corporations";
 
 export const papRecordsTable = pgTable("pap_records", {
   id: serial("id").primaryKey(),
+  corporationId: integer("corporation_id")
+    .notNull()
+    .references(() => corporationsTable.id, { onDelete: "cascade" }),
   userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
   characterId: integer("character_id").references(() => charactersTable.id, { onDelete: "set null" }),
   fleetId: integer("fleet_id").references(() => fleetsTable.id, { onDelete: "set null" }),

@@ -2,6 +2,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { db, redemptionsTable, rewardsTable, usersTable } from "@workspace/db";
 import { and, count, desc, eq, ne } from "drizzle-orm";
 import { requireAuth, hasRole } from "../middlewares/auth";
+import { requireModule, requireTenant } from "../lib/tenant";
 import {
   CreateRewardBody,
   UpdateRewardParams,
@@ -11,6 +12,7 @@ import {
 import { addCalendarMonths, ensureCorporationJoinedAt } from "../lib/corporation-membership";
 
 const router: IRouter = Router();
+router.use("/rewards", requireAuth, requireTenant, requireModule("pap"));
 
 function isValidOptionalPositiveInteger(value: number | null | undefined): boolean {
   return value === null || value === undefined || (Number.isInteger(value) && value > 0);
@@ -18,7 +20,9 @@ function isValidOptionalPositiveInteger(value: number | null | undefined): boole
 
 // GET /api/rewards
 router.get("/rewards", requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const rewards = await db.select().from(rewardsTable).orderBy(desc(rewardsTable.createdAt));
+  const rewards = await db.select().from(rewardsTable)
+    .where(eq(rewardsTable.corporationId, req.tenant!.corporation.id))
+    .orderBy(desc(rewardsTable.createdAt));
   const hasTenureLimitedRewards = rewards.some((reward) => reward.eligibilityMonths !== null);
   const hasRedemptionLimitedRewards = rewards.some((reward) => reward.maxRedemptionsPerUser !== null);
   const [currentUser] = hasTenureLimitedRewards
@@ -73,7 +77,7 @@ router.get("/rewards", requireAuth, async (req: Request, res: Response): Promise
 // POST /api/rewards - admin only
 router.post("/rewards", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || !hasRole(currentUser.role, "admin")) {
+  if (!currentUser || !hasRole(req.tenant!.membership.role, "admin")) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -95,6 +99,7 @@ router.post("/rewards", requireAuth, async (req: Request, res: Response): Promis
   const [reward] = await db
     .insert(rewardsTable)
     .values({
+      corporationId: req.tenant!.corporation.id,
       name: body.data.name,
       description: body.data.description ?? null,
       papCost: body.data.papCost,
@@ -111,7 +116,7 @@ router.post("/rewards", requireAuth, async (req: Request, res: Response): Promis
 // PATCH /api/rewards/:id - admin only
 router.patch("/rewards/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || !hasRole(currentUser.role, "admin")) {
+  if (!currentUser || !hasRole(req.tenant!.membership.role, "admin")) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -148,7 +153,10 @@ router.patch("/rewards/:id", requireAuth, async (req: Request, res: Response): P
   const [reward] = await db
     .update(rewardsTable)
     .set(updates)
-    .where(eq(rewardsTable.id, params.data.id))
+    .where(and(
+      eq(rewardsTable.id, params.data.id),
+      eq(rewardsTable.corporationId, req.tenant!.corporation.id),
+    ))
     .returning();
 
   if (!reward) {
@@ -162,7 +170,7 @@ router.patch("/rewards/:id", requireAuth, async (req: Request, res: Response): P
 // DELETE /api/rewards/:id - admin only
 router.delete("/rewards/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || !hasRole(currentUser.role, "admin")) {
+  if (!currentUser || !hasRole(req.tenant!.membership.role, "admin")) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -175,7 +183,10 @@ router.delete("/rewards/:id", requireAuth, async (req: Request, res: Response): 
 
   const [deletedReward] = await db
     .delete(rewardsTable)
-    .where(eq(rewardsTable.id, params.data.id))
+    .where(and(
+      eq(rewardsTable.id, params.data.id),
+      eq(rewardsTable.corporationId, req.tenant!.corporation.id),
+    ))
     .returning({ id: rewardsTable.id });
 
   if (!deletedReward) {

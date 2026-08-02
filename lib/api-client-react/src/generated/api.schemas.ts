@@ -29,6 +29,15 @@ export const CurrentUserRole = {
   controller: "controller",
 } as const;
 
+export interface CorporationModules {
+  pap: boolean;
+  identity: boolean;
+  economy: boolean;
+  fleet: boolean;
+  reimbursement: boolean;
+  diplomacy: boolean;
+}
+
 export interface CurrentUser {
   id: number;
   /** @nullable */
@@ -39,7 +48,10 @@ export interface CurrentUser {
   corporationId?: number | null;
   /** @nullable */
   corporationName?: string | null;
+  isPrimaryCorporation: boolean;
   role: CurrentUserRole;
+  permissions: string[];
+  modules: CorporationModules;
   totalPap: number;
   redeemablePap: number;
   createdAt: string;
@@ -290,14 +302,25 @@ export interface FittingSimulationResult {
   limitations: string[];
 }
 
+export interface FleetReimbursementRule {
+  description?: string;
+  /** @nullable */
+  maximumAmount?: number | null;
+  eligibleShips?: string[];
+}
+
 export interface Fleet {
   id: number;
+  corporationId: number;
   /** @nullable */
   eveFleetId?: string | null;
   name: string;
   fleetCommander: string;
   papValue: number;
   isActive: boolean;
+  fleetFunction: string;
+  reimbursementEnabled: boolean;
+  reimbursementRule?: FleetReimbursementRule | null;
   /** @nullable */
   startedAt?: string | null;
   /** @nullable */
@@ -317,6 +340,9 @@ export interface CreateFleetBody {
   papValue: number;
   /** @nullable */
   startedAt?: string | null;
+  fleetFunction?: string;
+  reimbursementEnabled?: boolean;
+  reimbursementRule?: FleetReimbursementRule | null;
 }
 
 export type BattleReportSummaryStatus =
@@ -713,6 +739,9 @@ export interface UpdateFleetBody {
   endedAt?: string | null;
   /** @nullable */
   eveFleetId?: string | null;
+  fleetFunction?: string;
+  reimbursementEnabled?: boolean;
+  reimbursementRule?: FleetReimbursementRule | null;
 }
 
 export interface Announcement {
@@ -918,6 +947,332 @@ export interface TopContributor {
   fleetCount: number;
 }
 
+export interface RequiredSkill {
+  skillId: number;
+  name: string;
+  /**
+   * @minimum 1
+   * @maximum 5
+   */
+  level: number;
+}
+
+export type SkillAuditItem = RequiredSkill & {
+  trainedLevel: number;
+  passed: boolean;
+};
+
+export interface SkillAuditResult {
+  checkedAt: string;
+  passed: boolean;
+  skills: SkillAuditItem[];
+}
+
+export type IdentityApplicationGroupCategory =
+  (typeof IdentityApplicationGroupCategory)[keyof typeof IdentityApplicationGroupCategory];
+
+export const IdentityApplicationGroupCategory = {
+  combat: "combat",
+  management: "management",
+} as const;
+
+export type IdentityApplicationStatus =
+  (typeof IdentityApplicationStatus)[keyof typeof IdentityApplicationStatus];
+
+export const IdentityApplicationStatus = {
+  pending_skill_audit: "pending_skill_audit",
+  pending_review: "pending_review",
+  needs_information: "needs_information",
+  approved: "approved",
+  rejected: "rejected",
+  withdrawn: "withdrawn",
+} as const;
+
+export interface IdentityApplication {
+  id: number;
+  corporationId: number;
+  groupId: number;
+  groupName?: string;
+  groupCategory?: IdentityApplicationGroupCategory;
+  userId: number;
+  /** @nullable */
+  applicantName?: string | null;
+  characterId: number;
+  characterName?: string;
+  statement: string;
+  status: IdentityApplicationStatus;
+  skillAudit?: SkillAuditResult | null;
+  /** @nullable */
+  rejectionReason?: string | null;
+  /** @nullable */
+  reviewerNotes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type IdentityGroupCategory =
+  (typeof IdentityGroupCategory)[keyof typeof IdentityGroupCategory];
+
+export const IdentityGroupCategory = {
+  combat: "combat",
+  management: "management",
+} as const;
+
+export interface IdentityGroup {
+  id: number;
+  corporationId: number;
+  name: string;
+  category: IdentityGroupCategory;
+  description: string;
+  requiredSkills: RequiredSkill[];
+  permissions: string[];
+  isActive: boolean;
+  isMember: boolean;
+  latestApplication?: IdentityApplication | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type IdentityGroupInputCategory =
+  (typeof IdentityGroupInputCategory)[keyof typeof IdentityGroupInputCategory];
+
+export const IdentityGroupInputCategory = {
+  combat: "combat",
+  management: "management",
+} as const;
+
+export interface IdentityGroupInput {
+  name: string;
+  category: IdentityGroupInputCategory;
+  description: string;
+  requiredSkills: RequiredSkill[];
+  isActive?: boolean;
+}
+
+export type DiplomacyCaseCategory =
+  (typeof DiplomacyCaseCategory)[keyof typeof DiplomacyCaseCategory];
+
+export const DiplomacyCaseCategory = {
+  standings: "standings",
+  conflict: "conflict",
+  cooperation: "cooperation",
+  compensation: "compensation",
+  complaint: "complaint",
+  other: "other",
+} as const;
+
+export type DiplomacyCaseUrgency =
+  (typeof DiplomacyCaseUrgency)[keyof typeof DiplomacyCaseUrgency];
+
+export const DiplomacyCaseUrgency = {
+  normal: "normal",
+  high: "high",
+  urgent: "urgent",
+} as const;
+
+export type DiplomacyCaseStatus =
+  (typeof DiplomacyCaseStatus)[keyof typeof DiplomacyCaseStatus];
+
+export const DiplomacyCaseStatus = {
+  submitted: "submitted",
+  accepted: "accepted",
+  investigating: "investigating",
+  waiting: "waiting",
+  resolved: "resolved",
+  rejected: "rejected",
+  closed: "closed",
+} as const;
+
+export interface DiplomacyCase {
+  id: number;
+  corporationId: number;
+  submittedBy: number;
+  submitterCharacterId: number;
+  submitterName: string;
+  category: DiplomacyCaseCategory;
+  counterparty: string;
+  subject: string;
+  description: string;
+  /** @nullable */
+  evidenceUrl?: string | null;
+  urgency: DiplomacyCaseUrgency;
+  status: DiplomacyCaseStatus;
+  /** @nullable */
+  internalNotes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CreateDiplomacyCaseBodyCategory =
+  (typeof CreateDiplomacyCaseBodyCategory)[keyof typeof CreateDiplomacyCaseBodyCategory];
+
+export const CreateDiplomacyCaseBodyCategory = {
+  standings: "standings",
+  conflict: "conflict",
+  cooperation: "cooperation",
+  compensation: "compensation",
+  complaint: "complaint",
+  other: "other",
+} as const;
+
+export type CreateDiplomacyCaseBodyUrgency =
+  (typeof CreateDiplomacyCaseBodyUrgency)[keyof typeof CreateDiplomacyCaseBodyUrgency];
+
+export const CreateDiplomacyCaseBodyUrgency = {
+  normal: "normal",
+  high: "high",
+  urgent: "urgent",
+} as const;
+
+export interface CreateDiplomacyCaseBody {
+  category: CreateDiplomacyCaseBodyCategory;
+  counterparty: string;
+  subject: string;
+  description: string;
+  evidenceUrl?: string;
+  urgency: CreateDiplomacyCaseBodyUrgency;
+}
+
+export interface ReimbursementValidation {
+  killmailVerified: boolean;
+  characterVerified: boolean;
+  /** @nullable */
+  fleetVerified: boolean | null;
+  checkedAt: string;
+  message: string;
+}
+
+export type ReimbursementClaimStatus =
+  (typeof ReimbursementClaimStatus)[keyof typeof ReimbursementClaimStatus];
+
+export const ReimbursementClaimStatus = {
+  submitted: "submitted",
+  reviewing: "reviewing",
+  approved: "approved",
+  partially_approved: "partially_approved",
+  rejected: "rejected",
+  pending_payment: "pending_payment",
+  paid: "paid",
+} as const;
+
+export interface ReimbursementClaim {
+  id: number;
+  corporationId: number;
+  submittedBy: number;
+  characterId: number;
+  characterName: string;
+  /** @nullable */
+  fleetId?: number | null;
+  killmailId: number;
+  killmailUrl: string;
+  lossOccurredAt: string;
+  shipTypeId: number;
+  shipName: string;
+  lossValue: number;
+  requestedAmount: number;
+  /** @nullable */
+  approvedAmount?: number | null;
+  description: string;
+  validation: ReimbursementValidation;
+  status: ReimbursementClaimStatus;
+  /** @nullable */
+  reviewerNotes?: string | null;
+  /** @nullable */
+  paymentReference?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateReimbursementBody {
+  characterId: number;
+  /** @nullable */
+  fleetId?: number | null;
+  killmailUrl: string;
+  requestedAmount: number;
+  description: string;
+}
+
+export type UpdateReimbursementBodyStatus =
+  (typeof UpdateReimbursementBodyStatus)[keyof typeof UpdateReimbursementBodyStatus];
+
+export const UpdateReimbursementBodyStatus = {
+  submitted: "submitted",
+  reviewing: "reviewing",
+  approved: "approved",
+  partially_approved: "partially_approved",
+  rejected: "rejected",
+  pending_payment: "pending_payment",
+  paid: "paid",
+} as const;
+
+export interface UpdateReimbursementBody {
+  status: UpdateReimbursementBodyStatus;
+  /** @nullable */
+  approvedAmount?: number | null;
+  reviewerNotes?: string;
+  paymentReference?: string;
+}
+
+export interface EconomySource {
+  source: string;
+  amount: number;
+}
+
+export interface EconomyAction {
+  title: string;
+  evidence: string;
+  owner: string;
+  steps: string[];
+  startupCost: number;
+  timeToImpactDays: number;
+  expectedMonthlyGain: number;
+  kpi: string;
+  risk: string;
+  confidence: number;
+}
+
+export type EconomyAnalysisSource =
+  (typeof EconomyAnalysisSource)[keyof typeof EconomyAnalysisSource];
+
+export const EconomyAnalysisSource = {
+  openai: "openai",
+  rules: "rules",
+} as const;
+
+export interface EconomyAnalysis {
+  source: EconomyAnalysisSource;
+  model: string;
+  generatedAt: string;
+  summary: string;
+  actions: EconomyAction[];
+}
+
+/**
+ * @nullable
+ */
+export type EconomySummaryConnection = { [key: string]: unknown } | null;
+
+export type EconomySummaryDivisionsItem = { [key: string]: unknown };
+
+export interface EconomySummary {
+  /** @nullable */
+  connection?: EconomySummaryConnection;
+  periodStart: string;
+  periodEnd: string;
+  walletBalance: number;
+  income: number;
+  expenses: number;
+  netGrowth: number;
+  previousNetGrowth: number;
+  reimbursementPaid: number;
+  reimbursementCount: number;
+  entryCount: number;
+  incomeSources: EconomySource[];
+  expenseSources: EconomySource[];
+  divisions: EconomySummaryDivisionsItem[];
+  analysis?: EconomyAnalysis | null;
+}
+
 export type SearchFittingCatalogParams = {
   q?: string;
   category?: SearchFittingCatalogCategory;
@@ -973,4 +1328,33 @@ export const AnalyzeBattleReplay202Status = {
 
 export type AnalyzeBattleReplay202 = {
   status: AnalyzeBattleReplay202Status;
+};
+
+export type ApplyIdentityGroupBody = {
+  characterId: number;
+  statement: string;
+};
+
+export type ReviewIdentityApplicationBodyStatus =
+  (typeof ReviewIdentityApplicationBodyStatus)[keyof typeof ReviewIdentityApplicationBodyStatus];
+
+export const ReviewIdentityApplicationBodyStatus = {
+  pending_review: "pending_review",
+  needs_information: "needs_information",
+  approved: "approved",
+  rejected: "rejected",
+} as const;
+
+export type ReviewIdentityApplicationBody = {
+  status: ReviewIdentityApplicationBodyStatus;
+  reviewerNotes?: string;
+};
+
+export type UpdateDiplomacyCaseBody = {
+  status: string;
+  internalNotes?: string;
+};
+
+export type SyncCorporationWallet200 = {
+  entries: number;
 };

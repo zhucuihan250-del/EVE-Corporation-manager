@@ -1,10 +1,23 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { db, usersTable, charactersTable, papRecordsTable } from "@workspace/db";
+import {
+  corporationWalletConnectionsTable,
+  corporationMembershipsTable,
+  db,
+  usersTable,
+  charactersTable,
+  papRecordsTable,
+} from "@workspace/db";
 import { and, desc, eq, gt, isNotNull, isNull, sql } from "drizzle-orm";
-import { getAuthorizationUrl, getLinkAltAuthorizationUrl, exchangeCode, getCharacterInfo, getCorporationName } from "../lib/eve-sso";
+import { generateOauthState, getAuthorizationUrl, getLinkAltAuthorizationUrl, exchangeCode, getCharacterInfo, getCorporationName } from "../lib/eve-sso";
 import { requireAuth } from "../middlewares/auth";
 import { logger } from "../lib/logger";
 import { getCorporationJoinDate } from "../lib/corporation-membership";
+import {
+  ensureCorporation,
+  ensureCorporationMembership,
+  getTenantContext,
+} from "../lib/tenant";
+import { timingSafeEqual } from "node:crypto";
 
 const router: IRouter = Router();
 
@@ -15,6 +28,17 @@ async function mergeOrphanUser(
   log: { info: (obj: object, msg: string) => void },
 ): Promise<void> {
   if (!orphan) return;
+  const memberships = await db
+    .select()
+    .from(corporationMembershipsTable)
+    .where(eq(corporationMembershipsTable.userId, orphan.id));
+  if (memberships.length > 0) {
+    await db.insert(corporationMembershipsTable).values(memberships.map((membership) => ({
+      corporationId: membership.corporationId,
+      userId: mainUserId,
+      role: membership.role,
+    }))).onConflictDoNothing();
+  }
   // Move all PAP records to main user
   await db.execute(sql`UPDATE pap_records SET user_id = ${mainUserId} WHERE user_id = ${orphan.id}`);
   // Add orphan's accumulated PAP totals to main user
@@ -68,6 +92,7 @@ async function restoreDeletedCharacter(
   characterName: string,
   corporationId: number | null,
   corporationName: string | null,
+  tokens?: { accessToken: string; refreshToken: string; tokenExpiry: Date },
 ) {
   const [restored] = await db
     .update(charactersTable)
@@ -76,6 +101,13 @@ async function restoreDeletedCharacter(
       eveCharacterName: characterName,
       corporationId,
       corporationName,
+      ...(tokens
+        ? {
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken,
+            tokenExpiry: tokens.tokenExpiry,
+          }
+        : {}),
       isMain,
       deletedAt: null,
       retainedUntil: null,
@@ -125,6 +157,9 @@ async function setCharacterAsAccountMain(
     isMain: true,
     deletedAt: null,
     retainedUntil: null,
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
+    tokenExpiry: tokens.tokenExpiry,
   }).where(eq(charactersTable.id, character.id));
   await db.update(usersTable).set({
     eveCharacterId: character.eveCharacterId,
@@ -136,6 +171,23 @@ async function setCharacterAsAccountMain(
     refreshToken: tokens.refreshToken,
     tokenExpiry: tokens.tokenExpiry,
   }).where(eq(usersTable.id, userId));
+}
+
+async function establishTenantSession(
+  req: Request,
+  user: typeof usersTable.$inferSelect,
+  corporationId: number,
+  corporationName: string,
+  eveCharacterId: number,
+): Promise<void> {
+  await ensureCorporation(corporationId, corporationName);
+  await ensureCorporationMembership(
+    user.id,
+    corporationId,
+    user.role as "member" | "fc" | "admin" | "controller",
+  );
+  req.session.corporationId = corporationId;
+  req.session.eveCharacterId = eveCharacterId;
 }
 
 function getCallbackUrl(req: Request): string {
@@ -168,17 +220,38 @@ function redirectToFrontend(res: Response, path: string): void {
   res.redirect(getFrontendRedirectUrl(path));
 }
 
+function validOauthState(expected: string | undefined, received: unknown): received is string {
+  if (!expected || typeof received !== "string") return false;
+  const expectedBuffer = Buffer.from(expected);
+  const receivedBuffer = Buffer.from(received);
+  return expectedBuffer.length === receivedBuffer.length && timingSafeEqual(expectedBuffer, receivedBuffer);
+}
+
 // GET /api/auth/eve/login - redirect to EVE SSO
 router.get("/auth/eve/login", (req: Request, res: Response): void => {
   const callbackUrl = getCallbackUrl(req);
-  req.log.info({ callbackUrl }, "Redirecting to EVE SSO");
-  const url = getAuthorizationUrl(callbackUrl);
-  res.redirect(url);
+  const state = generateOauthState();
+  req.session.eveOauthState = state;
+  req.session.eveOauthFlow = "login";
+  req.session.linkingUserId = undefined;
+  req.session.economyLinkCorporationId = undefined;
+  req.session.save((error) => {
+    if (error) {
+      res.status(500).json({ error: "Unable to start EVE SSO" });
+      return;
+    }
+    req.log.info({ callbackUrl }, "Redirecting to EVE SSO");
+    res.redirect(getAuthorizationUrl(callbackUrl, state));
+  });
 });
 
 // GET /api/auth/eve/link-alt - start alt character linking (must be logged in)
 router.get("/auth/eve/link-alt", requireAuth, (req: Request, res: Response): void => {
   req.session.linkingUserId = req.session.userId;
+  req.session.economyLinkCorporationId = undefined;
+  const state = generateOauthState();
+  req.session.eveOauthState = state;
+  req.session.eveOauthFlow = "link_alt";
   req.session.save((err) => {
     if (err) {
       req.log.error({ err }, "Session save error for link-alt");
@@ -187,16 +260,36 @@ router.get("/auth/eve/link-alt", requireAuth, (req: Request, res: Response): voi
     }
     const callbackUrl = getCallbackUrl(req);
     req.log.info({ callbackUrl, userId: req.session.linkingUserId }, "Starting alt character link via EVE SSO");
-    const url = getLinkAltAuthorizationUrl(callbackUrl);
+    const url = getLinkAltAuthorizationUrl(callbackUrl, state);
     res.redirect(url);
   });
 });
 
 // GET /api/auth/eve/callback - EVE SSO callback
 router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<void> => {
-  const { code } = req.query;
+  const { code, state } = req.query;
   if (!code || typeof code !== "string") {
     res.status(400).json({ error: "Missing authorization code" });
+    return;
+  }
+  if (!validOauthState(req.session.eveOauthState, state) || !req.session.eveOauthFlow) {
+    res.status(400).json({ error: "Invalid or expired EVE SSO state" });
+    return;
+  }
+  const oauthFlow = req.session.eveOauthFlow;
+  if (
+    (oauthFlow === "economy" && !req.session.economyLinkCorporationId)
+    || (oauthFlow === "link_alt" && !req.session.linkingUserId)
+  ) {
+    res.status(400).json({ error: "Invalid EVE SSO flow" });
+    return;
+  }
+  req.session.eveOauthState = undefined;
+  req.session.eveOauthFlow = undefined;
+  try {
+    await new Promise<void>((resolve, reject) => req.session.save((error) => error ? reject(error) : resolve()));
+  } catch {
+    res.status(500).json({ error: "Unable to validate EVE SSO session" });
     return;
   }
 
@@ -217,11 +310,58 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
       : null;
     const mainCharacterTokens = { accessToken, refreshToken, tokenExpiry, corporationJoinedAt };
 
+    if (oauthFlow === "economy" && req.session.economyLinkCorporationId) {
+      const targetCorporationId = req.session.economyLinkCorporationId;
+      req.session.economyLinkCorporationId = undefined;
+      const tenant = await getTenantContext(req);
+      if (
+        !tenant
+        || tenant.corporation.id !== targetCorporationId
+        || corporationId !== targetCorporationId
+        || !tenant.permissions.includes("economy.manage")
+      ) {
+        redirectToFrontend(res, "/economy?error=wallet_forbidden");
+        return;
+      }
+      await db
+        .insert(corporationWalletConnectionsTable)
+        .values({
+          corporationId: targetCorporationId,
+          characterId,
+          connectedBy: tenant.user.id,
+          accessToken,
+          refreshToken,
+          tokenExpiry,
+          status: "connected",
+          lastError: null,
+        })
+        .onConflictDoUpdate({
+          target: corporationWalletConnectionsTable.corporationId,
+          set: {
+            characterId,
+            connectedBy: tenant.user.id,
+            accessToken,
+            refreshToken,
+            tokenExpiry,
+            status: "connected",
+            lastError: null,
+            updatedAt: new Date(),
+          },
+        });
+      req.session.save(() => {});
+      redirectToFrontend(res, "/economy?wallet=connected");
+      return;
+    }
+
     // Alt character linking flow
-    if (req.session.linkingUserId) {
+    if (oauthFlow === "link_alt" && req.session.linkingUserId) {
       const mainUserId = req.session.linkingUserId;
       req.session.linkingUserId = undefined;
       const [mainUser] = await db.select().from(usersTable).where(eq(usersTable.id, mainUserId));
+      if (corporationId) {
+        await ensureCorporation(corporationId, corporationName);
+        await ensureCorporationMembership(mainUserId, corporationId, "member");
+      }
       const shouldBecomeMain = await accountNeedsMainCharacter(mainUserId, mainUser ?? null);
 
       // Check if this character is already actively linked.
@@ -234,6 +374,9 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
             eveCharacterName: characterName,
             corporationId,
             corporationName,
+            accessToken,
+            refreshToken,
+            tokenExpiry,
           }).where(eq(charactersTable.id, existingChar.id)).returning();
           if (shouldBecomeMain && updatedChar) {
             await setCharacterAsAccountMain(mainUserId, updatedChar, mainCharacterTokens);
@@ -250,6 +393,9 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
             corporationId,
             corporationName,
             isMain: shouldBecomeMain,
+            accessToken,
+            refreshToken,
+            tokenExpiry,
           }).where(eq(charactersTable.id, existingChar.id)).returning();
           if (shouldBecomeMain && reclaimedChar) {
             await setCharacterAsAccountMain(mainUserId, reclaimedChar, mainCharacterTokens);
@@ -297,6 +443,7 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
           characterName,
           corporationId,
           corporationName,
+          { accessToken, refreshToken, tokenExpiry },
         );
         if (shouldBecomeMain) {
           await setCharacterAsAccountMain(mainUserId, restoredChar, mainCharacterTokens);
@@ -328,6 +475,9 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
           corporationId,
           corporationName,
           isMain: true,
+          accessToken,
+          refreshToken,
+          tokenExpiry,
         });
         await mergeOrphanUser(orphanByMain, mainUserId, req.log);
         if (shouldBecomeMain) {
@@ -358,6 +508,9 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
         corporationId,
         corporationName,
         isMain: shouldBecomeMain,
+        accessToken,
+        refreshToken,
+        tokenExpiry,
       }).returning();
       if (shouldBecomeMain && newChar) {
         await setCharacterAsAccountMain(mainUserId, newChar, mainCharacterTokens);
@@ -393,6 +546,7 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
             await setCharacterAsAccountMain(mainUser.id, linkedChar, mainCharacterTokens);
           }
           req.session.userId = mainUser.id;
+          await establishTenantSession(req, mainUser, corporationId, corporationName, characterId);
           req.session.save((err) => {
             if (err) {
               req.log.error({ err }, "Session save error (alt-as-main login)");
@@ -438,6 +592,7 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
           characterName,
           corporationId,
           corporationName,
+          { accessToken, refreshToken, tokenExpiry },
         );
         req.log.info({ charId: characterId, userId: user.id, previousCharId: deletedChar.id }, "Restored deleted character on main login");
       } else {
@@ -449,6 +604,9 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
           corporationId,
           corporationName,
           isMain: true,
+          accessToken,
+          refreshToken,
+          tokenExpiry,
         });
       }
     } else {
@@ -481,6 +639,7 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
             characterName,
             corporationId,
             corporationName,
+            { accessToken, refreshToken, tokenExpiry },
           );
           req.log.info({ charId: characterId, userId: user.id, previousCharId: deletedChar.id }, "Restored deleted character for existing main login");
         } else {
@@ -491,11 +650,27 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
             corporationId,
             corporationName,
             isMain: true,
+            accessToken,
+            refreshToken,
+            tokenExpiry,
           });
         }
+      } else {
+        await db
+          .update(charactersTable)
+          .set({
+            eveCharacterName: characterName,
+            corporationId,
+            corporationName,
+            accessToken,
+            refreshToken,
+            tokenExpiry,
+          })
+          .where(eq(charactersTable.id, existingChar.id));
       }
     }
 
+    await establishTenantSession(req, user, corporationId, corporationName, characterId);
     req.session.userId = user.id;
     req.session.save((err) => {
       if (err) {
@@ -513,27 +688,33 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
 
 // GET /api/auth/me - get current user
 router.get("/auth/me", requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const [user] = await db
-    .select()
-    .from(usersTable)
-    .where(eq(usersTable.id, req.session.userId!));
-
-  if (!user) {
+  const tenant = await getTenantContext(req);
+  if (!tenant) {
     req.session.destroy(() => {});
     res.status(401).json({ error: "User not found" });
     return;
   }
 
   res.json({
-    id: user.id,
-    eveCharacterId: user.eveCharacterId,
-    eveCharacterName: user.eveCharacterName,
-    corporationId: user.corporationId,
-    corporationName: user.corporationName,
-    role: user.role,
-    totalPap: user.totalPap,
-    redeemablePap: user.redeemablePap,
-    createdAt: user.createdAt,
+    id: tenant.user.id,
+    eveCharacterId: tenant.actorCharacter?.eveCharacterId ?? null,
+    eveCharacterName: tenant.actorCharacter?.eveCharacterName ?? null,
+    corporationId: tenant.corporation.id,
+    corporationName: tenant.corporation.name,
+    isPrimaryCorporation: tenant.corporation.isPrimary,
+    role: tenant.membership.role,
+    permissions: tenant.permissions,
+    modules: {
+      pap: tenant.corporation.papEnabled,
+      identity: tenant.corporation.identityEnabled,
+      economy: tenant.corporation.economyEnabled,
+      fleet: tenant.corporation.fleetEnabled,
+      reimbursement: tenant.corporation.reimbursementEnabled,
+      diplomacy: tenant.corporation.diplomacyEnabled,
+    },
+    totalPap: tenant.corporation.papEnabled ? tenant.user.totalPap : 0,
+    redeemablePap: tenant.corporation.papEnabled ? tenant.user.redeemablePap : 0,
+    createdAt: tenant.user.createdAt,
   });
 });
 

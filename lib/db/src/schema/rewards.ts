@@ -2,9 +2,11 @@ import { pgTable, text, serial, timestamp, integer, real, boolean, check } from 
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { corporationsTable } from "./corporations";
 
 export const rewardsTable = pgTable("rewards", {
   id: serial("id").primaryKey(),
+  corporationId: integer("corporation_id").notNull().references(() => corporationsTable.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description"),
   papCost: real("pap_cost").notNull(),

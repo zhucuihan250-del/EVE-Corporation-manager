@@ -5,6 +5,7 @@
  * EVE Online PAP Tracking System API
  * OpenAPI spec version: 0.1.0
  */
+import type { FleetReimbursementRule } from "./fleetReimbursementRule";
 
 export interface UpdateFleetBody {
   name?: string;
@@ -15,4 +16,7 @@ export interface UpdateFleetBody {
   endedAt?: string | null;
   /** @nullable */
   eveFleetId?: string | null;
+  fleetFunction?: string;
+  reimbursementEnabled?: boolean;
+  reimbursementRule?: FleetReimbursementRule | null;
 }

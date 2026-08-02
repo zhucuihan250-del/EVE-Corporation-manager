@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { db, usersTable, papRecordsTable, charactersTable, redemptionsTable } from "@workspace/db";
-import { asc, eq, sql } from "drizzle-orm";
+import { corporationMembershipsTable, db, usersTable, papRecordsTable, charactersTable, redemptionsTable } from "@workspace/db";
+import { and, asc, count, eq, inArray, isNull, sql } from "drizzle-orm";
 import { requireAuth, hasRole } from "../middlewares/auth";
 import {
   UpdateUserRoleParams,
@@ -8,47 +8,51 @@ import {
   AdjustUserPapParams,
   AdjustUserPapBody,
 } from "@workspace/api-zod";
+import { requireModule, requireTenant } from "../lib/tenant";
 
 const router: IRouter = Router();
+router.use("/users", requireAuth, requireTenant, requireModule("pap"));
 
-// Middleware to load user for role checks
-async function loadUser(req: Request & { user?: typeof usersTable.$inferSelect }, res: Response, next: () => void): Promise<void> {
-  if (!req.session.userId) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
+async function corporationIdentities(userIds: number[], corporationId: number) {
+  if (userIds.length === 0) return new Map<number, typeof charactersTable.$inferSelect>();
+  const rows = await db.select().from(charactersTable).where(and(
+    inArray(charactersTable.userId, userIds),
+    eq(charactersTable.corporationId, corporationId),
+    isNull(charactersTable.deletedAt),
+  )).orderBy(asc(charactersTable.createdAt), asc(charactersTable.id));
+  const result = new Map<number, typeof charactersTable.$inferSelect>();
+  for (const character of rows) {
+    if (character.userId && !result.has(character.userId)) result.set(character.userId, character);
   }
-  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId));
-  if (!user) {
-    res.status(401).json({ error: "User not found" });
-    return;
-  }
-  (req as Request & { user: typeof usersTable.$inferSelect }).user = user;
-  next();
+  return result;
 }
 
 // GET /api/users - list all users (admin or above)
 router.get("/users", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || !hasRole(currentUser.role, "admin")) {
+  if (!currentUser || !hasRole(req.tenant!.membership.role, "admin")) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
 
   const users = await db
-    .select()
-    .from(usersTable)
+    .select({ user: usersTable, membershipRole: corporationMembershipsTable.role })
+    .from(corporationMembershipsTable)
+    .innerJoin(usersTable, eq(usersTable.id, corporationMembershipsTable.userId))
+    .where(eq(corporationMembershipsTable.corporationId, req.tenant!.corporation.id))
     .orderBy(
       sql`NULLIF(BTRIM(${usersTable.eveCharacterName}), '') IS NULL`,
       sql`LOWER(${usersTable.eveCharacterName})`,
       asc(usersTable.id),
     );
-  res.json(users.map(u => ({
+  const identities = await corporationIdentities(users.map(({ user }) => user.id), req.tenant!.corporation.id);
+  res.json(users.map(({ user: u, membershipRole }) => ({
     id: u.id,
-    eveCharacterId: u.eveCharacterId,
-    eveCharacterName: u.eveCharacterName,
-    corporationId: u.corporationId,
-    corporationName: u.corporationName,
-    role: u.role,
+    eveCharacterId: identities.get(u.id)?.eveCharacterId ?? null,
+    eveCharacterName: identities.get(u.id)?.eveCharacterName ?? null,
+    corporationId: req.tenant!.corporation.id,
+    corporationName: req.tenant!.corporation.name,
+    role: membershipRole,
     totalPap: u.totalPap,
     redeemablePap: u.redeemablePap,
     createdAt: u.createdAt,
@@ -63,29 +67,36 @@ router.get("/users/:id", requireAuth, async (req: Request, res: Response): Promi
     return;
   }
 
-  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, params.data.id));
-  if (!user) {
+  const [row] = await db.select({ user: usersTable, role: corporationMembershipsTable.role })
+    .from(corporationMembershipsTable)
+    .innerJoin(usersTable, eq(usersTable.id, corporationMembershipsTable.userId))
+    .where(and(
+      eq(corporationMembershipsTable.corporationId, req.tenant!.corporation.id),
+      eq(corporationMembershipsTable.userId, params.data.id),
+    ));
+  if (!row) {
     res.status(404).json({ error: "User not found" });
     return;
   }
+  const identity = (await corporationIdentities([row.user.id], req.tenant!.corporation.id)).get(row.user.id);
 
   res.json({
-    id: user.id,
-    eveCharacterId: user.eveCharacterId,
-    eveCharacterName: user.eveCharacterName,
-    corporationId: user.corporationId,
-    corporationName: user.corporationName,
-    role: user.role,
-    totalPap: user.totalPap,
-    redeemablePap: user.redeemablePap,
-    createdAt: user.createdAt,
+    id: row.user.id,
+    eveCharacterId: identity?.eveCharacterId ?? null,
+    eveCharacterName: identity?.eveCharacterName ?? null,
+    corporationId: req.tenant!.corporation.id,
+    corporationName: req.tenant!.corporation.name,
+    role: row.role,
+    totalPap: row.user.totalPap,
+    redeemablePap: row.user.redeemablePap,
+    createdAt: row.user.createdAt,
   });
 });
 
 // PATCH /api/users/:id/role - controller only
 router.patch("/users/:id/role", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || !hasRole(currentUser.role, "controller")) {
+  if (!currentUser || !hasRole(req.tenant!.membership.role, "controller")) {
     res.status(403).json({ error: "Forbidden: controller only" });
     return;
   }
@@ -102,24 +113,32 @@ router.patch("/users/:id/role", requireAuth, async (req: Request, res: Response)
     return;
   }
 
-  const [user] = await db
-    .update(usersTable)
+  const [membership] = await db.update(corporationMembershipsTable)
     .set({ role: body.data.role })
-    .where(eq(usersTable.id, params.data.id))
-    .returning();
+    .where(and(
+      eq(corporationMembershipsTable.corporationId, req.tenant!.corporation.id),
+      eq(corporationMembershipsTable.userId, params.data.id),
+    )).returning();
+  const [user] = membership
+    ? await db.select().from(usersTable).where(eq(usersTable.id, params.data.id))
+    : [];
+  if (user?.corporationId === req.tenant!.corporation.id) {
+    await db.update(usersTable).set({ role: body.data.role }).where(eq(usersTable.id, user.id));
+  }
 
   if (!user) {
     res.status(404).json({ error: "User not found" });
     return;
   }
+  const identity = (await corporationIdentities([user.id], req.tenant!.corporation.id)).get(user.id);
 
   res.json({
     id: user.id,
-    eveCharacterId: user.eveCharacterId,
-    eveCharacterName: user.eveCharacterName,
-    corporationId: user.corporationId,
-    corporationName: user.corporationName,
-    role: user.role,
+    eveCharacterId: identity?.eveCharacterId ?? null,
+    eveCharacterName: identity?.eveCharacterName ?? null,
+    corporationId: req.tenant!.corporation.id,
+    corporationName: req.tenant!.corporation.name,
+    role: membership.role,
     totalPap: user.totalPap,
     redeemablePap: user.redeemablePap,
     createdAt: user.createdAt,
@@ -129,7 +148,7 @@ router.patch("/users/:id/role", requireAuth, async (req: Request, res: Response)
 // PATCH /api/users/:id/pap - admin or above
 router.patch("/users/:id/pap", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || !hasRole(currentUser.role, "admin")) {
+  if (!currentUser || !hasRole(req.tenant!.membership.role, "admin")) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -146,8 +165,14 @@ router.patch("/users/:id/pap", requireAuth, async (req: Request, res: Response):
     return;
   }
 
-  const [targetUser] = await db.select().from(usersTable).where(eq(usersTable.id, params.data.id));
-  if (!targetUser) {
+  const [targetMembership] = await db.select().from(corporationMembershipsTable).where(and(
+    eq(corporationMembershipsTable.corporationId, req.tenant!.corporation.id),
+    eq(corporationMembershipsTable.userId, params.data.id),
+  ));
+  const [targetUser] = targetMembership
+    ? await db.select().from(usersTable).where(eq(usersTable.id, params.data.id))
+    : [];
+  if (!targetMembership || !targetUser) {
     res.status(404).json({ error: "User not found" });
     return;
   }
@@ -161,6 +186,7 @@ router.patch("/users/:id/pap", requireAuth, async (req: Request, res: Response):
   }).where(eq(usersTable.id, params.data.id));
 
   await db.insert(papRecordsTable).values({
+    corporationId: req.tenant!.corporation.id,
     userId: params.data.id,
     amount: body.data.amount,
     type: "adjustment",
@@ -173,7 +199,7 @@ router.patch("/users/:id/pap", requireAuth, async (req: Request, res: Response):
 // DELETE /api/users/:id - completely remove a user and all their data (admin or above)
 router.delete("/users/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!));
-  if (!currentUser || !hasRole(currentUser.role, "admin")) {
+  if (!currentUser || !hasRole(req.tenant!.membership.role, "admin")) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -189,20 +215,33 @@ router.delete("/users/:id", requireAuth, async (req: Request, res: Response): Pr
     return;
   }
 
-  const [target] = await db.select().from(usersTable).where(eq(usersTable.id, targetId));
-  if (!target) {
+  const [targetMembership] = await db.select().from(corporationMembershipsTable).where(and(
+    eq(corporationMembershipsTable.corporationId, req.tenant!.corporation.id),
+    eq(corporationMembershipsTable.userId, targetId),
+  ));
+  const [target] = targetMembership ? await db.select().from(usersTable).where(eq(usersTable.id, targetId)) : [];
+  if (!targetMembership || !target) {
     res.status(404).json({ error: "User not found" });
     return;
   }
 
+  const [{ membershipCount }] = await db.select({ membershipCount: count() })
+    .from(corporationMembershipsTable)
+    .where(eq(corporationMembershipsTable.userId, targetId));
+  if (membershipCount > 1) {
+    res.status(409).json({ error: "该账号属于多个军团，不能由单个军团删除整个账号" });
+    return;
+  }
+  const identity = (await corporationIdentities([targetId], req.tenant!.corporation.id)).get(targetId);
+
   // Cascade delete: PAP records, redemptions, characters, then user
   // (FK cascade handles most of this, but we log what's removed)
-  await db.delete(papRecordsTable).where(eq(papRecordsTable.userId, targetId));
-  await db.delete(redemptionsTable).where(eq(redemptionsTable.userId, targetId));
+  await db.delete(papRecordsTable).where(and(eq(papRecordsTable.userId, targetId), eq(papRecordsTable.corporationId, req.tenant!.corporation.id)));
+  await db.delete(redemptionsTable).where(and(eq(redemptionsTable.userId, targetId), eq(redemptionsTable.corporationId, req.tenant!.corporation.id)));
   await db.delete(charactersTable).where(eq(charactersTable.userId, targetId));
   await db.delete(usersTable).where(eq(usersTable.id, targetId));
 
-  req.log.info({ deletedUserId: targetId, name: target.eveCharacterName }, "Admin hard-deleted user and all their data");
+  req.log.info({ deletedUserId: targetId, name: identity?.eveCharacterName ?? null }, "Admin hard-deleted user and all their data");
   res.json({ success: true });
 });
 

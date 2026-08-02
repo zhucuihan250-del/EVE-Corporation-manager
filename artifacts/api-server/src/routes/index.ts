@@ -12,6 +12,10 @@ import announcementsRouter from "./announcements";
 import battleReportsRouter from "./battle-reports";
 import battleReplaysRouter from "./battle-replays";
 import fittingRouter from "./fitting";
+import identityGroupsRouter from "./identity-groups";
+import diplomacyRouter from "./diplomacy";
+import reimbursementsRouter from "./reimbursements";
+import economyRouter from "./economy";
 
 const router: IRouter = Router();
 
@@ -28,5 +32,9 @@ router.use(announcementsRouter);
 router.use(battleReportsRouter);
 router.use(battleReplaysRouter);
 router.use(fittingRouter);
+router.use(identityGroupsRouter);
+router.use(diplomacyRouter);
+router.use(reimbursementsRouter);
+router.use(economyRouter);
 
 export default router;

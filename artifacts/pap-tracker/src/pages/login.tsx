@@ -15,7 +15,7 @@ export function Login() {
 
   useEffect(() => {
     if (!isLoading && user) {
-      setLocation("/dashboard");
+      setLocation(user.modules.pap ? "/dashboard" : user.modules.reimbursement ? "/reimbursements" : "/diplomacy");
     }
   }, [user, isLoading, setLocation]);
 

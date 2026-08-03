@@ -1186,13 +1186,34 @@ paths:
               schema:
                 $ref: "#/components/schemas/ReimbursementClaim"
 
+  /reimbursements/losses:
+    get:
+      operationId: listReimbursementLosses
+      tags: [reimbursements]
+      summary: List recent zKillboard losses for one of the current user's characters
+      parameters:
+        - in: query
+          name: characterId
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Recent verified losses that can be submitted with one click
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReimbursementLoss"
+
   /reimbursements/fleets:
     get:
       operationId: listReimbursementFleets
       tags: [reimbursements]
+      deprecated: true
       responses:
         "200":
-          description: Eligible fleets for the active corporation
+          description: Legacy fleet eligibility response; reimbursement is no longer fleet-restricted
           content:
             application/json:
               schema:
@@ -2879,11 +2900,42 @@ components:
       type: object
       properties:
         characterId: { type: integer }
-        fleetId: { type: ["integer", "null"] }
+        killmailId:
+          type: integer
+          description: zKillboard killmail selected from the recent losses endpoint
+        fleetId:
+          type: ["integer", "null"]
+          deprecated: true
+          description: Accepted for backward compatibility and ignored
+        killmailUrl:
+          type: string
+          deprecated: true
+          description: Legacy alternative to killmailId
+        requestedAmount:
+          type: number
+          deprecated: true
+          description: Accepted for backward compatibility and ignored; the verified loss value is used
+        description:
+          type: string
+          deprecated: true
+          description: Optional legacy note
+      required: [characterId]
+
+    ReimbursementLoss:
+      type: object
+      properties:
+        killmailId: { type: integer }
         killmailUrl: { type: string }
-        requestedAmount: { type: number }
-        description: { type: string }
-      required: [characterId, killmailUrl, requestedAmount, description]
+        lossOccurredAt: { type: string, format: date-time }
+        shipTypeId: { type: integer }
+        shipName: { type: string }
+        lossValue: { type: number }
+        alreadySubmitted: { type: boolean }
+        claimId: { type: ["integer", "null"] }
+        claimStatus:
+          type: ["string", "null"]
+          enum: [submitted, reviewing, approved, partially_approved, rejected, pending_payment, paid, null]
+      required: [killmailId, killmailUrl, lossOccurredAt, shipTypeId, shipName, lossValue, alreadySubmitted, claimId, claimStatus]
 
     UpdateReimbursementBody:
       type: object

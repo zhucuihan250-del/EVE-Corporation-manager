@@ -8,9 +8,27 @@
 
 export interface CreateReimbursementBody {
   characterId: number;
-  /** @nullable */
+  /** zKillboard killmail selected from the recent losses endpoint */
+  killmailId?: number;
+  /**
+   * Accepted for backward compatibility and ignored
+   * @deprecated
+   * @nullable
+   */
   fleetId?: number | null;
-  killmailUrl: string;
-  requestedAmount: number;
-  description: string;
+  /**
+   * Legacy alternative to killmailId
+   * @deprecated
+   */
+  killmailUrl?: string;
+  /**
+   * Accepted for backward compatibility and ignored; the verified loss value is used
+   * @deprecated
+   */
+  requestedAmount?: number;
+  /**
+   * Optional legacy note
+   * @deprecated
+   */
+  description?: string;
 }

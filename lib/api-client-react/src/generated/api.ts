@@ -51,10 +51,12 @@ import type {
   IdentityApplication,
   IdentityGroup,
   IdentityGroupInput,
+  ListReimbursementLossesParams,
   PapRecord,
   Redemption,
   RefreshBattleReport202,
   ReimbursementClaim,
+  ReimbursementLoss,
   ReviewIdentityApplicationBody,
   Reward,
   ScanFleetResponse,
@@ -4723,6 +4725,112 @@ export const useCreateReimbursement = <
   return useMutation(getCreateReimbursementMutationOptions(options));
 };
 
+/**
+ * @summary List recent zKillboard losses for one of the current user's characters
+ */
+export const getListReimbursementLossesUrl = (
+  params: ListReimbursementLossesParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/reimbursements/losses?${stringifiedParams}`
+    : `/api/reimbursements/losses`;
+};
+
+export const listReimbursementLosses = async (
+  params: ListReimbursementLossesParams,
+  options?: RequestInit,
+): Promise<ReimbursementLoss[]> => {
+  return customFetch<ReimbursementLoss[]>(
+    getListReimbursementLossesUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListReimbursementLossesQueryKey = (
+  params?: ListReimbursementLossesParams,
+) => {
+  return [`/api/reimbursements/losses`, ...(params ? [params] : [])] as const;
+};
+
+export const getListReimbursementLossesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listReimbursementLosses>>,
+  TError = ErrorType<unknown>,
+>(
+  params: ListReimbursementLossesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listReimbursementLosses>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListReimbursementLossesQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listReimbursementLosses>>
+  > = ({ signal }) =>
+    listReimbursementLosses(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listReimbursementLosses>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListReimbursementLossesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listReimbursementLosses>>
+>;
+export type ListReimbursementLossesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List recent zKillboard losses for one of the current user's characters
+ */
+
+export function useListReimbursementLosses<
+  TData = Awaited<ReturnType<typeof listReimbursementLosses>>,
+  TError = ErrorType<unknown>,
+>(
+  params: ListReimbursementLossesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listReimbursementLosses>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListReimbursementLossesQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @deprecated
+ */
 export const getListReimbursementFleetsUrl = () => {
   return `/api/reimbursements/fleets`;
 };
@@ -4771,6 +4879,10 @@ export type ListReimbursementFleetsQueryResult = NonNullable<
   Awaited<ReturnType<typeof listReimbursementFleets>>
 >;
 export type ListReimbursementFleetsQueryError = ErrorType<unknown>;
+
+/**
+ * @deprecated
+ */
 
 export function useListReimbursementFleets<
   TData = Awaited<ReturnType<typeof listReimbursementFleets>>,

@@ -1185,11 +1185,60 @@ export interface ReimbursementClaim {
 
 export interface CreateReimbursementBody {
   characterId: number;
-  /** @nullable */
+  /** zKillboard killmail selected from the recent losses endpoint */
+  killmailId?: number;
+  /**
+   * Accepted for backward compatibility and ignored
+   * @deprecated
+   * @nullable
+   */
   fleetId?: number | null;
+  /**
+   * Legacy alternative to killmailId
+   * @deprecated
+   */
+  killmailUrl?: string;
+  /**
+   * Accepted for backward compatibility and ignored; the verified loss value is used
+   * @deprecated
+   */
+  requestedAmount?: number;
+  /**
+   * Optional legacy note
+   * @deprecated
+   */
+  description?: string;
+}
+
+/**
+ * @nullable
+ */
+export type ReimbursementLossClaimStatus =
+  | (typeof ReimbursementLossClaimStatus)[keyof typeof ReimbursementLossClaimStatus]
+  | null;
+
+export const ReimbursementLossClaimStatus = {
+  submitted: "submitted",
+  reviewing: "reviewing",
+  approved: "approved",
+  partially_approved: "partially_approved",
+  rejected: "rejected",
+  pending_payment: "pending_payment",
+  paid: "paid",
+} as const;
+
+export interface ReimbursementLoss {
+  killmailId: number;
   killmailUrl: string;
-  requestedAmount: number;
-  description: string;
+  lossOccurredAt: string;
+  shipTypeId: number;
+  shipName: string;
+  lossValue: number;
+  alreadySubmitted: boolean;
+  /** @nullable */
+  claimId: number | null;
+  /** @nullable */
+  claimStatus: ReimbursementLossClaimStatus;
 }
 
 export type UpdateReimbursementBodyStatus =
@@ -1353,6 +1402,10 @@ export type ReviewIdentityApplicationBody = {
 export type UpdateDiplomacyCaseBody = {
   status: string;
   internalNotes?: string;
+};
+
+export type ListReimbursementLossesParams = {
+  characterId: number;
 };
 
 export type SyncCorporationWallet200 = {

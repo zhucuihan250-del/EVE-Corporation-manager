@@ -2386,12 +2386,63 @@ export const ListReimbursementsResponse = zod.array(
 
 export const CreateReimbursementBody = zod.object({
   characterId: zod.number(),
-  fleetId: zod.number().nullish(),
-  killmailUrl: zod.string(),
-  requestedAmount: zod.number(),
-  description: zod.string(),
+  killmailId: zod
+    .number()
+    .optional()
+    .describe("zKillboard killmail selected from the recent losses endpoint"),
+  fleetId: zod
+    .number()
+    .nullish()
+    .describe("Accepted for backward compatibility and ignored"),
+  killmailUrl: zod
+    .string()
+    .optional()
+    .describe("Legacy alternative to killmailId"),
+  requestedAmount: zod
+    .number()
+    .optional()
+    .describe(
+      "Accepted for backward compatibility and ignored; the verified loss value is used",
+    ),
+  description: zod.string().optional().describe("Optional legacy note"),
 });
 
+/**
+ * @summary List recent zKillboard losses for one of the current user's characters
+ */
+export const ListReimbursementLossesQueryParams = zod.object({
+  characterId: zod.coerce.number(),
+});
+
+export const ListReimbursementLossesResponseItem = zod.object({
+  killmailId: zod.number(),
+  killmailUrl: zod.string(),
+  lossOccurredAt: zod.coerce.date(),
+  shipTypeId: zod.number(),
+  shipName: zod.string(),
+  lossValue: zod.number(),
+  alreadySubmitted: zod.boolean(),
+  claimId: zod.number().nullable(),
+  claimStatus: zod
+    .union([
+      zod.literal("submitted"),
+      zod.literal("reviewing"),
+      zod.literal("approved"),
+      zod.literal("partially_approved"),
+      zod.literal("rejected"),
+      zod.literal("pending_payment"),
+      zod.literal("paid"),
+      zod.literal(null),
+    ])
+    .nullable(),
+});
+export const ListReimbursementLossesResponse = zod.array(
+  ListReimbursementLossesResponseItem,
+);
+
+/**
+ * @deprecated
+ */
 export const ListReimbursementFleetsResponseItem = zod.object({
   id: zod.number(),
   corporationId: zod.number(),

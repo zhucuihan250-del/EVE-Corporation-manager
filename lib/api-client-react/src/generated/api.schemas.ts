@@ -52,6 +52,7 @@ export interface CurrentUser {
   role: CurrentUserRole;
   permissions: string[];
   modules: CorporationModules;
+  reimbursementOpen: boolean;
   totalPap: number;
   redeemablePap: number;
   createdAt: string;
@@ -1140,6 +1141,14 @@ export interface ReimbursementValidation {
   fleetVerified: boolean | null;
   checkedAt: string;
   message: string;
+}
+
+export interface ReimbursementWindowStatus {
+  open: boolean;
+}
+
+export interface UpdateReimbursementWindowBody {
+  open: boolean;
 }
 
 export type ReimbursementClaimStatus =

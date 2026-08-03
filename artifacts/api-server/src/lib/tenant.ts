@@ -228,7 +228,11 @@ export async function getTenantContext(req: Request): Promise<TenantContext | nu
 
   const permissions = await loadPermissions(user.id, corporationId);
   if (membership.role === "controller") {
-    permissions.push("economy.view", "economy.manage");
+    permissions.push(
+      "economy.view",
+      "economy.manage",
+      "reimbursement.window.manage",
+    );
   }
   const scopedPermissions = [...new Set(permissions)];
   req.tenant = { user, corporation, membership, actorCharacter: actorCharacter ?? null, permissions: scopedPermissions };

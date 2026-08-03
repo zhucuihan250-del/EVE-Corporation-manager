@@ -256,7 +256,7 @@ export const corporationPlatformModulesMigration = {
         ('FC组', 'management', '舰队创建与指挥管理', '[]', '["fleet.manage"]'),
         ('外交组', 'management', '处理军团外交问题', '[]', '["diplomacy.manage"]'),
         ('补损审核组', 'management', '审核及记录舰船补损', '[]', '["reimbursement.manage"]'),
-        ('总监组', 'management', '军团总监专属管理权限', '[]', '["economy.view","economy.manage","diplomacy.manage","reimbursement.manage","identity.manage"]')
+        ('总监组', 'management', '军团总监专属管理权限', '[]', '["economy.view","economy.manage","diplomacy.manage","reimbursement.manage","reimbursement.window.manage","identity.manage"]')
       ) AS seed("name", "category", "description", "required_skills", "permissions")
       WHERE c."is_primary" = true;
 

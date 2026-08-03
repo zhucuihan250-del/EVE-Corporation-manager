@@ -34,6 +34,7 @@ import { IdentityGroups } from "@/pages/identity-groups";
 import { Diplomacy } from "@/pages/diplomacy";
 import { Reimbursements } from "@/pages/reimbursements";
 import { Economy } from "@/pages/economy";
+import { ReimbursementSettings } from "@/pages/reimbursement-settings";
 import type { CorporationModules, CurrentUser } from "@workspace/api-client-react";
 
 const queryClient = new QueryClient({
@@ -54,7 +55,8 @@ function hasRole(userRole: string, minRole: Role): boolean {
 
 function defaultLanding(user: CurrentUser): string {
   if (user.modules.pap) return "/dashboard";
-  if (user.modules.reimbursement) return "/reimbursements";
+  if (user.modules.reimbursement && user.reimbursementOpen) return "/reimbursements";
+  if (user.modules.reimbursement && user.permissions.includes("reimbursement.window.manage")) return "/reimbursement-settings";
   if (user.modules.diplomacy) return "/diplomacy";
   return "/";
 }
@@ -65,12 +67,14 @@ function ProtectedRoute({
   module,
   permission,
   permissionAlternative,
+  requiresReimbursementOpen,
 }: {
   component: any;
   minRole?: Role;
   module?: keyof CorporationModules;
   permission?: string;
   permissionAlternative?: string;
+  requiresReimbursementOpen?: boolean;
 }) {
   const { data: user, isLoading, isError, error } = useGetMe();
   const [, setLocation] = useLocation();
@@ -92,11 +96,12 @@ function ProtectedRoute({
       user
       && ((minRole && !hasRole(user.role, minRole) && !(permissionAlternative && user.permissions.includes(permissionAlternative)))
         || (module && !user.modules[module])
+        || (requiresReimbursementOpen && !user.reimbursementOpen)
         || (permission && !user.permissions.includes(permission)))
     ) {
       setLocation(defaultLanding(user));
     }
-  }, [isLoading, isError, isUnauthorized, user, setLocation, minRole, module, permission, permissionAlternative]);
+  }, [isLoading, isError, isUnauthorized, user, setLocation, minRole, module, permission, permissionAlternative, requiresReimbursementOpen]);
 
   if (isLoading) {
     return (
@@ -120,6 +125,7 @@ function ProtectedRoute({
     || !user
     || (minRole && !hasRole(user.role, minRole) && !(permissionAlternative && user.permissions.includes(permissionAlternative)))
     || (module && !user.modules[module])
+    || (requiresReimbursementOpen && !user.reimbursementOpen)
     || (permission && !user.permissions.includes(permission))
   ) {
     return null;
@@ -167,7 +173,10 @@ function Router() {
         {() => <ProtectedRoute component={Diplomacy} module="diplomacy" />}
       </Route>
       <Route path="/reimbursements">
-        {() => <ProtectedRoute component={Reimbursements} module="reimbursement" />}
+        {() => <ProtectedRoute component={Reimbursements} module="reimbursement" requiresReimbursementOpen />}
+      </Route>
+      <Route path="/reimbursement-settings">
+        {() => <ProtectedRoute component={ReimbursementSettings} module="reimbursement" permission="reimbursement.window.manage" />}
       </Route>
       <Route path="/economy">
         {() => <ProtectedRoute component={Economy} module="economy" permission="economy.view" />}

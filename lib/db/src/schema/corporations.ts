@@ -19,6 +19,7 @@ export const corporationsTable = pgTable("corporations", {
   economyEnabled: boolean("economy_enabled").notNull().default(false),
   fleetEnabled: boolean("fleet_enabled").notNull().default(false),
   reimbursementEnabled: boolean("reimbursement_enabled").notNull().default(true),
+  reimbursementOpen: boolean("reimbursement_open").notNull().default(true),
   diplomacyEnabled: boolean("diplomacy_enabled").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })

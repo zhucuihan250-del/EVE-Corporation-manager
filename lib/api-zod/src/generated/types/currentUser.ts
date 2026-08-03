@@ -22,6 +22,7 @@ export interface CurrentUser {
   role: CurrentUserRole;
   permissions: string[];
   modules: CorporationModules;
+  reimbursementOpen: boolean;
   totalPap: number;
   redeemablePap: number;
   createdAt: Date;

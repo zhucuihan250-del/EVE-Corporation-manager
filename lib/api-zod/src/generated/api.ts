@@ -34,6 +34,7 @@ export const GetMeResponse = zod.object({
     reimbursement: zod.boolean(),
     diplomacy: zod.boolean(),
   }),
+  reimbursementOpen: zod.boolean(),
   totalPap: zod.number(),
   redeemablePap: zod.number(),
   createdAt: zod.coerce.date(),
@@ -2405,6 +2406,17 @@ export const CreateReimbursementBody = zod.object({
       "Accepted for backward compatibility and ignored; the verified loss value is used",
     ),
   description: zod.string().optional().describe("Optional legacy note"),
+});
+
+/**
+ * @summary Open or close the current corporation's reimbursement window
+ */
+export const UpdateReimbursementWindowBody = zod.object({
+  open: zod.boolean(),
+});
+
+export const UpdateReimbursementWindowResponse = zod.object({
+  open: zod.boolean(),
 });
 
 /**

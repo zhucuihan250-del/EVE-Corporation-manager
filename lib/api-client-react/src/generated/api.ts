@@ -57,6 +57,7 @@ import type {
   RefreshBattleReport202,
   ReimbursementClaim,
   ReimbursementLoss,
+  ReimbursementWindowStatus,
   ReviewIdentityApplicationBody,
   Reward,
   ScanFleetResponse,
@@ -69,6 +70,7 @@ import type {
   UpdateFleetBody,
   UpdateRedemptionBody,
   UpdateReimbursementBody,
+  UpdateReimbursementWindowBody,
   UpdateRewardBody,
   UpdateUserRoleBody,
   User,
@@ -4723,6 +4725,96 @@ export const useCreateReimbursement = <
   TContext
 > => {
   return useMutation(getCreateReimbursementMutationOptions(options));
+};
+
+/**
+ * @summary Open or close the current corporation's reimbursement window
+ */
+export const getUpdateReimbursementWindowUrl = () => {
+  return `/api/reimbursements/window`;
+};
+
+export const updateReimbursementWindow = async (
+  updateReimbursementWindowBody: UpdateReimbursementWindowBody,
+  options?: RequestInit,
+): Promise<ReimbursementWindowStatus> => {
+  return customFetch<ReimbursementWindowStatus>(
+    getUpdateReimbursementWindowUrl(),
+    {
+      ...options,
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(updateReimbursementWindowBody),
+    },
+  );
+};
+
+export const getUpdateReimbursementWindowMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateReimbursementWindow>>,
+    TError,
+    { data: BodyType<UpdateReimbursementWindowBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateReimbursementWindow>>,
+  TError,
+  { data: BodyType<UpdateReimbursementWindowBody> },
+  TContext
+> => {
+  const mutationKey = ["updateReimbursementWindow"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateReimbursementWindow>>,
+    { data: BodyType<UpdateReimbursementWindowBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return updateReimbursementWindow(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateReimbursementWindowMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateReimbursementWindow>>
+>;
+export type UpdateReimbursementWindowMutationBody =
+  BodyType<UpdateReimbursementWindowBody>;
+export type UpdateReimbursementWindowMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Open or close the current corporation's reimbursement window
+ */
+export const useUpdateReimbursementWindow = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateReimbursementWindow>>,
+    TError,
+    { data: BodyType<UpdateReimbursementWindowBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateReimbursementWindow>>,
+  TError,
+  { data: BodyType<UpdateReimbursementWindowBody> },
+  TContext
+> => {
+  return useMutation(getUpdateReimbursementWindowMutationOptions(options));
 };
 
 /**

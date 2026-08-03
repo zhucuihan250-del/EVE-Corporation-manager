@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import {
   BookOpen, BrainCircuit, ClipboardList, Crosshair, Database, Gift, Handshake,
   History, Inbox, Languages, Landmark, LayoutDashboard, LogOut, Radio, ReceiptText,
-  ShieldAlert, ShieldCheck, Swords, UserSquare2, Users, Wrench,
+  LockKeyhole, ShieldAlert, ShieldCheck, Swords, UserSquare2, Users, Wrench,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent,
@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/sidebar";
 import i18n from "@/i18n";
 
-type NavItem = { href: string; label: string; icon: ElementType; exact?: boolean };
+type NavItem = { href: string; label: string; icon: ElementType; exact?: boolean; disabled?: boolean };
 
 export function Layout({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
@@ -42,7 +42,12 @@ export function Layout({ children }: { children: ReactNode }) {
     );
   }
   if (modules?.identity) serviceItems.push({ href: "/identity-groups", label: tr("身份组", "Identity groups"), icon: ShieldCheck });
-  if (modules?.reimbursement) serviceItems.push({ href: "/reimbursements", label: tr("补损", "Reimbursement"), icon: ReceiptText });
+  if (modules?.reimbursement) serviceItems.push({
+    href: "/reimbursements",
+    label: tr("补损", "Reimbursement"),
+    icon: ReceiptText,
+    disabled: user?.reimbursementOpen === false,
+  });
   if (modules?.diplomacy) serviceItems.push({ href: "/diplomacy", label: tr("外交", "Diplomacy"), icon: Handshake });
   if (modules?.fleet) {
     serviceItems.push(
@@ -80,13 +85,32 @@ export function Layout({ children }: { children: ReactNode }) {
     );
   }
 
-  const renderItems = (items: NavItem[]) => items.map(({ href, label, icon: Icon, exact }) => (
-    <SidebarMenuItem key={href}>
-      <SidebarMenuButton asChild isActive={exact ? location === href : location === href || location.startsWith(`${href}/`)}>
-        <Link href={href} className="font-mono flex items-center gap-3"><Icon className="w-4 h-4" /><span>{label}</span></Link>
-      </SidebarMenuButton>
-    </SidebarMenuItem>
-  ));
+  const directorItems: NavItem[] = [];
+  if (user?.permissions.includes("economy.view") && modules?.economy) {
+    directorItems.push({ href: "/economy", label: tr("军团经济", "Corporation economy"), icon: Landmark });
+  }
+  if (user?.permissions.includes("reimbursement.window.manage") && modules?.reimbursement) {
+    directorItems.push({ href: "/reimbursement-settings", label: tr("补损窗口", "Reimbursement window"), icon: LockKeyhole });
+  }
+
+  const renderItems = (items: NavItem[]) => items.map(({ href, label, icon: Icon, exact, disabled }) => {
+    if (disabled) {
+      return (
+        <SidebarMenuItem key={href}>
+          <SidebarMenuButton disabled className="cursor-not-allowed text-muted-foreground opacity-40" tooltip={tr("补损窗口已关闭", "Reimbursement window is closed")}>
+            <Icon className="w-4 h-4" /><span>{label}</span><span className="ml-auto text-[10px]">{tr("已关闭", "Closed")}</span>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      );
+    }
+    return (
+      <SidebarMenuItem key={href}>
+        <SidebarMenuButton asChild isActive={exact ? location === href : location === href || location.startsWith(`${href}/`)}>
+          <Link href={href} className="font-mono flex items-center gap-3"><Icon className="w-4 h-4" /><span>{label}</span></Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    );
+  });
 
   return (
     <SidebarProvider>
@@ -101,10 +125,10 @@ export function Layout({ children }: { children: ReactNode }) {
               <SidebarGroupContent><SidebarMenu>{renderItems(serviceItems)}</SidebarMenu></SidebarGroupContent>
             </SidebarGroup>
 
-            {user?.permissions.includes("economy.view") && modules?.economy && (
+            {directorItems.length > 0 && (
               <SidebarGroup>
                 <SidebarGroupLabel className="text-xs uppercase tracking-widest text-emerald-400 font-mono">{tr("总监专区", "Director")}</SidebarGroupLabel>
-                <SidebarGroupContent><SidebarMenu>{renderItems([{ href: "/economy", label: tr("军团经济", "Corporation economy"), icon: Landmark }])}</SidebarMenu></SidebarGroupContent>
+                <SidebarGroupContent><SidebarMenu>{renderItems(directorItems)}</SidebarMenu></SidebarGroupContent>
               </SidebarGroup>
             )}
 

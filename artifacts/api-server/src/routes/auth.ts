@@ -704,6 +704,7 @@ router.get("/auth/me", requireAuth, async (req: Request, res: Response): Promise
     isPrimaryCorporation: tenant.corporation.isPrimary,
     role: tenant.membership.role,
     permissions: tenant.permissions,
+    reimbursementOpen: tenant.corporation.reimbursementOpen,
     modules: {
       pap: tenant.corporation.papEnabled,
       identity: tenant.corporation.identityEnabled,

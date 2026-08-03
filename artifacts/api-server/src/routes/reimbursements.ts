@@ -1,17 +1,52 @@
-import { Router, type IRouter, type Request, type Response } from "express";
+import { Router, type IRouter, type NextFunction, type Request, type Response } from "express";
 import {
   charactersTable,
+  corporationsTable,
   db,
   reimbursementClaimsTable,
 } from "@workspace/db";
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { hasRole, requireAuth } from "../middlewares/auth";
 import { KillmailValidationError, listCharacterLosses, verifyKillmail } from "../lib/reimbursements";
-import { hasPermission, requireModule, requireTenant } from "../lib/tenant";
+import { hasPermission, requireModule, requirePermission, requireTenant } from "../lib/tenant";
 
 const router: IRouter = Router();
 
 router.use("/reimbursements", requireAuth, requireTenant, requireModule("reimbursement"));
+
+router.patch(
+  "/reimbursements/window",
+  requirePermission("reimbursement.window.manage"),
+  async (req: Request, res: Response): Promise<void> => {
+    if (typeof req.body.open !== "boolean") {
+      res.status(400).json({ error: "Invalid reimbursement window state" });
+      return;
+    }
+    const [updated] = await db
+      .update(corporationsTable)
+      .set({ reimbursementOpen: req.body.open })
+      .where(eq(corporationsTable.id, req.tenant!.corporation.id))
+      .returning({ open: corporationsTable.reimbursementOpen });
+    res.json(updated);
+  },
+);
+
+function requireReimbursementOpen(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  if (!req.tenant!.corporation.reimbursementOpen) {
+    res.status(423).json({
+      error: "本军团补损窗口已关闭",
+      code: "REIMBURSEMENT_WINDOW_CLOSED",
+    });
+    return;
+  }
+  next();
+}
+
+router.use("/reimbursements", requireReimbursementOpen);
 
 function canManage(req: Request): boolean {
   return Boolean(

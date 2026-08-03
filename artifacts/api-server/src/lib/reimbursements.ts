@@ -1,7 +1,12 @@
 const ESI_BASE = "https://esi.evetech.net/latest";
 const ZKILL_BASE = "https://zkillboard.com/api";
-const CACHE_TTL_MS = 5 * 60_000;
-const MAX_RECENT_LOSSES = 20;
+const CHARACTER_LOSS_CACHE_TTL_MS = 15 * 60_000;
+const VERIFIED_KILLMAIL_CACHE_TTL_MS = 60 * 60_000;
+const LOSS_HISTORY_DAYS = 365;
+const LOSS_HISTORY_MONTH_BUCKETS = 13;
+const MAX_HISTORY_LOSSES = 100;
+const ESI_VERIFY_CONCURRENCY = 6;
+const ZKILL_REQUEST_DELAY_MS = 500;
 const REQUEST_TIMEOUT_MS = 12_000;
 const USER_AGENT = "EVE-Corporation-Manager/1.0 https://zephyr-fleet-track-production.up.railway.app";
 
@@ -77,6 +82,9 @@ async function verifyZkillEntry(entry: ZkillEntry): Promise<VerifiedKillmail> {
   if (!Number.isSafeInteger(killmailId) || !hash) {
     throw new KillmailValidationError("击杀报告缺少 ESI 验证信息");
   }
+  const cached = verifiedKillmailCache.get(killmailId);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+
   const killmail = await fetchJson<{
     killmail_id: number;
     killmail_time: string;
@@ -97,8 +105,62 @@ async function verifyZkillEntry(entry: ZkillEntry): Promise<VerifiedKillmail> {
   if (Number.isNaN(verified.occurredAt.getTime())) {
     throw new KillmailValidationError("击杀报告的时间无效");
   }
-  verifiedKillmailCache.set(killmailId, { expiresAt: Date.now() + CACHE_TTL_MS, value: verified });
+  verifiedKillmailCache.set(killmailId, { expiresAt: Date.now() + VERIFIED_KILLMAIL_CACHE_TTL_MS, value: verified });
   return verified;
+}
+
+async function verifyLossEntries(entries: ZkillEntry[]): Promise<VerifiedKillmail[]> {
+  const verified: Array<VerifiedKillmail | null> = Array.from({ length: entries.length }, () => null);
+  let nextIndex = 0;
+  const workerCount = Math.min(ESI_VERIFY_CONCURRENCY, entries.length);
+
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (nextIndex < entries.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      try {
+        verified[index] = await verifyZkillEntry(entries[index]);
+      } catch {
+        // Ignore individual stale or inaccessible killmails while keeping the rest of the timeline usable.
+      }
+    }
+  }));
+
+  return verified.flatMap((loss) => loss ? [loss] : []);
+}
+
+function getLossHistoryMonths(now = new Date()): Array<{ year: number; month: number }> {
+  return Array.from({ length: LOSS_HISTORY_MONTH_BUCKETS }, (_, offset) => {
+    const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - offset, 1));
+    return { year: date.getUTCFullYear(), month: date.getUTCMonth() + 1 };
+  });
+}
+
+async function listZkillLossEntries(characterId: number): Promise<ZkillEntry[]> {
+  const entriesById = new Map<number, ZkillEntry>();
+  const months = getLossHistoryMonths();
+
+  for (let index = 0; index < months.length && entriesById.size < MAX_HISTORY_LOSSES; index += 1) {
+    if (index > 0) {
+      await new Promise((resolve) => setTimeout(resolve, ZKILL_REQUEST_DELAY_MS));
+    }
+    const { year, month } = months[index];
+    const monthlyEntries = await fetchJson<ZkillEntry[]>(
+      `${ZKILL_BASE}/losses/characterID/${characterId}/year/${year}/month/${month}/page/1/`,
+      "zkill",
+    );
+    if (!Array.isArray(monthlyEntries)) {
+      throw new KillmailValidationError("zKillboard 返回了无效的损失列表");
+    }
+    for (const entry of monthlyEntries) {
+      const killmailId = Number(entry.killmail_id);
+      if (Number.isSafeInteger(killmailId) && entry.zkb?.hash && !entriesById.has(killmailId)) {
+        entriesById.set(killmailId, entry);
+      }
+    }
+  }
+
+  return [...entriesById.values()].slice(0, MAX_HISTORY_LOSSES);
 }
 
 export async function listCharacterLosses(characterId: number): Promise<VerifiedKillmail[]> {
@@ -108,23 +170,12 @@ export async function listCharacterLosses(characterId: number): Promise<Verified
   const cached = characterLossCache.get(characterId);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
 
-  const entries = await fetchJson<ZkillEntry[]>(
-    `${ZKILL_BASE}/losses/characterID/${characterId}/page/1/`,
-    "zkill",
-  );
-  if (!Array.isArray(entries)) throw new KillmailValidationError("zKillboard 返回了无效的损失列表");
-
-  const settled = await Promise.allSettled(
-    entries
-      .filter((entry) => Number.isSafeInteger(Number(entry.killmail_id)) && Boolean(entry.zkb?.hash))
-      .slice(0, MAX_RECENT_LOSSES)
-      .map((entry) => verifyZkillEntry(entry)),
-  );
-  const losses = settled
-    .flatMap((result) => result.status === "fulfilled" ? [result.value] : [])
+  const cutoffAt = Date.now() - LOSS_HISTORY_DAYS * 24 * 60 * 60_000;
+  const losses = (await verifyLossEntries(await listZkillLossEntries(characterId)))
     .filter((loss) => loss.victimCharacterId === characterId)
+    .filter((loss) => loss.occurredAt.getTime() >= cutoffAt)
     .sort((left, right) => right.occurredAt.getTime() - left.occurredAt.getTime());
-  characterLossCache.set(characterId, { expiresAt: Date.now() + CACHE_TTL_MS, value: losses });
+  characterLossCache.set(characterId, { expiresAt: Date.now() + CHARACTER_LOSS_CACHE_TTL_MS, value: losses });
   return losses;
 }
 

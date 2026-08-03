@@ -23,6 +23,8 @@ import { CheckCircle2, ClipboardCheck, ExternalLink, Loader2, RefreshCw, ShieldC
 
 const ROLE_LEVELS = ["member", "fc", "admin", "controller"];
 const AUTO_DESCRIPTION = "通过 zKillboard 自动提交";
+const INITIAL_VISIBLE_LOSSES = 40;
+const VISIBLE_LOSS_STEP = 40;
 
 const formatIsk = (value: number) => `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value)} ISK`;
 
@@ -39,6 +41,7 @@ export function Reimbursements() {
   const update = useUpdateReimbursement();
   const [characterId, setCharacterId] = useState("");
   const [submittingKillmailId, setSubmittingKillmailId] = useState<number | null>(null);
+  const [visibleLossCount, setVisibleLossCount] = useState(INITIAL_VISIBLE_LOSSES);
   const [review, setReview] = useState<Record<number, { status: UpdateReimbursementBodyStatus; approvedAmount: string; reviewerNotes: string; paymentReference: string }>>({});
   const canManage = Boolean(user?.permissions.includes("reimbursement.manage") || ROLE_LEVELS.indexOf(user?.role ?? "member") >= ROLE_LEVELS.indexOf("admin"));
   const selectedCharacter = (characters.data ?? []).find((character) => character.id === Number(characterId));
@@ -54,11 +57,28 @@ export function Reimbursements() {
     setCharacterId(String(active.id));
   }, [characterId, characters.data, user?.eveCharacterId]);
 
+  useEffect(() => {
+    setVisibleLossCount(INITIAL_VISIBLE_LOSSES);
+  }, [characterId]);
+
   const statusLabels = useMemo<Record<string, string>>(() => ({
     submitted: tr("已提交", "Submitted"), reviewing: tr("审核中", "Reviewing"), approved: tr("已批准", "Approved"),
     partially_approved: tr("部分批准", "Partially approved"), rejected: tr("已拒绝", "Rejected"),
     pending_payment: tr("待打款", "Pending payment"), paid: tr("已打款", "Paid"),
   }), [zh]);
+  const visibleLosses = useMemo(
+    () => (losses.data ?? []).slice(0, visibleLossCount),
+    [losses.data, visibleLossCount],
+  );
+  const lossTimeline = useMemo(() => {
+    if (!losses.data?.length) return null;
+    const timestamps = losses.data.map((loss) => new Date(loss.lossOccurredAt).getTime()).filter(Number.isFinite);
+    if (!timestamps.length) return null;
+    return {
+      newest: new Date(Math.max(...timestamps)).toLocaleDateString(),
+      oldest: new Date(Math.min(...timestamps)).toLocaleDateString(),
+    };
+  }, [losses.data]);
 
   const submitLoss = (loss: ReimbursementLoss) => {
     if (!characterId || loss.alreadySubmitted) return;
@@ -78,7 +98,7 @@ export function Reimbursements() {
       <div>
         <h1 className="text-2xl font-bold font-mono tracking-wider">{tr("补损", "REIMBURSEMENT")}</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          {tr("补损不限制舰队，也不填写申请金额；系统直接读取并验证角色在 zKillboard 上的损失。", "Reimbursement is not fleet-restricted and requires no requested amount; losses are read and verified directly from zKillboard.")}
+          {tr("补损不限制舰队，也不填写申请金额；系统直接读取并验证角色最近 12 个月内最多 100 条 zKillboard 损失。", "Reimbursement is not fleet-restricted and requires no requested amount; up to 100 zKillboard losses from the last 12 months are read and verified directly.")}
         </p>
       </div>
 
@@ -109,24 +129,36 @@ export function Reimbursements() {
           ) : losses.isError ? (
             <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">{getErrorMessage(losses.error)}</div>
           ) : (losses.data ?? []).length === 0 ? (
-            <p className="rounded-md border border-border/50 p-4 text-sm text-muted-foreground">{tr("该角色暂时没有可读取的近期损失。", "No recent losses are currently available for this character.")}</p>
+            <p className="rounded-md border border-border/50 p-4 text-sm text-muted-foreground">{tr("该角色最近 12 个月内暂时没有可读取的损失。", "No readable losses are currently available for this character in the last 12 months.")}</p>
           ) : (
-            <div className="grid gap-3 lg:grid-cols-2">
-              {(losses.data ?? []).map((loss) => (
-                <div key={loss.killmailId} className="flex gap-4 rounded-md border border-border/50 p-4">
-                  <img className="h-14 w-14 rounded bg-background object-cover" src={`https://images.evetech.net/types/${loss.shipTypeId}/icon?size=64`} alt="" />
-                  <div className="min-w-0 flex-1 space-y-2">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div><div className="font-medium">{loss.shipName}</div><div className="text-xs text-muted-foreground">{new Date(loss.lossOccurredAt).toLocaleString()} · {formatIsk(loss.lossValue)}</div></div>
-                      <a className="inline-flex items-center gap-1 text-xs text-primary hover:underline" href={loss.killmailUrl} target="_blank" rel="noreferrer">zKill <ExternalLink className="h-3 w-3" /></a>
+            <div className="space-y-4">
+              <div className="rounded-md border border-border/50 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+                {tr(`已读取 ${losses.data?.length ?? 0} 条损失`, `${losses.data?.length ?? 0} losses loaded`)}
+                {lossTimeline && <> · {lossTimeline.oldest} — {lossTimeline.newest}</>}
+                <span className="ml-1">· {tr("时间范围上限为最近 12 个月", "up to the last 12 months")}</span>
+              </div>
+              <div className="grid gap-3 lg:grid-cols-2">
+                {visibleLosses.map((loss) => (
+                  <div key={loss.killmailId} className="flex gap-4 rounded-md border border-border/50 p-4">
+                    <img className="h-14 w-14 rounded bg-background object-cover" src={`https://images.evetech.net/types/${loss.shipTypeId}/icon?size=64`} alt="" />
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div><div className="font-medium">{loss.shipName}</div><div className="text-xs text-muted-foreground">{new Date(loss.lossOccurredAt).toLocaleString()} · {formatIsk(loss.lossValue)}</div></div>
+                        <a className="inline-flex items-center gap-1 text-xs text-primary hover:underline" href={loss.killmailUrl} target="_blank" rel="noreferrer">zKill <ExternalLink className="h-3 w-3" /></a>
+                      </div>
+                      <Button className="w-full" disabled={loss.alreadySubmitted || submittingKillmailId !== null} onClick={() => submitLoss(loss)}>
+                        {submittingKillmailId === loss.killmailId ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
+                        {loss.alreadySubmitted ? tr(`已提交 · ${statusLabels[loss.claimStatus ?? "submitted"]}`, `Submitted · ${statusLabels[loss.claimStatus ?? "submitted"]}`) : tr("一键提交补损", "Submit reimbursement")}
+                      </Button>
                     </div>
-                    <Button className="w-full" disabled={loss.alreadySubmitted || submittingKillmailId !== null} onClick={() => submitLoss(loss)}>
-                      {submittingKillmailId === loss.killmailId ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
-                      {loss.alreadySubmitted ? tr(`已提交 · ${statusLabels[loss.claimStatus ?? "submitted"]}`, `Submitted · ${statusLabels[loss.claimStatus ?? "submitted"]}`) : tr("一键提交补损", "Submit reimbursement")}
-                    </Button>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+              {visibleLossCount < (losses.data?.length ?? 0) && (
+                <Button className="w-full" variant="outline" onClick={() => setVisibleLossCount((current) => current + VISIBLE_LOSS_STEP)}>
+                  {tr(`显示更早的损失（剩余 ${(losses.data?.length ?? 0) - visibleLossCount} 条）`, `Show older losses (${(losses.data?.length ?? 0) - visibleLossCount} remaining)`)}
+                </Button>
+              )}
             </div>
           )}
         </CardContent>

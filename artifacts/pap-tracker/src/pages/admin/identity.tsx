@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ClipboardEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useCreateIdentityGroup,
   useCreateIdentitySkillPlan,
+  useImportIdentitySkillPlan,
   useListIdentityApplications,
   useListIdentityGroups,
   useListIdentitySkillPlans,
@@ -22,7 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/api-error";
-import { CheckCircle2, KeyRound, Pencil, ShieldCheck, UsersRound, XCircle } from "lucide-react";
+import { CheckCircle2, ClipboardPaste, KeyRound, Loader2, Pencil, ShieldCheck, UsersRound, XCircle } from "lucide-react";
 
 const PERMISSIONS = [
   ["fleet.manage", "FC与舰队管理", "FC and fleet management"],
@@ -53,11 +54,14 @@ type PlanDraft = {
   name: string;
   description: string;
   skills: string;
+  parsedText: string;
+  parsedSkills: RequiredSkill[];
+  unresolvedLines: string[];
   isActive: boolean;
 };
 
 const emptyGroup = (): GroupDraft => ({ id: null, name: "", category: "combat", description: "", requiredSkills: [], permissions: [], skillPlanIds: [], skillPlanMatchMode: "all", isActive: true });
-const emptyPlan = (): PlanDraft => ({ id: null, name: "", description: "", skills: "", isActive: true });
+const emptyPlan = (): PlanDraft => ({ id: null, name: "", description: "", skills: "", parsedText: "", parsedSkills: [], unresolvedLines: [], isActive: true });
 
 export function AdminIdentity() {
   const { i18n } = useTranslation();
@@ -70,6 +74,7 @@ export function AdminIdentity() {
   const applications = useListIdentityApplications();
   const createGroup = useCreateIdentityGroup();
   const updateGroup = useUpdateIdentityGroup();
+  const importPlan = useImportIdentitySkillPlan();
   const createPlan = useCreateIdentitySkillPlan();
   const updatePlan = useUpdateIdentitySkillPlan();
   const review = useReviewIdentityApplication();
@@ -97,20 +102,48 @@ export function AdminIdentity() {
     ]);
   };
 
-  const parseSkills = (value: string): RequiredSkill[] | null => {
-    if (!value.trim()) return [];
-    const result: RequiredSkill[] = [];
-    for (const line of value.split("\n").map((item) => item.trim()).filter(Boolean)) {
-      const [id, name, level] = line.split(",").map((item) => item.trim());
-      const skillId = Number(id);
-      const requiredLevel = Number(level);
-      if (!Number.isInteger(skillId) || skillId <= 0 || !name || !Number.isInteger(requiredLevel) || requiredLevel < 1 || requiredLevel > 5) return null;
-      result.push({ skillId, name, level: requiredLevel });
+  const skillText = (plan: CorporationSkillPlan) => plan.requiredSkills.map((skill) => `${skill.skillId}, ${skill.name}, ${skill.level}`).join("\n");
+
+  const parseSkillText = async (text: string, showSuccess = true): Promise<RequiredSkill[] | null> => {
+    try {
+      const result = await importPlan.mutateAsync({ data: { text } });
+      setPlanDraft((current) => current.skills === text ? {
+        ...current,
+        parsedText: text,
+        parsedSkills: result.requiredSkills,
+        unresolvedLines: result.unresolvedLines,
+      } : current);
+      if (result.unresolvedLines.length) {
+        toast({
+          title: tr("有技能行未能识别", "Some skill lines could not be recognized"),
+          description: tr("请检查下方标出的内容后再保存。", "Review the highlighted lines before saving."),
+          variant: "destructive",
+        });
+        return null;
+      }
+      if (showSuccess) {
+        toast({
+          title: tr(`已读取 ${result.requiredSkills.length} 项技能`, `Imported ${result.requiredSkills.length} skills`),
+          description: tr("重复等级已自动合并为最高要求。", "Repeated levels were merged into the highest requirement."),
+        });
+      }
+      return result.requiredSkills;
+    } catch (error) {
+      toast({ title: tr("技能方案读取失败", "Skill plan import failed"), description: getErrorMessage(error), variant: "destructive" });
+      return null;
     }
-    return result;
   };
 
-  const skillText = (plan: CorporationSkillPlan) => plan.requiredSkills.map((skill) => `${skill.skillId}, ${skill.name}, ${skill.level}`).join("\n");
+  const handleSkillPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
+    const pasted = event.clipboardData.getData("text");
+    if (!pasted.includes("<localized")) return;
+    event.preventDefault();
+    const start = event.currentTarget.selectionStart;
+    const end = event.currentTarget.selectionEnd;
+    const nextText = `${planDraft.skills.slice(0, start)}${pasted}${planDraft.skills.slice(end)}`;
+    setPlanDraft({ ...planDraft, skills: nextText, parsedText: "", parsedSkills: [], unresolvedLines: [] });
+    void parseSkillText(nextText);
+  };
 
   const editGroup = (group: IdentityGroup) => setGroupDraft({
     id: group.id,
@@ -147,12 +180,15 @@ export function AdminIdentity() {
     else createGroup.mutate({ data }, options);
   };
 
-  const savePlan = () => {
-    const requiredSkills = parseSkills(planDraft.skills);
-    if (!planDraft.name.trim() || !requiredSkills) {
-      toast({ title: tr("请检查方案名称和技能格式", "Check the plan name and skill format"), variant: "destructive" });
+  const savePlan = async () => {
+    if (!planDraft.name.trim()) {
+      toast({ title: tr("请输入方案名称", "Enter a plan name"), variant: "destructive" });
       return;
     }
+    const requiredSkills = planDraft.parsedText === planDraft.skills && planDraft.unresolvedLines.length === 0
+      ? planDraft.parsedSkills
+      : await parseSkillText(planDraft.skills, false);
+    if (!requiredSkills) return;
     const data = { name: planDraft.name.trim(), description: planDraft.description.trim(), requiredSkills, isActive: planDraft.isActive };
     const options = {
       onSuccess: async () => { setPlanDraft(emptyPlan()); await refreshIdentity(); toast({ title: tr("技能方案已保存", "Skill plan saved") }); },
@@ -209,14 +245,15 @@ export function AdminIdentity() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>{planDraft.id ? tr("编辑技能方案", "Edit skill plan") : tr("军团技能方案", "Corporation skill plans")}</CardTitle><CardDescription>{tr("技能方案可被多个身份组直接套用；每行填写：技能ID, 技能名称, 最低等级。", "Skill plans can be reused by multiple identity groups. One line per skill ID, name, and minimum level.")}</CardDescription></CardHeader>
+        <CardHeader><CardTitle>{planDraft.id ? tr("编辑技能方案", "Edit skill plan") : tr("军团技能方案", "Corporation skill plans")}</CardTitle><CardDescription>{tr("从游戏内复制军团技能训练方案后直接粘贴；网站会读取技能名称、解析技能 ID，并把重复的 1→目标等级自动合并为最高等级。", "Copy a corporation skill plan in the EVE client and paste it here. The site resolves skill IDs and merges repeated levels into the highest requirement.")}</CardDescription></CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2"><Label>{tr("方案名称", "Plan name")}</Label><Input value={planDraft.name} onChange={(event) => setPlanDraft({ ...planDraft, name: event.target.value })} /></div>
           <label className="flex items-center gap-2 self-end pb-2 text-sm"><input type="checkbox" checked={planDraft.isActive} onChange={(event) => setPlanDraft({ ...planDraft, isActive: event.target.checked })} />{tr("方案启用", "Plan active")}</label>
           <div className="space-y-2 md:col-span-2"><Label>{tr("说明", "Description")}</Label><Input value={planDraft.description} onChange={(event) => setPlanDraft({ ...planDraft, description: event.target.value })} /></div>
-          <div className="space-y-2 md:col-span-2"><Label>{tr("技能清单", "Skills")}</Label><Textarea rows={6} placeholder="28656, Black Ops, 4" value={planDraft.skills} onChange={(event) => setPlanDraft({ ...planDraft, skills: event.target.value })} /></div>
-          <div className="flex gap-2 md:col-span-2"><Button onClick={savePlan}>{tr("保存技能方案", "Save skill plan")}</Button>{planDraft.id && <Button variant="outline" onClick={() => setPlanDraft(emptyPlan())}>{tr("取消编辑", "Cancel editing")}</Button>}</div>
-          <div className="space-y-2 md:col-span-2 border-t border-border/50 pt-4"><div className="grid gap-2 md:grid-cols-2">{(plans.data ?? []).map((plan) => <div key={plan.id} className="flex items-center justify-between rounded-md border border-border/50 p-3"><div><div className="font-medium">{plan.name} {!plan.isActive && <Badge variant="outline">{tr("停用", "Inactive")}</Badge>}</div><div className="text-xs text-muted-foreground">{plan.requiredSkills.map((skill) => `${skill.name} Lv.${skill.level}`).join(" · ") || tr("无技能", "No skills")}</div></div><Button size="sm" variant="outline" onClick={() => setPlanDraft({ id: plan.id, name: plan.name, description: plan.description, skills: skillText(plan), isActive: plan.isActive })}><Pencil className="mr-1 h-3 w-3" />{tr("编辑", "Edit")}</Button></div>)}</div></div>
+          <div className="space-y-2 md:col-span-2"><Label>{tr("游戏内技能方案", "In-game skill plan")}</Label><Textarea rows={12} placeholder={'<localized hint="Black Ops">黑隐特勤舰操作*</localized> 4'} value={planDraft.skills} onPaste={handleSkillPaste} onChange={(event) => setPlanDraft({ ...planDraft, skills: event.target.value, parsedText: "", parsedSkills: [], unresolvedLines: [] })} /><p className="text-xs text-muted-foreground">{tr("支持游戏内中文复制格式、英文“技能名 等级”，并继续兼容“技能ID, 名称, 等级”旧格式。粘贴游戏格式后会自动读取。", "Supports EVE localized clipboard text, English skill-name and level lines, and the legacy skill-ID, name, level format. EVE clipboard text is imported automatically on paste.")}</p></div>
+          <div className="flex flex-wrap gap-2 md:col-span-2"><Button type="button" variant="outline" disabled={importPlan.isPending} onClick={() => void parseSkillText(planDraft.skills)}>{importPlan.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ClipboardPaste className="mr-2 h-4 w-4" />}{tr("读取并预览", "Import and preview")}</Button><Button onClick={() => void savePlan()} disabled={importPlan.isPending || createPlan.isPending || updatePlan.isPending}>{tr("保存技能方案", "Save skill plan")}</Button>{planDraft.id && <Button variant="outline" onClick={() => setPlanDraft(emptyPlan())}>{tr("取消编辑", "Cancel editing")}</Button>}</div>
+          {planDraft.parsedText === planDraft.skills && <div className="space-y-3 rounded-md border border-border/50 p-3 md:col-span-2"><div className="text-sm font-medium text-emerald-400">{tr(`已识别并去重 ${planDraft.parsedSkills.length} 项技能`, `${planDraft.parsedSkills.length} skills recognized and deduplicated`)}</div><div className="flex max-h-44 flex-wrap gap-2 overflow-auto">{planDraft.parsedSkills.map((skill) => <Badge key={skill.skillId} variant="secondary">{skill.name} Lv.{skill.level}</Badge>)}</div>{planDraft.unresolvedLines.length > 0 && <div className="rounded border border-destructive/50 bg-destructive/10 p-3 text-xs text-destructive"><div className="mb-1 font-medium">{tr(`未识别 ${planDraft.unresolvedLines.length} 行，保存前必须修正`, `${planDraft.unresolvedLines.length} unrecognized lines must be fixed before saving`)}</div>{planDraft.unresolvedLines.slice(0, 8).map((line, index) => <div key={`${line}-${index}`} className="break-all">{line}</div>)}</div>}</div>}
+          <div className="space-y-2 md:col-span-2 border-t border-border/50 pt-4"><div className="grid gap-2 md:grid-cols-2">{(plans.data ?? []).map((plan) => <div key={plan.id} className="flex items-center justify-between rounded-md border border-border/50 p-3"><div><div className="font-medium">{plan.name} {!plan.isActive && <Badge variant="outline">{tr("停用", "Inactive")}</Badge>}</div><div className="text-xs text-muted-foreground">{plan.requiredSkills.map((skill) => `${skill.name} Lv.${skill.level}`).join(" · ") || tr("无技能", "No skills")}</div></div><Button size="sm" variant="outline" onClick={() => { const skills = skillText(plan); setPlanDraft({ id: plan.id, name: plan.name, description: plan.description, skills, parsedText: skills, parsedSkills: plan.requiredSkills, unresolvedLines: [], isActive: plan.isActive }); }}><Pencil className="mr-1 h-3 w-3" />{tr("编辑", "Edit")}</Button></div>)}</div></div>
         </CardContent>
       </Card>
     </div>

@@ -2450,6 +2450,33 @@ export const CreateIdentitySkillPlanBody = zod.object({
 });
 
 /**
+ * @summary Parse a skill plan copied from the EVE client and resolve skill IDs
+ */
+export const importIdentitySkillPlanBodyTextMax = 100000;
+
+export const ImportIdentitySkillPlanBody = zod.object({
+  text: zod.string().max(importIdentitySkillPlanBodyTextMax),
+});
+
+export const importIdentitySkillPlanResponseRequiredSkillsItemLevelMax = 5;
+
+export const ImportIdentitySkillPlanResponse = zod.object({
+  requiredSkills: zod.array(
+    zod.object({
+      skillId: zod.number(),
+      name: zod.string(),
+      level: zod
+        .number()
+        .min(1)
+        .max(importIdentitySkillPlanResponseRequiredSkillsItemLevelMax),
+    }),
+  ),
+  unresolvedLines: zod.array(zod.string()),
+  sourceFormat: zod.enum(["eve_localized", "legacy_csv", "plain", "mixed"]),
+  parsedLineCount: zod.number(),
+});
+
+/**
  * @summary Update a reusable corporation skill plan
  */
 export const UpdateIdentitySkillPlanParams = zod.object({

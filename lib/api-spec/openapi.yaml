@@ -1155,6 +1155,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/CorporationSkillPlan"
 
+  /identity-skill-plans/import:
+    post:
+      operationId: importIdentitySkillPlan
+      tags: [identity]
+      summary: Parse a skill plan copied from the EVE client and resolve skill IDs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IdentitySkillPlanImportInput"
+      responses:
+        "200":
+          description: Parsed and resolved skill requirements
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IdentitySkillPlanImportResult"
+
   /identity-skill-plans/{id}:
     patch:
       operationId: updateIdentitySkillPlan
@@ -2977,6 +2996,30 @@ components:
             $ref: "#/components/schemas/RequiredSkill"
         isActive: { type: boolean }
       required: [name, description, requiredSkills]
+
+    IdentitySkillPlanImportInput:
+      type: object
+      properties:
+        text:
+          type: string
+          maxLength: 100000
+      required: [text]
+
+    IdentitySkillPlanImportResult:
+      type: object
+      properties:
+        requiredSkills:
+          type: array
+          items:
+            $ref: "#/components/schemas/RequiredSkill"
+        unresolvedLines:
+          type: array
+          items: { type: string }
+        sourceFormat:
+          type: string
+          enum: [eve_localized, legacy_csv, plain, mixed]
+        parsedLineCount: { type: integer }
+      required: [requiredSkills, unresolvedLines, sourceFormat, parsedLineCount]
 
     IdentityApplication:
       type: object

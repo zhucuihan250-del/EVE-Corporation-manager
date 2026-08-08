@@ -1053,6 +1053,28 @@ export interface CorporationSkillPlanInput {
   isActive?: boolean;
 }
 
+export interface IdentitySkillPlanImportInput {
+  /** @maxLength 100000 */
+  text: string;
+}
+
+export type IdentitySkillPlanImportResultSourceFormat =
+  (typeof IdentitySkillPlanImportResultSourceFormat)[keyof typeof IdentitySkillPlanImportResultSourceFormat];
+
+export const IdentitySkillPlanImportResultSourceFormat = {
+  eve_localized: "eve_localized",
+  legacy_csv: "legacy_csv",
+  plain: "plain",
+  mixed: "mixed",
+} as const;
+
+export interface IdentitySkillPlanImportResult {
+  requiredSkills: RequiredSkill[];
+  unresolvedLines: string[];
+  sourceFormat: IdentitySkillPlanImportResultSourceFormat;
+  parsedLineCount: number;
+}
+
 export type IdentityApplicationGroupCategory =
   (typeof IdentityApplicationGroupCategory)[keyof typeof IdentityApplicationGroupCategory];
 

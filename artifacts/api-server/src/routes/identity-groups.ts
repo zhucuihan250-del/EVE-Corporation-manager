@@ -13,6 +13,7 @@ import {
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { hasRole, requireAuth } from "../middlewares/auth";
 import { auditCharacterSkills, SkillAuditError } from "../lib/identity-skills";
+import { importSkillPlanText, SkillPlanImportError } from "../lib/skill-plan-import";
 import { hasPermission, requireModule, requireTenant } from "../lib/tenant";
 
 const router: IRouter = Router();
@@ -266,6 +267,23 @@ router.get("/identity-skill-plans", async (req: Request, res: Response): Promise
     eq(corporationSkillPlansTable.corporationId, req.tenant!.corporation.id),
   ).orderBy(corporationSkillPlansTable.name);
   res.json(plans);
+});
+
+router.post("/identity-skill-plans/import", async (req: Request, res: Response): Promise<void> => {
+  if (!canManage(req)) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  try {
+    const result = await importSkillPlanText(req.body.text);
+    res.json(result);
+  } catch (error) {
+    if (error instanceof SkillPlanImportError) {
+      res.status(error.code === "INVALID_TEXT" ? 400 : 502).json({ error: error.message, code: error.code });
+      return;
+    }
+    throw error;
+  }
 });
 
 router.post("/identity-skill-plans", async (req: Request, res: Response): Promise<void> => {

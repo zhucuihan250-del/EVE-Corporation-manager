@@ -57,6 +57,8 @@ import type {
   IdentityApplication,
   IdentityGroup,
   IdentityGroupInput,
+  IdentitySkillPlanImportInput,
+  IdentitySkillPlanImportResult,
   ListIdentityApplicationsParams,
   ListIdentityGroupsParams,
   ListReimbursementLossesParams,
@@ -4670,6 +4672,96 @@ export const useCreateIdentitySkillPlan = <
   TContext
 > => {
   return useMutation(getCreateIdentitySkillPlanMutationOptions(options));
+};
+
+/**
+ * @summary Parse a skill plan copied from the EVE client and resolve skill IDs
+ */
+export const getImportIdentitySkillPlanUrl = () => {
+  return `/api/identity-skill-plans/import`;
+};
+
+export const importIdentitySkillPlan = async (
+  identitySkillPlanImportInput: IdentitySkillPlanImportInput,
+  options?: RequestInit,
+): Promise<IdentitySkillPlanImportResult> => {
+  return customFetch<IdentitySkillPlanImportResult>(
+    getImportIdentitySkillPlanUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(identitySkillPlanImportInput),
+    },
+  );
+};
+
+export const getImportIdentitySkillPlanMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof importIdentitySkillPlan>>,
+    TError,
+    { data: BodyType<IdentitySkillPlanImportInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof importIdentitySkillPlan>>,
+  TError,
+  { data: BodyType<IdentitySkillPlanImportInput> },
+  TContext
+> => {
+  const mutationKey = ["importIdentitySkillPlan"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof importIdentitySkillPlan>>,
+    { data: BodyType<IdentitySkillPlanImportInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return importIdentitySkillPlan(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ImportIdentitySkillPlanMutationResult = NonNullable<
+  Awaited<ReturnType<typeof importIdentitySkillPlan>>
+>;
+export type ImportIdentitySkillPlanMutationBody =
+  BodyType<IdentitySkillPlanImportInput>;
+export type ImportIdentitySkillPlanMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Parse a skill plan copied from the EVE client and resolve skill IDs
+ */
+export const useImportIdentitySkillPlan = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof importIdentitySkillPlan>>,
+    TError,
+    { data: BodyType<IdentitySkillPlanImportInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof importIdentitySkillPlan>>,
+  TError,
+  { data: BodyType<IdentitySkillPlanImportInput> },
+  TContext
+> => {
+  return useMutation(getImportIdentitySkillPlanMutationOptions(options));
 };
 
 /**

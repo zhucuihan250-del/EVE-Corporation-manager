@@ -996,6 +996,38 @@ export interface ActivitySettingsInput {
   minimumPap: number;
 }
 
+export type CorporationRosterConnectionStatus =
+  (typeof CorporationRosterConnectionStatus)[keyof typeof CorporationRosterConnectionStatus];
+
+export const CorporationRosterConnectionStatus = {
+  connected: "connected",
+  error: "error",
+} as const;
+
+export interface CorporationRosterConnection {
+  characterId: number;
+  status: CorporationRosterConnectionStatus;
+  lastError: string | null;
+  lastSyncedAt: string | null;
+}
+
+export interface RecentUnboundMember {
+  characterId: number;
+  characterName: string;
+  corporationJoinedAt: string;
+  daysInCorporation: number;
+}
+
+export interface RecentUnboundMemberAudit {
+  connection: CorporationRosterConnection | null;
+  reviewedAt: string | null;
+  windowDays: number;
+  totalCorporationMembers: number | null;
+  recentMemberCount: number;
+  unboundMemberCount: number;
+  members: RecentUnboundMember[];
+}
+
 export interface RequiredSkill {
   skillId: number;
   name: string;

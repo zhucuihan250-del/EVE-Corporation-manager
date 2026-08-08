@@ -9,6 +9,8 @@ import {
 import { and, eq, gte, isNotNull, lt, sql } from "drizzle-orm";
 import { hasRole, requireAuth } from "../middlewares/auth";
 import { ensureCorporationJoinedAt } from "../lib/corporation-membership";
+import { generateOauthState, getCorporationRosterAuthorizationUrl } from "../lib/eve-sso";
+import { getCorporationRosterConnection, getRecentUnboundMemberAudit } from "../lib/corporation-roster";
 import { hasPermission, requireModule, requireTenant } from "../lib/tenant";
 
 const router: IRouter = Router();
@@ -24,6 +26,12 @@ function canManage(req: Request): boolean {
     && (hasPermission(req.tenant, "activity.manage")
       || hasRole(req.tenant.membership.role, "admin")),
   );
+}
+
+function getCallbackUrl(req: Request): string {
+  const host = req.get("x-forwarded-host")?.split(",")[0]?.trim() ?? req.get("host") ?? "localhost";
+  const proto = req.get("x-forwarded-proto")?.split(",")[0]?.trim() ?? req.protocol ?? "https";
+  return `${proto}://${host}/api/auth/eve/callback`;
 }
 
 function parseMonth(value: unknown): { month: string; start: Date; end: Date; evaluatedAt: Date } | null {
@@ -161,6 +169,43 @@ router.patch("/activity/settings", async (req: Request, res: Response): Promise<
     activityMinimumPap: minimumPap,
   }).where(eq(corporationsTable.id, req.tenant!.corporation.id)).returning();
   res.json({ minimumPap: corporation.activityMinimumPap, eligibilityDays: ELIGIBILITY_DAYS });
+});
+
+router.get("/activity/new-members", async (req: Request, res: Response): Promise<void> => {
+  if (!canManage(req)) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  const corporationId = req.tenant!.corporation.id;
+  try {
+    res.json(await getRecentUnboundMemberAudit(corporationId));
+  } catch (error) {
+    const connection = await getCorporationRosterConnection(corporationId);
+    res.status(502).json({
+      error: error instanceof Error ? error.message : "Corporation roster audit failed",
+      connection,
+    });
+  }
+});
+
+router.get("/activity/new-members/connect", (req: Request, res: Response): void => {
+  if (!canManage(req)) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  const state = generateOauthState();
+  req.session.rosterLinkCorporationId = req.tenant!.corporation.id;
+  req.session.economyLinkCorporationId = undefined;
+  req.session.linkingUserId = undefined;
+  req.session.eveOauthState = state;
+  req.session.eveOauthFlow = "roster";
+  req.session.save((error) => {
+    if (error) {
+      res.status(500).json({ error: "Unable to start corporation roster authorization" });
+      return;
+    }
+    res.redirect(getCorporationRosterAuthorizationUrl(getCallbackUrl(req), state));
+  });
 });
 
 export default router;

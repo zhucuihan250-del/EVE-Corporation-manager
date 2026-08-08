@@ -36,6 +36,7 @@ router.get("/economy/connect", async (req: Request, res: Response): Promise<void
   if (!requireEconomy(req, res, true)) return;
   const state = generateOauthState();
   req.session.economyLinkCorporationId = req.tenant!.corporation.id;
+  req.session.rosterLinkCorporationId = undefined;
   req.session.linkingUserId = undefined;
   req.session.eveOauthState = state;
   req.session.eveOauthFlow = "economy";

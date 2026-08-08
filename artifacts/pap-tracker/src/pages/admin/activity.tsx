@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useGetActivityReport, useUpdateActivitySettings } from "@workspace/api-client-react";
+import { useGetActivityReport, useGetRecentUnboundMembers, useUpdateActivitySettings } from "@workspace/api-client-react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/api-error";
-import { Activity, CheckCircle2, Clock3, Save, TriangleAlert, Users } from "lucide-react";
+import { apiUrl } from "@/lib/api";
+import { Activity, CheckCircle2, Clock3, Link2, RefreshCw, Save, ShieldCheck, TriangleAlert, Users, UserX } from "lucide-react";
 
 function currentMonth(): string {
   const now = new Date();
@@ -27,6 +28,7 @@ export function AdminActivity() {
   const [filter, setFilter] = useState<"all" | "below" | "met">("all");
   const [minimumPap, setMinimumPap] = useState("2");
   const report = useGetActivityReport({ month });
+  const rosterAudit = useGetRecentUnboundMembers();
   const updateSettings = useUpdateActivitySettings();
 
   useEffect(() => {
@@ -58,6 +60,67 @@ export function AdminActivity() {
         <h1 className="flex items-center gap-2 text-2xl font-bold font-mono tracking-wider"><Activity className="h-6 w-6 text-primary" />{tr("活跃度查询", "ACTIVITY TRACKING")}</h1>
         <p className="mt-1 text-sm text-muted-foreground">{tr("自动纳入主角色已加入当前军团至少60天的玩家，并按月检查PAP是否达标。", "Automatically includes players whose main character has been in the corporation for at least 60 days and checks monthly PAP compliance.")}</p>
       </div>
+
+      <Card className="border-primary/30">
+        <CardHeader className="gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-1.5">
+            <CardTitle className="flex items-center gap-2"><UserX className="h-5 w-5 text-primary" />{tr("近60天新成员未绑定审查", "RECENT UNBOUND MEMBER AUDIT")}</CardTitle>
+            <CardDescription>{tr("对照当前军团的 EVE 完整成员名册，找出最近60天入团但尚未绑定 PAP 网站的角色。其他军团的数据不会出现在本军团结果中。", "Compares this corporation's complete EVE roster with PAP site bindings and finds characters who joined in the last 60 days without binding. Other corporations never appear in these results.")}</CardDescription>
+          </div>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <Button asChild variant="outline">
+              <a href={apiUrl("/api/activity/new-members/connect")}><Link2 className="mr-2 h-4 w-4" />{rosterAudit.data?.connection ? tr("重新授权", "Reauthorize") : tr("总监授权名册", "Authorize roster")}</a>
+            </Button>
+            <Button variant="outline" onClick={() => rosterAudit.refetch()} disabled={rosterAudit.isFetching || !rosterAudit.data?.connection}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${rosterAudit.isFetching ? "animate-spin" : ""}`} />{tr("重新审查", "Review now")}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {rosterAudit.isLoading ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">{tr("正在读取军团成员名册…", "Loading corporation roster…")}</div>
+          ) : rosterAudit.isError ? (
+            <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm">
+              <div className="flex items-center gap-2 font-medium text-destructive"><TriangleAlert className="h-4 w-4" />{tr("名册审查失败", "Roster audit failed")}</div>
+              <p className="mt-2 text-muted-foreground">{getErrorMessage(rosterAudit.error)}</p>
+              <p className="mt-2 text-muted-foreground">{tr("请由当前军团中拥有 Director 角色的角色重新授权。", "Reauthorize with a character in this corporation who has the Director role.")}</p>
+            </div>
+          ) : !rosterAudit.data?.connection ? (
+            <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-4 text-sm">
+              <div className="flex items-center gap-2 font-medium text-amber-400"><ShieldCheck className="h-4 w-4" />{tr("需要一次军团总监授权", "Director authorization required")}</div>
+              <p className="mt-2 text-muted-foreground">{tr("网站数据库只包含已经绑定的人。请由拥有 EVE 军团 Director 角色的角色通过 SSO 授权成员追踪权限，授权仅用于本军团的新成员审查。", "The site database only contains already-bound users. A character with the EVE corporation Director role must authorize member tracking through SSO; the authorization is used only for this corporation's new-member audit.")}</p>
+            </div>
+          ) : (
+            <>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-md border p-3"><div className="text-xs text-muted-foreground">{tr("军团当前成员", "Current members")}</div><div className="mt-1 text-2xl font-bold">{rosterAudit.data.totalCorporationMembers ?? "-"}</div></div>
+                <div className="rounded-md border p-3"><div className="text-xs text-muted-foreground">{tr("近60天入团", "Joined in 60 days")}</div><div className="mt-1 text-2xl font-bold">{rosterAudit.data.recentMemberCount}</div></div>
+                <div className="rounded-md border border-amber-500/30 p-3"><div className="text-xs text-muted-foreground">{tr("尚未绑定", "Not bound")}</div><div className="mt-1 text-2xl font-bold text-amber-400">{rosterAudit.data.unboundMemberCount}</div></div>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                <span>{tr("名单按入团时间从新到旧排列。", "Members are ordered from newest to oldest join date.")}</span>
+                {rosterAudit.data.reviewedAt && <span>{tr("审查时间", "Reviewed")}：{new Date(rosterAudit.data.reviewedAt).toLocaleString()}</span>}
+              </div>
+              <div className="overflow-hidden rounded-md border">
+                <Table>
+                  <TableHeader><TableRow><TableHead>{tr("角色", "Character")}</TableHead><TableHead>{tr("入团时间", "Joined")}</TableHead><TableHead>{tr("已入团", "Days in corporation")}</TableHead><TableHead>{tr("网站状态", "Site status")}</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {rosterAudit.data.members.map((member) => (
+                      <TableRow key={member.characterId}>
+                        <TableCell className="font-medium">{member.characterName}<div className="text-xs text-muted-foreground">ID {member.characterId}</div></TableCell>
+                        <TableCell>{new Date(member.corporationJoinedAt).toLocaleString()}</TableCell>
+                        <TableCell>{tr(`${member.daysInCorporation} 天`, `${member.daysInCorporation} days`)}</TableCell>
+                        <TableCell><Badge variant="destructive"><UserX className="mr-1 h-3 w-3" />{tr("未绑定", "Not bound")}</Badge></TableCell>
+                      </TableRow>
+                    ))}
+                    {rosterAudit.data.members.length === 0 && <TableRow><TableCell colSpan={4} className="py-8 text-center text-muted-foreground"><CheckCircle2 className="mx-auto mb-2 h-5 w-5 text-emerald-400" />{tr("近60天入团的成员均已绑定网站", "All members who joined in the last 60 days are bound to the site")}</TableCell></TableRow>}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

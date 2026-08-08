@@ -1,5 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import {
+  corporationRosterConnectionsTable,
   corporationWalletConnectionsTable,
   corporationMembershipsTable,
   db,
@@ -9,7 +10,7 @@ import {
 } from "@workspace/db";
 import { and, desc, eq, gt, isNotNull, isNull, sql } from "drizzle-orm";
 import { generateOauthState, getAuthorizationUrl, getLinkAltAuthorizationUrl, exchangeCode, getCharacterInfo, getCorporationName } from "../lib/eve-sso";
-import { requireAuth } from "../middlewares/auth";
+import { hasRole, requireAuth } from "../middlewares/auth";
 import { logger } from "../lib/logger";
 import { getCorporationJoinDate } from "../lib/corporation-membership";
 import {
@@ -235,6 +236,7 @@ router.get("/auth/eve/login", (req: Request, res: Response): void => {
   req.session.eveOauthFlow = "login";
   req.session.linkingUserId = undefined;
   req.session.economyLinkCorporationId = undefined;
+  req.session.rosterLinkCorporationId = undefined;
   req.session.save((error) => {
     if (error) {
       res.status(500).json({ error: "Unable to start EVE SSO" });
@@ -249,6 +251,7 @@ router.get("/auth/eve/login", (req: Request, res: Response): void => {
 router.get("/auth/eve/link-alt", requireAuth, (req: Request, res: Response): void => {
   req.session.linkingUserId = req.session.userId;
   req.session.economyLinkCorporationId = undefined;
+  req.session.rosterLinkCorporationId = undefined;
   const state = generateOauthState();
   req.session.eveOauthState = state;
   req.session.eveOauthFlow = "link_alt";
@@ -279,6 +282,7 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
   const oauthFlow = req.session.eveOauthFlow;
   if (
     (oauthFlow === "economy" && !req.session.economyLinkCorporationId)
+    || (oauthFlow === "roster" && !req.session.rosterLinkCorporationId)
     || (oauthFlow === "link_alt" && !req.session.linkingUserId)
   ) {
     res.status(400).json({ error: "Invalid EVE SSO flow" });
@@ -309,6 +313,50 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
       ? await getCorporationJoinDate(characterId, corporationId)
       : null;
     const mainCharacterTokens = { accessToken, refreshToken, tokenExpiry, corporationJoinedAt };
+
+    if (oauthFlow === "roster" && req.session.rosterLinkCorporationId) {
+      const targetCorporationId = req.session.rosterLinkCorporationId;
+      req.session.rosterLinkCorporationId = undefined;
+      const tenant = await getTenantContext(req);
+      if (
+        !tenant
+        || tenant.corporation.id !== targetCorporationId
+        || corporationId !== targetCorporationId
+        || (!tenant.permissions.includes("activity.manage")
+          && !hasRole(tenant.membership.role, "admin"))
+      ) {
+        redirectToFrontend(res, "/admin/activity?error=roster_forbidden");
+        return;
+      }
+      await db
+        .insert(corporationRosterConnectionsTable)
+        .values({
+          corporationId: targetCorporationId,
+          characterId,
+          connectedBy: tenant.user.id,
+          accessToken,
+          refreshToken,
+          tokenExpiry,
+          status: "connected",
+          lastError: null,
+        })
+        .onConflictDoUpdate({
+          target: corporationRosterConnectionsTable.corporationId,
+          set: {
+            characterId,
+            connectedBy: tenant.user.id,
+            accessToken,
+            refreshToken,
+            tokenExpiry,
+            status: "connected",
+            lastError: null,
+            updatedAt: new Date(),
+          },
+        });
+      req.session.save(() => {});
+      redirectToFrontend(res, "/admin/activity?roster=connected");
+      return;
+    }
 
     if (oauthFlow === "economy" && req.session.economyLinkCorporationId) {
       const targetCorporationId = req.session.economyLinkCorporationId;

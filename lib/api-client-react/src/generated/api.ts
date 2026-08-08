@@ -63,6 +63,7 @@ import type {
   ListIdentityGroupsParams,
   ListReimbursementLossesParams,
   PapRecord,
+  RecentUnboundMemberAudit,
   Redemption,
   RefreshBattleReport202,
   ReimbursementClaim,
@@ -2808,6 +2809,161 @@ export const useUpdateActivitySettings = <
 > => {
   return useMutation(getUpdateActivitySettingsMutationOptions(options));
 };
+
+/**
+ * @summary Audit corporation members who joined in the last 60 days without a PAP site binding
+ */
+export const getGetRecentUnboundMembersUrl = () => {
+  return `/api/activity/new-members`;
+};
+
+export const getRecentUnboundMembers = async (
+  options?: RequestInit,
+): Promise<RecentUnboundMemberAudit> => {
+  return customFetch<RecentUnboundMemberAudit>(
+    getGetRecentUnboundMembersUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetRecentUnboundMembersQueryKey = () => {
+  return [`/api/activity/new-members`] as const;
+};
+
+export const getGetRecentUnboundMembersQueryOptions = <
+  TData = Awaited<ReturnType<typeof getRecentUnboundMembers>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getRecentUnboundMembers>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetRecentUnboundMembersQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getRecentUnboundMembers>>
+  > = ({ signal }) => getRecentUnboundMembers({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getRecentUnboundMembers>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetRecentUnboundMembersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getRecentUnboundMembers>>
+>;
+export type GetRecentUnboundMembersQueryError = ErrorType<void>;
+
+/**
+ * @summary Audit corporation members who joined in the last 60 days without a PAP site binding
+ */
+
+export function useGetRecentUnboundMembers<
+  TData = Awaited<ReturnType<typeof getRecentUnboundMembers>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getRecentUnboundMembers>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetRecentUnboundMembersQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Authorize EVE corporation member tracking for the current corporation
+ */
+export const getConnectCorporationRosterUrl = () => {
+  return `/api/activity/new-members/connect`;
+};
+
+export const connectCorporationRoster = async (
+  options?: RequestInit,
+): Promise<unknown> => {
+  return customFetch<unknown>(getConnectCorporationRosterUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getConnectCorporationRosterQueryKey = () => {
+  return [`/api/activity/new-members/connect`] as const;
+};
+
+export const getConnectCorporationRosterQueryOptions = <
+  TData = Awaited<ReturnType<typeof connectCorporationRoster>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof connectCorporationRoster>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getConnectCorporationRosterQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof connectCorporationRoster>>
+  > = ({ signal }) => connectCorporationRoster({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof connectCorporationRoster>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ConnectCorporationRosterQueryResult = NonNullable<
+  Awaited<ReturnType<typeof connectCorporationRoster>>
+>;
+export type ConnectCorporationRosterQueryError = ErrorType<void>;
+
+/**
+ * @summary Authorize EVE corporation member tracking for the current corporation
+ */
+
+export function useConnectCorporationRoster<
+  TData = Awaited<ReturnType<typeof connectCorporationRoster>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof connectCorporationRoster>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getConnectCorporationRosterQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary List all available rewards

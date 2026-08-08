@@ -43,6 +43,13 @@ export function getCorporationWalletAuthorizationUrl(callbackUrl: string, state:
   ], state);
 }
 
+export function getCorporationRosterAuthorizationUrl(callbackUrl: string, state: string): string {
+  return buildAuthorizationUrl(callbackUrl, [
+    "publicData",
+    "esi-corporations.track_members.v1",
+  ], state);
+}
+
 export async function exchangeCode(code: string, callbackUrl: string): Promise<{
   accessToken: string;
   refreshToken: string;

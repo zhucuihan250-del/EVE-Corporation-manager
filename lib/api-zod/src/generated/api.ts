@@ -1688,6 +1688,33 @@ export const UpdateActivitySettingsResponse = zod.object({
 });
 
 /**
+ * @summary Audit corporation members who joined in the last 60 days without a PAP site binding
+ */
+export const GetRecentUnboundMembersResponse = zod.object({
+  connection: zod
+    .object({
+      characterId: zod.number(),
+      status: zod.enum(["connected", "error"]),
+      lastError: zod.string().nullable(),
+      lastSyncedAt: zod.coerce.date().nullable(),
+    })
+    .nullable(),
+  reviewedAt: zod.coerce.date().nullable(),
+  windowDays: zod.number(),
+  totalCorporationMembers: zod.number().nullable(),
+  recentMemberCount: zod.number(),
+  unboundMemberCount: zod.number(),
+  members: zod.array(
+    zod.object({
+      characterId: zod.number(),
+      characterName: zod.string(),
+      corporationJoinedAt: zod.coerce.date(),
+      daysInCorporation: zod.number(),
+    }),
+  ),
+});
+
+/**
  * @summary List all available rewards
  */
 

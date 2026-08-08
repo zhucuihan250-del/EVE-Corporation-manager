@@ -729,6 +729,34 @@ paths:
               schema:
                 $ref: "#/components/schemas/ActivitySettings"
 
+  /activity/new-members:
+    get:
+      operationId: getRecentUnboundMembers
+      tags: [activity]
+      summary: Audit corporation members who joined in the last 60 days without a PAP site binding
+      responses:
+        "200":
+          description: Recent unbound member audit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecentUnboundMemberAudit"
+        "403":
+          description: Forbidden
+        "502":
+          description: EVE member tracking is unavailable or needs authorization
+
+  /activity/new-members/connect:
+    get:
+      operationId: connectCorporationRoster
+      tags: [activity]
+      summary: Authorize EVE corporation member tracking for the current corporation
+      responses:
+        "302":
+          description: Redirect to EVE SSO
+        "403":
+          description: Forbidden
+
   /rewards:
     get:
       operationId: listRewards
@@ -2910,6 +2938,42 @@ components:
       properties:
         minimumPap: { type: number, minimum: 0, maximum: 1000 }
       required: [minimumPap]
+
+    CorporationRosterConnection:
+      type: object
+      properties:
+        characterId: { type: integer }
+        status: { type: string, enum: [connected, error] }
+        lastError: { type: string, nullable: true }
+        lastSyncedAt: { type: string, format: date-time, nullable: true }
+      required: [characterId, status, lastError, lastSyncedAt]
+
+    RecentUnboundMember:
+      type: object
+      properties:
+        characterId: { type: integer }
+        characterName: { type: string }
+        corporationJoinedAt: { type: string, format: date-time }
+        daysInCorporation: { type: integer }
+      required: [characterId, characterName, corporationJoinedAt, daysInCorporation]
+
+    RecentUnboundMemberAudit:
+      type: object
+      properties:
+        connection:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/CorporationRosterConnection"
+        reviewedAt: { type: string, format: date-time, nullable: true }
+        windowDays: { type: integer }
+        totalCorporationMembers: { type: integer, nullable: true }
+        recentMemberCount: { type: integer }
+        unboundMemberCount: { type: integer }
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/RecentUnboundMember"
+      required: [connection, reviewedAt, windowDays, totalCorporationMembers, recentMemberCount, unboundMemberCount, members]
 
     CorporationModules:
       type: object

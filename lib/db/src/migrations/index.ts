@@ -10,6 +10,7 @@ import { userMainCharacterNullableMigration } from "./0008-user-main-character-n
 import { corporationPlatformModulesMigration } from "./0009-corporation-platform-modules";
 import { reimbursementWindowMigration } from "./0010-reimbursement-window";
 import { activityIdentityManagementMigration } from "./0011-activity-identity-management";
+import { corporationRosterAuditMigration } from "./0012-corporation-roster-audit";
 
 type Migration = {
   id: string;
@@ -28,6 +29,7 @@ const migrations: Migration[] = [
   corporationPlatformModulesMigration,
   reimbursementWindowMigration,
   activityIdentityManagementMigration,
+  corporationRosterAuditMigration,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {

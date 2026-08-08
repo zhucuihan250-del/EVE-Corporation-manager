@@ -6,7 +6,6 @@ import {
   useListCharacters,
   useListIdentityApplications,
   useListIdentityGroups,
-  type IdentityGroup,
 } from "@workspace/api-client-react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
@@ -15,19 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/api-error";
-import { CheckCircle2, KeyRound, ShieldCheck, XCircle } from "lucide-react";
-
-const PERMISSION_LABELS: Record<string, [string, string]> = {
-  "activity.manage": ["活跃度管理", "Activity management"],
-  "diplomacy.manage": ["外交管理", "Diplomacy management"],
-  "economy.manage": ["经济管理", "Economy management"],
-  "economy.view": ["经济查看", "Economy access"],
-  "fleet.manage": ["FC与舰队管理", "FC and fleet management"],
-  "identity.manage": ["身份组管理", "Identity management"],
-  "recruitment.manage": ["招新管理", "Recruitment management"],
-  "reimbursement.manage": ["补损审核", "Reimbursement review"],
-  "reimbursement.window.manage": ["补损窗口管理", "Reimbursement window management"],
-};
+import { CheckCircle2, ShieldCheck, XCircle } from "lucide-react";
 
 export function IdentityGroups() {
   const { i18n } = useTranslation();
@@ -68,7 +55,7 @@ export function IdentityGroups() {
         toast({
           title,
           description: result.rejectionReason ?? (result.status === "pending_review"
-            ? tr("管理身份审批通过后，系统会立即授予对应权限。", "The configured permissions will be granted immediately after approval.")
+            ? tr("请等待军团管理人员审核。", "Please wait for corporation management review.")
             : undefined),
           variant: result.status === "rejected" ? "destructive" : "default",
         });
@@ -86,38 +73,11 @@ export function IdentityGroups() {
     withdrawn: tr("已撤回", "Withdrawn"),
   }), [zh]);
 
-  const renderSkillPlans = (group: IdentityGroup) => {
-    if (!group.skillPlans.length) {
-      return group.requiredSkills.length ? (
-        <div className="space-y-1">
-          {group.requiredSkills.map((skill) => (
-            <div key={skill.skillId} className="flex justify-between text-muted-foreground"><span>{skill.name}</span><span>Lv. {skill.level}</span></div>
-          ))}
-        </div>
-      ) : <span className="text-muted-foreground">{tr("暂未配置技能门槛", "No skill threshold configured")}</span>;
-    }
-    return (
-      <div className="space-y-3">
-        <Badge variant="outline">
-          {group.skillPlanMatchMode === "any" ? tr("满足任意一套方案", "Match any one plan") : tr("需要满足全部方案", "Match all plans")}
-        </Badge>
-        {group.skillPlans.map((plan) => (
-          <div key={plan.id} className="rounded border border-border/40 p-2">
-            <div className="font-medium text-foreground">{plan.name}</div>
-            {plan.requiredSkills.map((skill) => (
-              <div key={skill.skillId} className="mt-1 flex justify-between text-muted-foreground"><span>{skill.name}</span><span>Lv. {skill.level}</span></div>
-            ))}
-          </div>
-        ))}
-      </div>
-    );
-  };
-
   return (
     <div className="p-6 space-y-6 overflow-auto">
       <div>
         <h1 className="text-2xl font-bold font-mono tracking-wider">{tr("身份组", "IDENTITY GROUPS")}</h1>
-        <p className="text-sm text-muted-foreground mt-1">{tr("作战与能力组自动审核并授予身份；管理组通过人工审核后立即获得对应权限。", "Combat groups are granted after automatic skill checks; management-group permissions are granted immediately after review.")}</p>
+        <p className="text-sm text-muted-foreground mt-1">{tr("作战与能力组自动审核；管理组由军团管理人员审核。", "Combat groups are reviewed automatically; management groups are reviewed by corporation management.")}</p>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -131,16 +91,6 @@ export function IdentityGroups() {
               <CardDescription>{group.description || tr("暂无说明", "No description")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="rounded-md border border-border/50 bg-muted/20 p-3 text-sm">
-                <div className="font-medium mb-2">{tr("技能方案", "Skill plans")}</div>
-                {renderSkillPlans(group)}
-              </div>
-              {group.permissions.length > 0 && (
-                <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-sm">
-                  <div className="mb-2 flex items-center gap-2 font-medium"><KeyRound className="h-4 w-4 text-primary" />{tr("批准后自动获得", "Granted automatically after approval")}</div>
-                  <div className="flex flex-wrap gap-2">{group.permissions.map((permission) => <Badge key={permission} variant="secondary">{PERMISSION_LABELS[permission]?.[zh ? 0 : 1] ?? permission}</Badge>)}</div>
-                </div>
-              )}
               {group.isMember ? (
                 <div className="flex items-center gap-2 text-sm text-emerald-400"><CheckCircle2 className="h-4 w-4" />{tr("您已加入该身份组", "You are a member")}</div>
               ) : group.latestApplication && ["pending_skill_audit", "pending_review", "needs_information"].includes(group.latestApplication.status) ? (
@@ -167,8 +117,6 @@ export function IdentityGroups() {
             <div key={application.id} className="rounded-md border border-border/50 p-4 space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2"><div className="font-medium">{application.groupName ?? `#${application.groupId}`} · {application.characterName ?? application.applicantName}</div><Badge variant="outline">{statusText[application.status]}</Badge></div>
               {application.statement && <p className="text-sm text-muted-foreground">{application.statement}</p>}
-              {application.skillAudit?.plans?.map((plan) => <div key={`${application.id}-${plan.planId}`} className="text-xs text-muted-foreground">{plan.name}: {plan.passed ? "✓" : "✗"} · {plan.skills.map((skill) => `${skill.name} ${skill.trainedLevel}/${skill.level}`).join(" · ")}</div>)}
-              {application.skillAudit && !application.skillAudit.plans?.length && <div className="text-xs text-muted-foreground">{application.skillAudit.skills.map((skill) => `${skill.name} ${skill.trainedLevel}/${skill.level}${skill.passed ? " ✓" : " ✗"}`).join(" · ") || tr("无技能门槛", "No skill threshold")}</div>}
               {application.rejectionReason && <div className="flex gap-2 text-sm text-destructive"><XCircle className="h-4 w-4 mt-0.5" />{application.rejectionReason}</div>}
             </div>
           ))}

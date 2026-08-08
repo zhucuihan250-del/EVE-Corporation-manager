@@ -15,6 +15,7 @@ export interface IdentityApplication {
   groupId: number;
   groupName?: string;
   groupCategory?: IdentityApplicationGroupCategory;
+  groupPermissions?: string[];
   userId: number;
   /** @nullable */
   applicantName?: string | null;

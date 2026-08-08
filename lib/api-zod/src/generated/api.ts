@@ -1631,6 +1631,63 @@ export const CreateManualPapBody = zod.object({
 });
 
 /**
+ * @summary List monthly PAP activity for eligible corporation members
+ */
+export const getActivityReportQueryMonthRegExp = new RegExp(
+  "^\\d{4}-(0[1-9]|1[0-2])$",
+);
+
+export const GetActivityReportQueryParams = zod.object({
+  month: zod.coerce
+    .string()
+    .regex(getActivityReportQueryMonthRegExp)
+    .optional(),
+});
+
+export const GetActivityReportResponse = zod.object({
+  month: zod.string(),
+  periodStart: zod.coerce.date(),
+  periodEnd: zod.coerce.date(),
+  evaluatedAt: zod.coerce.date(),
+  eligibilityDays: zod.number(),
+  minimumPap: zod.number(),
+  totalEligible: zod.number(),
+  meetingRequirement: zod.number(),
+  belowRequirement: zod.number(),
+  members: zod.array(
+    zod.object({
+      userId: zod.number(),
+      characterName: zod.string(),
+      role: zod.enum(["member", "fc", "admin", "controller"]),
+      corporationJoinedAt: zod.coerce.date(),
+      daysInCorporation: zod.number(),
+      pap: zod.number(),
+      papRecords: zod.number(),
+      remainingPap: zod.number(),
+      metRequirement: zod.boolean(),
+    }),
+  ),
+});
+
+/**
+ * @summary Update the corporation monthly PAP requirement
+ */
+export const updateActivitySettingsBodyMinimumPapMin = 0;
+export const updateActivitySettingsBodyMinimumPapMax = 1000;
+
+export const UpdateActivitySettingsBody = zod.object({
+  minimumPap: zod
+    .number()
+    .min(updateActivitySettingsBodyMinimumPapMin)
+    .max(updateActivitySettingsBodyMinimumPapMax),
+});
+
+export const UpdateActivitySettingsResponse = zod.object({
+  minimumPap: zod.number(),
+  eligibilityDays: zod.number(),
+});
+
+/**
  * @summary List all available rewards
  */
 
@@ -1901,9 +1958,17 @@ export const DeleteAnnouncementParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const ListIdentityGroupsQueryParams = zod.object({
+  includeInactive: zod.coerce.boolean().optional(),
+});
+
 export const listIdentityGroupsResponseRequiredSkillsItemLevelMax = 5;
 
+export const listIdentityGroupsResponseSkillPlansItemRequiredSkillsItemLevelMax = 5;
+
 export const listIdentityGroupsResponseLatestApplicationOneSkillAuditOneSkillsItemOneLevelMax = 5;
+
+export const listIdentityGroupsResponseLatestApplicationOneSkillAuditOnePlansItemSkillsItemOneLevelMax = 5;
 
 export const ListIdentityGroupsResponseItem = zod.object({
   id: zod.number(),
@@ -1922,6 +1987,30 @@ export const ListIdentityGroupsResponseItem = zod.object({
     }),
   ),
   permissions: zod.array(zod.string()),
+  skillPlanMatchMode: zod.enum(["all", "any"]),
+  skillPlans: zod.array(
+    zod.object({
+      id: zod.number(),
+      corporationId: zod.number(),
+      name: zod.string(),
+      description: zod.string(),
+      requiredSkills: zod.array(
+        zod.object({
+          skillId: zod.number(),
+          name: zod.string(),
+          level: zod
+            .number()
+            .min(1)
+            .max(
+              listIdentityGroupsResponseSkillPlansItemRequiredSkillsItemLevelMax,
+            ),
+        }),
+      ),
+      isActive: zod.boolean(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    }),
+  ),
   isActive: zod.boolean(),
   isMember: zod.boolean(),
   latestApplication: zod
@@ -1932,6 +2021,7 @@ export const ListIdentityGroupsResponseItem = zod.object({
         groupId: zod.number(),
         groupName: zod.string().optional(),
         groupCategory: zod.enum(["combat", "management"]).optional(),
+        groupPermissions: zod.array(zod.string()).optional(),
         userId: zod.number(),
         applicantName: zod.string().nullish(),
         characterId: zod.number(),
@@ -1969,6 +2059,35 @@ export const ListIdentityGroupsResponseItem = zod.object({
                     }),
                   ),
               ),
+              matchMode: zod.enum(["all", "any"]).optional(),
+              plans: zod
+                .array(
+                  zod.object({
+                    planId: zod.number().nullable(),
+                    name: zod.string(),
+                    passed: zod.boolean(),
+                    skills: zod.array(
+                      zod
+                        .object({
+                          skillId: zod.number(),
+                          name: zod.string(),
+                          level: zod
+                            .number()
+                            .min(1)
+                            .max(
+                              listIdentityGroupsResponseLatestApplicationOneSkillAuditOnePlansItemSkillsItemOneLevelMax,
+                            ),
+                        })
+                        .and(
+                          zod.object({
+                            trainedLevel: zod.number(),
+                            passed: zod.boolean(),
+                          }),
+                        ),
+                    ),
+                  }),
+                )
+                .optional(),
             }),
             zod.null(),
           ])
@@ -2004,6 +2123,9 @@ export const CreateIdentityGroupBody = zod.object({
         .max(createIdentityGroupBodyRequiredSkillsItemLevelMax),
     }),
   ),
+  permissions: zod.array(zod.string()).optional(),
+  skillPlanIds: zod.array(zod.number()).optional(),
+  skillPlanMatchMode: zod.enum(["all", "any"]).optional(),
   isActive: zod.boolean().optional(),
 });
 
@@ -2027,12 +2149,19 @@ export const UpdateIdentityGroupBody = zod.object({
         .max(updateIdentityGroupBodyRequiredSkillsItemLevelMax),
     }),
   ),
+  permissions: zod.array(zod.string()).optional(),
+  skillPlanIds: zod.array(zod.number()).optional(),
+  skillPlanMatchMode: zod.enum(["all", "any"]).optional(),
   isActive: zod.boolean().optional(),
 });
 
 export const updateIdentityGroupResponseRequiredSkillsItemLevelMax = 5;
 
+export const updateIdentityGroupResponseSkillPlansItemRequiredSkillsItemLevelMax = 5;
+
 export const updateIdentityGroupResponseLatestApplicationOneSkillAuditOneSkillsItemOneLevelMax = 5;
+
+export const updateIdentityGroupResponseLatestApplicationOneSkillAuditOnePlansItemSkillsItemOneLevelMax = 5;
 
 export const UpdateIdentityGroupResponse = zod.object({
   id: zod.number(),
@@ -2051,6 +2180,30 @@ export const UpdateIdentityGroupResponse = zod.object({
     }),
   ),
   permissions: zod.array(zod.string()),
+  skillPlanMatchMode: zod.enum(["all", "any"]),
+  skillPlans: zod.array(
+    zod.object({
+      id: zod.number(),
+      corporationId: zod.number(),
+      name: zod.string(),
+      description: zod.string(),
+      requiredSkills: zod.array(
+        zod.object({
+          skillId: zod.number(),
+          name: zod.string(),
+          level: zod
+            .number()
+            .min(1)
+            .max(
+              updateIdentityGroupResponseSkillPlansItemRequiredSkillsItemLevelMax,
+            ),
+        }),
+      ),
+      isActive: zod.boolean(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    }),
+  ),
   isActive: zod.boolean(),
   isMember: zod.boolean(),
   latestApplication: zod
@@ -2061,6 +2214,7 @@ export const UpdateIdentityGroupResponse = zod.object({
         groupId: zod.number(),
         groupName: zod.string().optional(),
         groupCategory: zod.enum(["combat", "management"]).optional(),
+        groupPermissions: zod.array(zod.string()).optional(),
         userId: zod.number(),
         applicantName: zod.string().nullish(),
         characterId: zod.number(),
@@ -2098,6 +2252,35 @@ export const UpdateIdentityGroupResponse = zod.object({
                     }),
                   ),
               ),
+              matchMode: zod.enum(["all", "any"]).optional(),
+              plans: zod
+                .array(
+                  zod.object({
+                    planId: zod.number().nullable(),
+                    name: zod.string(),
+                    passed: zod.boolean(),
+                    skills: zod.array(
+                      zod
+                        .object({
+                          skillId: zod.number(),
+                          name: zod.string(),
+                          level: zod
+                            .number()
+                            .min(1)
+                            .max(
+                              updateIdentityGroupResponseLatestApplicationOneSkillAuditOnePlansItemSkillsItemOneLevelMax,
+                            ),
+                        })
+                        .and(
+                          zod.object({
+                            trainedLevel: zod.number(),
+                            passed: zod.boolean(),
+                          }),
+                        ),
+                    ),
+                  }),
+                )
+                .optional(),
             }),
             zod.null(),
           ])
@@ -2123,7 +2306,13 @@ export const ApplyIdentityGroupBody = zod.object({
   statement: zod.string(),
 });
 
+export const ListIdentityApplicationsQueryParams = zod.object({
+  mine: zod.coerce.boolean().optional(),
+});
+
 export const listIdentityApplicationsResponseSkillAuditOneSkillsItemOneLevelMax = 5;
+
+export const listIdentityApplicationsResponseSkillAuditOnePlansItemSkillsItemOneLevelMax = 5;
 
 export const ListIdentityApplicationsResponseItem = zod.object({
   id: zod.number(),
@@ -2131,6 +2320,7 @@ export const ListIdentityApplicationsResponseItem = zod.object({
   groupId: zod.number(),
   groupName: zod.string().optional(),
   groupCategory: zod.enum(["combat", "management"]).optional(),
+  groupPermissions: zod.array(zod.string()).optional(),
   userId: zod.number(),
   applicantName: zod.string().nullish(),
   characterId: zod.number(),
@@ -2168,6 +2358,35 @@ export const ListIdentityApplicationsResponseItem = zod.object({
               }),
             ),
         ),
+        matchMode: zod.enum(["all", "any"]).optional(),
+        plans: zod
+          .array(
+            zod.object({
+              planId: zod.number().nullable(),
+              name: zod.string(),
+              passed: zod.boolean(),
+              skills: zod.array(
+                zod
+                  .object({
+                    skillId: zod.number(),
+                    name: zod.string(),
+                    level: zod
+                      .number()
+                      .min(1)
+                      .max(
+                        listIdentityApplicationsResponseSkillAuditOnePlansItemSkillsItemOneLevelMax,
+                      ),
+                  })
+                  .and(
+                    zod.object({
+                      trainedLevel: zod.number(),
+                      passed: zod.boolean(),
+                    }),
+                  ),
+              ),
+            }),
+          )
+          .optional(),
       }),
       zod.null(),
     ])
@@ -2180,6 +2399,102 @@ export const ListIdentityApplicationsResponseItem = zod.object({
 export const ListIdentityApplicationsResponse = zod.array(
   ListIdentityApplicationsResponseItem,
 );
+
+/**
+ * @summary List reusable corporation skill plans
+ */
+export const listIdentitySkillPlansResponseRequiredSkillsItemLevelMax = 5;
+
+export const ListIdentitySkillPlansResponseItem = zod.object({
+  id: zod.number(),
+  corporationId: zod.number(),
+  name: zod.string(),
+  description: zod.string(),
+  requiredSkills: zod.array(
+    zod.object({
+      skillId: zod.number(),
+      name: zod.string(),
+      level: zod
+        .number()
+        .min(1)
+        .max(listIdentitySkillPlansResponseRequiredSkillsItemLevelMax),
+    }),
+  ),
+  isActive: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListIdentitySkillPlansResponse = zod.array(
+  ListIdentitySkillPlansResponseItem,
+);
+
+/**
+ * @summary Create a reusable corporation skill plan
+ */
+export const createIdentitySkillPlanBodyRequiredSkillsItemLevelMax = 5;
+
+export const CreateIdentitySkillPlanBody = zod.object({
+  name: zod.string(),
+  description: zod.string(),
+  requiredSkills: zod.array(
+    zod.object({
+      skillId: zod.number(),
+      name: zod.string(),
+      level: zod
+        .number()
+        .min(1)
+        .max(createIdentitySkillPlanBodyRequiredSkillsItemLevelMax),
+    }),
+  ),
+  isActive: zod.boolean().optional(),
+});
+
+/**
+ * @summary Update a reusable corporation skill plan
+ */
+export const UpdateIdentitySkillPlanParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const updateIdentitySkillPlanBodyRequiredSkillsItemLevelMax = 5;
+
+export const UpdateIdentitySkillPlanBody = zod.object({
+  name: zod.string(),
+  description: zod.string(),
+  requiredSkills: zod.array(
+    zod.object({
+      skillId: zod.number(),
+      name: zod.string(),
+      level: zod
+        .number()
+        .min(1)
+        .max(updateIdentitySkillPlanBodyRequiredSkillsItemLevelMax),
+    }),
+  ),
+  isActive: zod.boolean().optional(),
+});
+
+export const updateIdentitySkillPlanResponseRequiredSkillsItemLevelMax = 5;
+
+export const UpdateIdentitySkillPlanResponse = zod.object({
+  id: zod.number(),
+  corporationId: zod.number(),
+  name: zod.string(),
+  description: zod.string(),
+  requiredSkills: zod.array(
+    zod.object({
+      skillId: zod.number(),
+      name: zod.string(),
+      level: zod
+        .number()
+        .min(1)
+        .max(updateIdentitySkillPlanResponseRequiredSkillsItemLevelMax),
+    }),
+  ),
+  isActive: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
 
 export const ReviewIdentityApplicationParams = zod.object({
   id: zod.coerce.number(),
@@ -2197,12 +2512,15 @@ export const ReviewIdentityApplicationBody = zod.object({
 
 export const reviewIdentityApplicationResponseSkillAuditOneSkillsItemOneLevelMax = 5;
 
+export const reviewIdentityApplicationResponseSkillAuditOnePlansItemSkillsItemOneLevelMax = 5;
+
 export const ReviewIdentityApplicationResponse = zod.object({
   id: zod.number(),
   corporationId: zod.number(),
   groupId: zod.number(),
   groupName: zod.string().optional(),
   groupCategory: zod.enum(["combat", "management"]).optional(),
+  groupPermissions: zod.array(zod.string()).optional(),
   userId: zod.number(),
   applicantName: zod.string().nullish(),
   characterId: zod.number(),
@@ -2240,6 +2558,35 @@ export const ReviewIdentityApplicationResponse = zod.object({
               }),
             ),
         ),
+        matchMode: zod.enum(["all", "any"]).optional(),
+        plans: zod
+          .array(
+            zod.object({
+              planId: zod.number().nullable(),
+              name: zod.string(),
+              passed: zod.boolean(),
+              skills: zod.array(
+                zod
+                  .object({
+                    skillId: zod.number(),
+                    name: zod.string(),
+                    level: zod
+                      .number()
+                      .min(1)
+                      .max(
+                        reviewIdentityApplicationResponseSkillAuditOnePlansItemSkillsItemOneLevelMax,
+                      ),
+                  })
+                  .and(
+                    zod.object({
+                      trainedLevel: zod.number(),
+                      passed: zod.boolean(),
+                    }),
+                  ),
+              ),
+            }),
+          )
+          .optional(),
       }),
       zod.null(),
     ])

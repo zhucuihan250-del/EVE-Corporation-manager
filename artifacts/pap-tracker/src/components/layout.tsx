@@ -4,7 +4,7 @@ import { useGetMe, useLogout } from "@workspace/api-client-react";
 import { Link, useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 import {
-  BookOpen, BrainCircuit, ClipboardList, Crosshair, Database, Gift, Handshake,
+  Activity, BookOpen, BrainCircuit, ClipboardList, Crosshair, Database, Gift, Handshake,
   History, Inbox, Languages, Landmark, LayoutDashboard, LogOut, Radio, ReceiptText,
   LockKeyhole, ShieldAlert, ShieldCheck, Swords, UserSquare2, Users, Wrench,
 } from "lucide-react";
@@ -33,6 +33,8 @@ export function Layout({ children }: { children: ReactNode }) {
   const isFc = hasRole("fc");
   const isController = hasRole("controller");
   const isFleetManager = isFc || Boolean(user?.permissions.includes("fleet.manage"));
+  const isActivityManager = isAdmin || Boolean(user?.permissions.includes("activity.manage"));
+  const isIdentityManager = isAdmin || Boolean(user?.permissions.includes("identity.manage"));
 
   const serviceItems: NavItem[] = [];
   if (modules?.pap) {
@@ -69,6 +71,12 @@ export function Layout({ children }: { children: ReactNode }) {
       { href: "/admin", label: t("nav.overview"), icon: Database, exact: true },
       { href: "/admin/users", label: t("nav.personnel"), icon: Users },
     );
+  }
+  if (isActivityManager && modules?.pap) {
+    commandItems.push({ href: "/admin/activity", label: tr("活跃度查询", "Activity tracking"), icon: Activity });
+  }
+  if (isIdentityManager && modules?.identity) {
+    commandItems.push({ href: "/admin/identity", label: tr("身份组审核", "Identity review"), icon: ShieldCheck });
   }
   if (isFleetManager && modules?.fleet) {
     commandItems.push(

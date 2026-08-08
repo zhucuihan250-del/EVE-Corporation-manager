@@ -6,9 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { SkillAuditItem } from "./skillAuditItem";
+import type { SkillAuditResultMatchMode } from "./skillAuditResultMatchMode";
+import type { SkillPlanAuditResult } from "./skillPlanAuditResult";
 
 export interface SkillAuditResult {
   checkedAt: Date;
   passed: boolean;
   skills: SkillAuditItem[];
+  matchMode?: SkillAuditResultMatchMode;
+  plans?: SkillPlanAuditResult[];
 }

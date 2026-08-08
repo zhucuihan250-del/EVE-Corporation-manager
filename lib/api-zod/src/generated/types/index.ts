@@ -6,6 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./activityMember";
+export * from "./activityMemberRole";
+export * from "./activityReport";
+export * from "./activitySettings";
+export * from "./activitySettingsInput";
 export * from "./addParticipantBody";
 export * from "./adjustPapBody";
 export * from "./adminSummary";
@@ -45,6 +50,8 @@ export * from "./battleReviewManualNodeCategory";
 export * from "./battleReviewStatus";
 export * from "./character";
 export * from "./corporationModules";
+export * from "./corporationSkillPlan";
+export * from "./corporationSkillPlanInput";
 export * from "./createAnnouncementBody";
 export * from "./createDiplomacyCaseBody";
 export * from "./createDiplomacyCaseBodyCategory";
@@ -93,6 +100,7 @@ export * from "./fittingSlot";
 export * from "./fittingSlotMetric";
 export * from "./fleet";
 export * from "./fleetReimbursementRule";
+export * from "./getActivityReportParams";
 export * from "./healthStatus";
 export * from "./identityApplication";
 export * from "./identityApplicationGroupCategory";
@@ -101,6 +109,10 @@ export * from "./identityGroup";
 export * from "./identityGroupCategory";
 export * from "./identityGroupInput";
 export * from "./identityGroupInputCategory";
+export * from "./identityGroupInputSkillPlanMatchMode";
+export * from "./identityGroupSkillPlanMatchMode";
+export * from "./listIdentityApplicationsParams";
+export * from "./listIdentityGroupsParams";
 export * from "./listReimbursementLossesParams";
 export * from "./papRecord";
 export * from "./papRecordType";
@@ -124,6 +136,8 @@ export * from "./searchFittingCatalogParams";
 export * from "./searchFittingCatalogSlot";
 export * from "./skillAuditItem";
 export * from "./skillAuditResult";
+export * from "./skillAuditResultMatchMode";
+export * from "./skillPlanAuditResult";
 export * from "./successResponse";
 export * from "./syncCorporationWallet200";
 export * from "./topContributor";

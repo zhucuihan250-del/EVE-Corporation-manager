@@ -20,6 +20,8 @@ tags:
     description: Fleet management
   - name: pap
     description: PAP records management
+  - name: activity
+    description: Corporation monthly PAP activity management
   - name: rewards
     description: Reward management
   - name: redemptions
@@ -686,6 +688,47 @@ paths:
               schema:
                 $ref: "#/components/schemas/PapRecord"
 
+  /activity:
+    get:
+      operationId: getActivityReport
+      tags: [activity]
+      summary: List monthly PAP activity for eligible corporation members
+      parameters:
+        - in: query
+          name: month
+          required: false
+          schema:
+            type: string
+            pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+      responses:
+        "200":
+          description: Monthly activity report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivityReport"
+        "403":
+          description: Forbidden
+
+  /activity/settings:
+    patch:
+      operationId: updateActivitySettings
+      tags: [activity]
+      summary: Update the corporation monthly PAP requirement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActivitySettingsInput"
+      responses:
+        "200":
+          description: Updated activity settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivitySettings"
+
   /rewards:
     get:
       operationId: listRewards
@@ -980,6 +1023,11 @@ paths:
     get:
       operationId: listIdentityGroups
       tags: [identity]
+      parameters:
+        - in: query
+          name: includeInactive
+          required: false
+          schema: { type: boolean }
       responses:
         "200":
           description: Identity groups for the active corporation
@@ -1060,6 +1108,11 @@ paths:
     get:
       operationId: listIdentityApplications
       tags: [identity]
+      parameters:
+        - in: query
+          name: mine
+          required: false
+          schema: { type: boolean }
       responses:
         "200":
           description: Visible identity applications
@@ -1069,6 +1122,62 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/IdentityApplication"
+
+  /identity-skill-plans:
+    get:
+      operationId: listIdentitySkillPlans
+      tags: [identity]
+      summary: List reusable corporation skill plans
+      responses:
+        "200":
+          description: Corporation skill plans
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CorporationSkillPlan"
+    post:
+      operationId: createIdentitySkillPlan
+      tags: [identity]
+      summary: Create a reusable corporation skill plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CorporationSkillPlanInput"
+      responses:
+        "201":
+          description: Skill plan created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CorporationSkillPlan"
+
+  /identity-skill-plans/{id}:
+    patch:
+      operationId: updateIdentitySkillPlan
+      tags: [identity]
+      summary: Update a reusable corporation skill plan
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CorporationSkillPlanInput"
+      responses:
+        "200":
+          description: Skill plan updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CorporationSkillPlan"
 
   /identity-applications/{id}:
     patch:
@@ -2738,6 +2847,51 @@ components:
         - totalPap
         - fleetCount
 
+    ActivityMember:
+      type: object
+      properties:
+        userId: { type: integer }
+        characterName: { type: string }
+        role: { type: string, enum: [member, fc, admin, controller] }
+        corporationJoinedAt: { type: string, format: date-time }
+        daysInCorporation: { type: integer }
+        pap: { type: number }
+        papRecords: { type: integer }
+        remainingPap: { type: number }
+        metRequirement: { type: boolean }
+      required: [userId, characterName, role, corporationJoinedAt, daysInCorporation, pap, papRecords, remainingPap, metRequirement]
+
+    ActivityReport:
+      type: object
+      properties:
+        month: { type: string }
+        periodStart: { type: string, format: date-time }
+        periodEnd: { type: string, format: date-time }
+        evaluatedAt: { type: string, format: date-time }
+        eligibilityDays: { type: integer }
+        minimumPap: { type: number }
+        totalEligible: { type: integer }
+        meetingRequirement: { type: integer }
+        belowRequirement: { type: integer }
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActivityMember"
+      required: [month, periodStart, periodEnd, evaluatedAt, eligibilityDays, minimumPap, totalEligible, meetingRequirement, belowRequirement, members]
+
+    ActivitySettings:
+      type: object
+      properties:
+        minimumPap: { type: number }
+        eligibilityDays: { type: integer }
+      required: [minimumPap, eligibilityDays]
+
+    ActivitySettingsInput:
+      type: object
+      properties:
+        minimumPap: { type: number, minimum: 0, maximum: 1000 }
+      required: [minimumPap]
+
     CorporationModules:
       type: object
       properties:
@@ -2775,7 +2929,54 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/SkillAuditItem"
+        matchMode:
+          type: string
+          enum: [all, any]
+        plans:
+          type: array
+          items:
+            $ref: "#/components/schemas/SkillPlanAuditResult"
       required: [checkedAt, passed, skills]
+
+    SkillPlanAuditResult:
+      type: object
+      properties:
+        planId: { type: ["integer", "null"] }
+        name: { type: string }
+        passed: { type: boolean }
+        skills:
+          type: array
+          items:
+            $ref: "#/components/schemas/SkillAuditItem"
+      required: [planId, name, passed, skills]
+
+    CorporationSkillPlan:
+      type: object
+      properties:
+        id: { type: integer }
+        corporationId: { type: integer }
+        name: { type: string }
+        description: { type: string }
+        requiredSkills:
+          type: array
+          items:
+            $ref: "#/components/schemas/RequiredSkill"
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, corporationId, name, description, requiredSkills, isActive, createdAt, updatedAt]
+
+    CorporationSkillPlanInput:
+      type: object
+      properties:
+        name: { type: string }
+        description: { type: string }
+        requiredSkills:
+          type: array
+          items:
+            $ref: "#/components/schemas/RequiredSkill"
+        isActive: { type: boolean }
+      required: [name, description, requiredSkills]
 
     IdentityApplication:
       type: object
@@ -2785,6 +2986,9 @@ components:
         groupId: { type: integer }
         groupName: { type: string }
         groupCategory: { type: string, enum: [combat, management] }
+        groupPermissions:
+          type: array
+          items: { type: string }
         userId: { type: integer }
         applicantName: { type: ["string", "null"] }
         characterId: { type: integer }
@@ -2818,6 +3022,11 @@ components:
         permissions:
           type: array
           items: { type: string }
+        skillPlanMatchMode: { type: string, enum: [all, any] }
+        skillPlans:
+          type: array
+          items:
+            $ref: "#/components/schemas/CorporationSkillPlan"
         isActive: { type: boolean }
         isMember: { type: boolean }
         latestApplication:
@@ -2826,7 +3035,7 @@ components:
             - type: "null"
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
-      required: [id, corporationId, name, category, description, requiredSkills, permissions, isActive, isMember, createdAt, updatedAt]
+      required: [id, corporationId, name, category, description, requiredSkills, permissions, skillPlanMatchMode, skillPlans, isActive, isMember, createdAt, updatedAt]
 
     IdentityGroupInput:
       type: object
@@ -2838,6 +3047,13 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/RequiredSkill"
+        permissions:
+          type: array
+          items: { type: string }
+        skillPlanIds:
+          type: array
+          items: { type: integer }
+        skillPlanMatchMode: { type: string, enum: [all, any] }
         isActive: { type: boolean }
       required: [name, category, description, requiredSkills]
 

@@ -26,6 +26,8 @@ import { AdminRewards } from "@/pages/admin/rewards";
 import { AdminRedemptions } from "@/pages/admin/redemptions";
 import { AdminPap } from "@/pages/admin/pap";
 import { AdminAnnouncements } from "@/pages/admin/announcements";
+import { AdminActivity } from "@/pages/admin/activity";
+import { AdminIdentity } from "@/pages/admin/identity";
 import { Characters } from "@/pages/characters";
 import { Fitting } from "@/pages/fitting";
 import { BattleReportDetail, BattleReports } from "@/pages/battle-reports";
@@ -205,6 +207,12 @@ function Router() {
       </Route>
       <Route path="/admin/pap">
         {() => <ProtectedRoute component={AdminPap} minRole="admin" module="pap" />}
+      </Route>
+      <Route path="/admin/activity">
+        {() => <ProtectedRoute component={AdminActivity} minRole="admin" module="pap" permissionAlternative="activity.manage" />}
+      </Route>
+      <Route path="/admin/identity">
+        {() => <ProtectedRoute component={AdminIdentity} minRole="admin" module="identity" permissionAlternative="identity.manage" />}
       </Route>
       {/* FC Routes - fc, admin & controller */}
       <Route path="/admin/fleets">

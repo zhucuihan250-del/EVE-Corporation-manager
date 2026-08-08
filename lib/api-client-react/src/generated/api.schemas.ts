@@ -948,6 +948,54 @@ export interface TopContributor {
   fleetCount: number;
 }
 
+export type ActivityMemberRole =
+  (typeof ActivityMemberRole)[keyof typeof ActivityMemberRole];
+
+export const ActivityMemberRole = {
+  member: "member",
+  fc: "fc",
+  admin: "admin",
+  controller: "controller",
+} as const;
+
+export interface ActivityMember {
+  userId: number;
+  characterName: string;
+  role: ActivityMemberRole;
+  corporationJoinedAt: string;
+  daysInCorporation: number;
+  pap: number;
+  papRecords: number;
+  remainingPap: number;
+  metRequirement: boolean;
+}
+
+export interface ActivityReport {
+  month: string;
+  periodStart: string;
+  periodEnd: string;
+  evaluatedAt: string;
+  eligibilityDays: number;
+  minimumPap: number;
+  totalEligible: number;
+  meetingRequirement: number;
+  belowRequirement: number;
+  members: ActivityMember[];
+}
+
+export interface ActivitySettings {
+  minimumPap: number;
+  eligibilityDays: number;
+}
+
+export interface ActivitySettingsInput {
+  /**
+   * @minimum 0
+   * @maximum 1000
+   */
+  minimumPap: number;
+}
+
 export interface RequiredSkill {
   skillId: number;
   name: string;
@@ -963,10 +1011,46 @@ export type SkillAuditItem = RequiredSkill & {
   passed: boolean;
 };
 
+export type SkillAuditResultMatchMode =
+  (typeof SkillAuditResultMatchMode)[keyof typeof SkillAuditResultMatchMode];
+
+export const SkillAuditResultMatchMode = {
+  all: "all",
+  any: "any",
+} as const;
+
+export interface SkillPlanAuditResult {
+  /** @nullable */
+  planId: number | null;
+  name: string;
+  passed: boolean;
+  skills: SkillAuditItem[];
+}
+
 export interface SkillAuditResult {
   checkedAt: string;
   passed: boolean;
   skills: SkillAuditItem[];
+  matchMode?: SkillAuditResultMatchMode;
+  plans?: SkillPlanAuditResult[];
+}
+
+export interface CorporationSkillPlan {
+  id: number;
+  corporationId: number;
+  name: string;
+  description: string;
+  requiredSkills: RequiredSkill[];
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CorporationSkillPlanInput {
+  name: string;
+  description: string;
+  requiredSkills: RequiredSkill[];
+  isActive?: boolean;
 }
 
 export type IdentityApplicationGroupCategory =
@@ -995,6 +1079,7 @@ export interface IdentityApplication {
   groupId: number;
   groupName?: string;
   groupCategory?: IdentityApplicationGroupCategory;
+  groupPermissions?: string[];
   userId: number;
   /** @nullable */
   applicantName?: string | null;
@@ -1019,6 +1104,14 @@ export const IdentityGroupCategory = {
   management: "management",
 } as const;
 
+export type IdentityGroupSkillPlanMatchMode =
+  (typeof IdentityGroupSkillPlanMatchMode)[keyof typeof IdentityGroupSkillPlanMatchMode];
+
+export const IdentityGroupSkillPlanMatchMode = {
+  all: "all",
+  any: "any",
+} as const;
+
 export interface IdentityGroup {
   id: number;
   corporationId: number;
@@ -1027,6 +1120,8 @@ export interface IdentityGroup {
   description: string;
   requiredSkills: RequiredSkill[];
   permissions: string[];
+  skillPlanMatchMode: IdentityGroupSkillPlanMatchMode;
+  skillPlans: CorporationSkillPlan[];
   isActive: boolean;
   isMember: boolean;
   latestApplication?: IdentityApplication | null;
@@ -1042,11 +1137,22 @@ export const IdentityGroupInputCategory = {
   management: "management",
 } as const;
 
+export type IdentityGroupInputSkillPlanMatchMode =
+  (typeof IdentityGroupInputSkillPlanMatchMode)[keyof typeof IdentityGroupInputSkillPlanMatchMode];
+
+export const IdentityGroupInputSkillPlanMatchMode = {
+  all: "all",
+  any: "any",
+} as const;
+
 export interface IdentityGroupInput {
   name: string;
   category: IdentityGroupInputCategory;
   description: string;
   requiredSkills: RequiredSkill[];
+  permissions?: string[];
+  skillPlanIds?: number[];
+  skillPlanMatchMode?: IdentityGroupInputSkillPlanMatchMode;
   isActive?: boolean;
 }
 
@@ -1388,9 +1494,24 @@ export type AnalyzeBattleReplay202 = {
   status: AnalyzeBattleReplay202Status;
 };
 
+export type GetActivityReportParams = {
+  /**
+   * @pattern ^\d{4}-(0[1-9]|1[0-2])$
+   */
+  month?: string;
+};
+
+export type ListIdentityGroupsParams = {
+  includeInactive?: boolean;
+};
+
 export type ApplyIdentityGroupBody = {
   characterId: number;
   statement: string;
+};
+
+export type ListIdentityApplicationsParams = {
+  mine?: boolean;
 };
 
 export type ReviewIdentityApplicationBodyStatus =

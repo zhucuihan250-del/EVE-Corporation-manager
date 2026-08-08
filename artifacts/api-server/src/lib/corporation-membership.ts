@@ -3,6 +3,8 @@ import { eq } from "drizzle-orm";
 import { logger } from "./logger";
 
 const ESI_BASE = "https://esi.evetech.net/latest";
+const ESI_REQUEST_TIMEOUT_MS = 12_000;
+const USER_AGENT = "EVE-Corporation-Manager/1.0 https://zephyr-fleet-track-production.up.railway.app";
 
 type MembershipUser = Pick<typeof usersTable.$inferSelect, "id" | "eveCharacterId" | "corporationId" | "corporationJoinedAt">;
 
@@ -13,7 +15,10 @@ type CorporationHistoryEntry = {
 
 export async function getCorporationJoinDate(characterId: number, corporationId: number): Promise<Date | null> {
   try {
-    const response = await fetch(`${ESI_BASE}/characters/${characterId}/corporationhistory/?datasource=tranquility`, { headers: { Accept: "application/json" } });
+    const response = await fetch(`${ESI_BASE}/characters/${characterId}/corporationhistory/?datasource=tranquility`, {
+      headers: { Accept: "application/json", "User-Agent": USER_AGENT },
+      signal: AbortSignal.timeout(ESI_REQUEST_TIMEOUT_MS),
+    });
 
     if (!response.ok) {
       logger.warn({ characterId, corporationId, status: response.status }, "Failed to fetch corporation history from ESI");

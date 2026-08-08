@@ -9,6 +9,7 @@ import { characterSoftDeleteRetentionMigration } from "./0007-character-soft-del
 import { userMainCharacterNullableMigration } from "./0008-user-main-character-nullable";
 import { corporationPlatformModulesMigration } from "./0009-corporation-platform-modules";
 import { reimbursementWindowMigration } from "./0010-reimbursement-window";
+import { activityIdentityManagementMigration } from "./0011-activity-identity-management";
 
 type Migration = {
   id: string;
@@ -26,6 +27,7 @@ const migrations: Migration[] = [
   userMainCharacterNullableMigration,
   corporationPlatformModulesMigration,
   reimbursementWindowMigration,
+  activityIdentityManagementMigration,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {

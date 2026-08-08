@@ -16,6 +16,7 @@ import identityGroupsRouter from "./identity-groups";
 import diplomacyRouter from "./diplomacy";
 import reimbursementsRouter from "./reimbursements";
 import economyRouter from "./economy";
+import activityRouter from "./activity";
 
 const router: IRouter = Router();
 
@@ -36,5 +37,6 @@ router.use(identityGroupsRouter);
 router.use(diplomacyRouter);
 router.use(reimbursementsRouter);
 router.use(economyRouter);
+router.use(activityRouter);
 
 export default router;

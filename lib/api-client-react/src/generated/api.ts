@@ -17,6 +17,9 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  ActivityReport,
+  ActivitySettings,
+  ActivitySettingsInput,
   AddParticipantBody,
   AdjustPapBody,
   AdminSummary,
@@ -29,6 +32,8 @@ import type {
   BattleReportSummary,
   BattleReview,
   Character,
+  CorporationSkillPlan,
+  CorporationSkillPlanInput,
   CreateAnnouncementBody,
   CreateDiplomacyCaseBody,
   CreateFleetBody,
@@ -47,10 +52,13 @@ import type {
   FittingSimulationBody,
   FittingSimulationResult,
   Fleet,
+  GetActivityReportParams,
   HealthStatus,
   IdentityApplication,
   IdentityGroup,
   IdentityGroupInput,
+  ListIdentityApplicationsParams,
+  ListIdentityGroupsParams,
   ListReimbursementLossesParams,
   PapRecord,
   Redemption,
@@ -2616,6 +2624,190 @@ export const useCreateManualPap = <
 };
 
 /**
+ * @summary List monthly PAP activity for eligible corporation members
+ */
+export const getGetActivityReportUrl = (params?: GetActivityReportParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/activity?${stringifiedParams}`
+    : `/api/activity`;
+};
+
+export const getActivityReport = async (
+  params?: GetActivityReportParams,
+  options?: RequestInit,
+): Promise<ActivityReport> => {
+  return customFetch<ActivityReport>(getGetActivityReportUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetActivityReportQueryKey = (
+  params?: GetActivityReportParams,
+) => {
+  return [`/api/activity`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetActivityReportQueryOptions = <
+  TData = Awaited<ReturnType<typeof getActivityReport>>,
+  TError = ErrorType<void>,
+>(
+  params?: GetActivityReportParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getActivityReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetActivityReportQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getActivityReport>>
+  > = ({ signal }) => getActivityReport(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getActivityReport>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetActivityReportQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getActivityReport>>
+>;
+export type GetActivityReportQueryError = ErrorType<void>;
+
+/**
+ * @summary List monthly PAP activity for eligible corporation members
+ */
+
+export function useGetActivityReport<
+  TData = Awaited<ReturnType<typeof getActivityReport>>,
+  TError = ErrorType<void>,
+>(
+  params?: GetActivityReportParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getActivityReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetActivityReportQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update the corporation monthly PAP requirement
+ */
+export const getUpdateActivitySettingsUrl = () => {
+  return `/api/activity/settings`;
+};
+
+export const updateActivitySettings = async (
+  activitySettingsInput: ActivitySettingsInput,
+  options?: RequestInit,
+): Promise<ActivitySettings> => {
+  return customFetch<ActivitySettings>(getUpdateActivitySettingsUrl(), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(activitySettingsInput),
+  });
+};
+
+export const getUpdateActivitySettingsMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateActivitySettings>>,
+    TError,
+    { data: BodyType<ActivitySettingsInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateActivitySettings>>,
+  TError,
+  { data: BodyType<ActivitySettingsInput> },
+  TContext
+> => {
+  const mutationKey = ["updateActivitySettings"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateActivitySettings>>,
+    { data: BodyType<ActivitySettingsInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return updateActivitySettings(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateActivitySettingsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateActivitySettings>>
+>;
+export type UpdateActivitySettingsMutationBody =
+  BodyType<ActivitySettingsInput>;
+export type UpdateActivitySettingsMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update the corporation monthly PAP requirement
+ */
+export const useUpdateActivitySettings = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateActivitySettings>>,
+    TError,
+    { data: BodyType<ActivitySettingsInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateActivitySettings>>,
+  TError,
+  { data: BodyType<ActivitySettingsInput> },
+  TContext
+> => {
+  return useMutation(getUpdateActivitySettingsMutationOptions(options));
+};
+
+/**
  * @summary List all available rewards
  */
 export const getListRewardsUrl = () => {
@@ -3889,41 +4081,60 @@ export const useDeleteAnnouncement = <
   return useMutation(getDeleteAnnouncementMutationOptions(options));
 };
 
-export const getListIdentityGroupsUrl = () => {
-  return `/api/identity-groups`;
+export const getListIdentityGroupsUrl = (params?: ListIdentityGroupsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/identity-groups?${stringifiedParams}`
+    : `/api/identity-groups`;
 };
 
 export const listIdentityGroups = async (
+  params?: ListIdentityGroupsParams,
   options?: RequestInit,
 ): Promise<IdentityGroup[]> => {
-  return customFetch<IdentityGroup[]>(getListIdentityGroupsUrl(), {
+  return customFetch<IdentityGroup[]>(getListIdentityGroupsUrl(params), {
     ...options,
     method: "GET",
   });
 };
 
-export const getListIdentityGroupsQueryKey = () => {
-  return [`/api/identity-groups`] as const;
+export const getListIdentityGroupsQueryKey = (
+  params?: ListIdentityGroupsParams,
+) => {
+  return [`/api/identity-groups`, ...(params ? [params] : [])] as const;
 };
 
 export const getListIdentityGroupsQueryOptions = <
   TData = Awaited<ReturnType<typeof listIdentityGroups>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listIdentityGroups>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
+>(
+  params?: ListIdentityGroupsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listIdentityGroups>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getListIdentityGroupsQueryKey();
+  const queryKey =
+    queryOptions?.queryKey ?? getListIdentityGroupsQueryKey(params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof listIdentityGroups>>
-  > = ({ signal }) => listIdentityGroups({ signal, ...requestOptions });
+  > = ({ signal }) => listIdentityGroups(params, { signal, ...requestOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof listIdentityGroups>>,
@@ -3940,15 +4151,18 @@ export type ListIdentityGroupsQueryError = ErrorType<unknown>;
 export function useListIdentityGroups<
   TData = Awaited<ReturnType<typeof listIdentityGroups>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listIdentityGroups>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getListIdentityGroupsQueryOptions(options);
+>(
+  params?: ListIdentityGroupsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listIdentityGroups>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListIdentityGroupsQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
@@ -4199,42 +4413,66 @@ export const useApplyIdentityGroup = <
   return useMutation(getApplyIdentityGroupMutationOptions(options));
 };
 
-export const getListIdentityApplicationsUrl = () => {
-  return `/api/identity-applications`;
+export const getListIdentityApplicationsUrl = (
+  params?: ListIdentityApplicationsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/identity-applications?${stringifiedParams}`
+    : `/api/identity-applications`;
 };
 
 export const listIdentityApplications = async (
+  params?: ListIdentityApplicationsParams,
   options?: RequestInit,
 ): Promise<IdentityApplication[]> => {
-  return customFetch<IdentityApplication[]>(getListIdentityApplicationsUrl(), {
-    ...options,
-    method: "GET",
-  });
+  return customFetch<IdentityApplication[]>(
+    getListIdentityApplicationsUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
 };
 
-export const getListIdentityApplicationsQueryKey = () => {
-  return [`/api/identity-applications`] as const;
+export const getListIdentityApplicationsQueryKey = (
+  params?: ListIdentityApplicationsParams,
+) => {
+  return [`/api/identity-applications`, ...(params ? [params] : [])] as const;
 };
 
 export const getListIdentityApplicationsQueryOptions = <
   TData = Awaited<ReturnType<typeof listIdentityApplications>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listIdentityApplications>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
+>(
+  params?: ListIdentityApplicationsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listIdentityApplications>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getListIdentityApplicationsQueryKey();
+    queryOptions?.queryKey ?? getListIdentityApplicationsQueryKey(params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof listIdentityApplications>>
-  > = ({ signal }) => listIdentityApplications({ signal, ...requestOptions });
+  > = ({ signal }) =>
+    listIdentityApplications(params, { signal, ...requestOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof listIdentityApplications>>,
@@ -4251,15 +4489,18 @@ export type ListIdentityApplicationsQueryError = ErrorType<unknown>;
 export function useListIdentityApplications<
   TData = Awaited<ReturnType<typeof listIdentityApplications>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listIdentityApplications>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getListIdentityApplicationsQueryOptions(options);
+>(
+  params?: ListIdentityApplicationsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listIdentityApplications>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListIdentityApplicationsQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
@@ -4267,6 +4508,257 @@ export function useListIdentityApplications<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary List reusable corporation skill plans
+ */
+export const getListIdentitySkillPlansUrl = () => {
+  return `/api/identity-skill-plans`;
+};
+
+export const listIdentitySkillPlans = async (
+  options?: RequestInit,
+): Promise<CorporationSkillPlan[]> => {
+  return customFetch<CorporationSkillPlan[]>(getListIdentitySkillPlansUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListIdentitySkillPlansQueryKey = () => {
+  return [`/api/identity-skill-plans`] as const;
+};
+
+export const getListIdentitySkillPlansQueryOptions = <
+  TData = Awaited<ReturnType<typeof listIdentitySkillPlans>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listIdentitySkillPlans>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListIdentitySkillPlansQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listIdentitySkillPlans>>
+  > = ({ signal }) => listIdentitySkillPlans({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listIdentitySkillPlans>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListIdentitySkillPlansQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listIdentitySkillPlans>>
+>;
+export type ListIdentitySkillPlansQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List reusable corporation skill plans
+ */
+
+export function useListIdentitySkillPlans<
+  TData = Awaited<ReturnType<typeof listIdentitySkillPlans>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listIdentitySkillPlans>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListIdentitySkillPlansQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a reusable corporation skill plan
+ */
+export const getCreateIdentitySkillPlanUrl = () => {
+  return `/api/identity-skill-plans`;
+};
+
+export const createIdentitySkillPlan = async (
+  corporationSkillPlanInput: CorporationSkillPlanInput,
+  options?: RequestInit,
+): Promise<CorporationSkillPlan> => {
+  return customFetch<CorporationSkillPlan>(getCreateIdentitySkillPlanUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(corporationSkillPlanInput),
+  });
+};
+
+export const getCreateIdentitySkillPlanMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createIdentitySkillPlan>>,
+    TError,
+    { data: BodyType<CorporationSkillPlanInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createIdentitySkillPlan>>,
+  TError,
+  { data: BodyType<CorporationSkillPlanInput> },
+  TContext
+> => {
+  const mutationKey = ["createIdentitySkillPlan"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createIdentitySkillPlan>>,
+    { data: BodyType<CorporationSkillPlanInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createIdentitySkillPlan(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateIdentitySkillPlanMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createIdentitySkillPlan>>
+>;
+export type CreateIdentitySkillPlanMutationBody =
+  BodyType<CorporationSkillPlanInput>;
+export type CreateIdentitySkillPlanMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create a reusable corporation skill plan
+ */
+export const useCreateIdentitySkillPlan = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createIdentitySkillPlan>>,
+    TError,
+    { data: BodyType<CorporationSkillPlanInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createIdentitySkillPlan>>,
+  TError,
+  { data: BodyType<CorporationSkillPlanInput> },
+  TContext
+> => {
+  return useMutation(getCreateIdentitySkillPlanMutationOptions(options));
+};
+
+/**
+ * @summary Update a reusable corporation skill plan
+ */
+export const getUpdateIdentitySkillPlanUrl = (id: number) => {
+  return `/api/identity-skill-plans/${id}`;
+};
+
+export const updateIdentitySkillPlan = async (
+  id: number,
+  corporationSkillPlanInput: CorporationSkillPlanInput,
+  options?: RequestInit,
+): Promise<CorporationSkillPlan> => {
+  return customFetch<CorporationSkillPlan>(getUpdateIdentitySkillPlanUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(corporationSkillPlanInput),
+  });
+};
+
+export const getUpdateIdentitySkillPlanMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateIdentitySkillPlan>>,
+    TError,
+    { id: number; data: BodyType<CorporationSkillPlanInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateIdentitySkillPlan>>,
+  TError,
+  { id: number; data: BodyType<CorporationSkillPlanInput> },
+  TContext
+> => {
+  const mutationKey = ["updateIdentitySkillPlan"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateIdentitySkillPlan>>,
+    { id: number; data: BodyType<CorporationSkillPlanInput> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateIdentitySkillPlan(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateIdentitySkillPlanMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateIdentitySkillPlan>>
+>;
+export type UpdateIdentitySkillPlanMutationBody =
+  BodyType<CorporationSkillPlanInput>;
+export type UpdateIdentitySkillPlanMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update a reusable corporation skill plan
+ */
+export const useUpdateIdentitySkillPlan = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateIdentitySkillPlan>>,
+    TError,
+    { id: number; data: BodyType<CorporationSkillPlanInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateIdentitySkillPlan>>,
+  TError,
+  { id: number; data: BodyType<CorporationSkillPlanInput> },
+  TContext
+> => {
+  return useMutation(getUpdateIdentitySkillPlanMutationOptions(options));
+};
 
 export const getReviewIdentityApplicationUrl = (id: number) => {
   return `/api/identity-applications/${id}`;

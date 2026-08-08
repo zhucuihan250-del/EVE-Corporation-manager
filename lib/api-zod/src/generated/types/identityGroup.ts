@@ -5,8 +5,10 @@
  * EVE Online PAP Tracking System API
  * OpenAPI spec version: 0.1.0
  */
+import type { CorporationSkillPlan } from "./corporationSkillPlan";
 import type { IdentityApplication } from "./identityApplication";
 import type { IdentityGroupCategory } from "./identityGroupCategory";
+import type { IdentityGroupSkillPlanMatchMode } from "./identityGroupSkillPlanMatchMode";
 import type { RequiredSkill } from "./requiredSkill";
 
 export interface IdentityGroup {
@@ -17,6 +19,8 @@ export interface IdentityGroup {
   description: string;
   requiredSkills: RequiredSkill[];
   permissions: string[];
+  skillPlanMatchMode: IdentityGroupSkillPlanMatchMode;
+  skillPlans: CorporationSkillPlan[];
   isActive: boolean;
   isMember: boolean;
   latestApplication?: IdentityApplication | null;

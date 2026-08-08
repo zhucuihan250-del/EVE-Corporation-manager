@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { IdentityGroupInputCategory } from "./identityGroupInputCategory";
+import type { IdentityGroupInputSkillPlanMatchMode } from "./identityGroupInputSkillPlanMatchMode";
 import type { RequiredSkill } from "./requiredSkill";
 
 export interface IdentityGroupInput {
@@ -13,5 +14,8 @@ export interface IdentityGroupInput {
   category: IdentityGroupInputCategory;
   description: string;
   requiredSkills: RequiredSkill[];
+  permissions?: string[];
+  skillPlanIds?: number[];
+  skillPlanMatchMode?: IdentityGroupInputSkillPlanMatchMode;
   isActive?: boolean;
 }

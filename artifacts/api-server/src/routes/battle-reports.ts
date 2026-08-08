@@ -11,7 +11,7 @@ import {
   RefreshBattleReportParams,
 } from "@workspace/api-zod";
 import { hasRole, requireAuth } from "../middlewares/auth";
-import { requireModule, requireTenant } from "../lib/tenant";
+import { hasPermission, requireModule, requireTenant } from "../lib/tenant";
 import { queueBattleReportGeneration } from "../lib/battle-reports";
 import {
   loadBattleReportDetail,
@@ -113,7 +113,7 @@ router.post(
       .select()
       .from(usersTable)
       .where(eq(usersTable.id, req.session.userId!));
-    if (!currentUser || !hasRole(req.tenant!.membership.role, "fc")) {
+    if (!currentUser || (!hasRole(req.tenant!.membership.role, "fc") && !hasPermission(req.tenant!, "fleet.manage"))) {
       res.status(403).json({ error: "Forbidden" });
       return;
     }

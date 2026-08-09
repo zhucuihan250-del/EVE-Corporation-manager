@@ -5572,6 +5572,177 @@ export const useUpdateReimbursementWindow = <
 };
 
 /**
+ * @summary List all general and tactical reimbursement claims for Director review
+ */
+export const getListReimbursementWindowClaimsUrl = () => {
+  return `/api/reimbursements/window/claims`;
+};
+
+export const listReimbursementWindowClaims = async (
+  options?: RequestInit,
+): Promise<ReimbursementClaim[]> => {
+  return customFetch<ReimbursementClaim[]>(
+    getListReimbursementWindowClaimsUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListReimbursementWindowClaimsQueryKey = () => {
+  return [`/api/reimbursements/window/claims`] as const;
+};
+
+export const getListReimbursementWindowClaimsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listReimbursementWindowClaims>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listReimbursementWindowClaims>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListReimbursementWindowClaimsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listReimbursementWindowClaims>>
+  > = ({ signal }) =>
+    listReimbursementWindowClaims({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listReimbursementWindowClaims>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListReimbursementWindowClaimsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listReimbursementWindowClaims>>
+>;
+export type ListReimbursementWindowClaimsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all general and tactical reimbursement claims for Director review
+ */
+
+export function useListReimbursementWindowClaims<
+  TData = Awaited<ReturnType<typeof listReimbursementWindowClaims>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listReimbursementWindowClaims>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListReimbursementWindowClaimsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Review any general or tactical reimbursement claim from the Director window
+ */
+export const getUpdateReimbursementWindowClaimUrl = (id: number) => {
+  return `/api/reimbursements/window/claims/${id}`;
+};
+
+export const updateReimbursementWindowClaim = async (
+  id: number,
+  updateReimbursementBody: UpdateReimbursementBody,
+  options?: RequestInit,
+): Promise<ReimbursementClaim> => {
+  return customFetch<ReimbursementClaim>(
+    getUpdateReimbursementWindowClaimUrl(id),
+    {
+      ...options,
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(updateReimbursementBody),
+    },
+  );
+};
+
+export const getUpdateReimbursementWindowClaimMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateReimbursementWindowClaim>>,
+    TError,
+    { id: number; data: BodyType<UpdateReimbursementBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateReimbursementWindowClaim>>,
+  TError,
+  { id: number; data: BodyType<UpdateReimbursementBody> },
+  TContext
+> => {
+  const mutationKey = ["updateReimbursementWindowClaim"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateReimbursementWindowClaim>>,
+    { id: number; data: BodyType<UpdateReimbursementBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateReimbursementWindowClaim(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateReimbursementWindowClaimMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateReimbursementWindowClaim>>
+>;
+export type UpdateReimbursementWindowClaimMutationBody =
+  BodyType<UpdateReimbursementBody>;
+export type UpdateReimbursementWindowClaimMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Review any general or tactical reimbursement claim from the Director window
+ */
+export const useUpdateReimbursementWindowClaim = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateReimbursementWindowClaim>>,
+    TError,
+    { id: number; data: BodyType<UpdateReimbursementBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateReimbursementWindowClaim>>,
+  TError,
+  { id: number; data: BodyType<UpdateReimbursementBody> },
+  TContext
+> => {
+  return useMutation(getUpdateReimbursementWindowClaimMutationOptions(options));
+};
+
+/**
  * @summary List recent zKillboard losses for one of the current user's characters
  */
 export const getListReimbursementLossesUrl = (

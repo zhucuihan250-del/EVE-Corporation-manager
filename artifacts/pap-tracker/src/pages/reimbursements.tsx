@@ -8,24 +8,18 @@ import {
   useListReimbursementLosses,
   useListReimbursements,
   useListTacticalGroupReimbursements,
-  useUpdateTacticalGroupReimbursement,
-  useUpdateReimbursement,
   type ReimbursementLoss,
-  type UpdateReimbursementBodyStatus,
 } from "@workspace/api-client-react";
 import { useTranslation } from "react-i18next";
 import { useParams } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/api-error";
 import { CheckCircle2, ClipboardCheck, ExternalLink, Loader2, RefreshCw, ShieldCheck } from "lucide-react";
 
-const ROLE_LEVELS = ["member", "fc", "admin", "controller"];
 const AUTO_DESCRIPTION = "通过 zKillboard 自动提交";
 const INITIAL_VISIBLE_LOSSES = 40;
 const VISIBLE_LOSS_STEP = 40;
@@ -61,13 +55,9 @@ function ReimbursementWorkspace({ identityGroupId, groupName }: { identityGroupI
   const claims = identityGroupId === undefined ? generalClaims : tacticalClaims;
   const characters = useListCharacters();
   const create = useCreateReimbursement();
-  const update = useUpdateReimbursement();
-  const tacticalUpdate = useUpdateTacticalGroupReimbursement();
   const [characterId, setCharacterId] = useState("");
   const [submittingKillmailId, setSubmittingKillmailId] = useState<number | null>(null);
   const [visibleLossCount, setVisibleLossCount] = useState(INITIAL_VISIBLE_LOSSES);
-  const [review, setReview] = useState<Record<number, { status: UpdateReimbursementBodyStatus; approvedAmount: string; reviewerNotes: string; paymentReference: string }>>({});
-  const canManage = Boolean(user?.permissions.includes("reimbursement.manage") || ROLE_LEVELS.indexOf(user?.role ?? "member") >= ROLE_LEVELS.indexOf("admin"));
   const selectedCharacter = (characters.data ?? []).find((character) => character.id === Number(characterId));
   const losses = useListReimbursementLosses(
     { characterId: Number(characterId) || 0, identityGroupId },
@@ -200,18 +190,19 @@ function ReimbursementWorkspace({ identityGroupId, groupName }: { identityGroupI
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>{identityGroupId ? (canManage ? tr(`${groupName ?? "身份组"}全部补损`, `All ${groupName ?? "group"} claims`) : tr("我的身份组补损", "My tactical claims")) : (canManage ? tr("本军团通用补损申请", "General corporation reimbursements") : tr("我的通用补损", "My general reimbursements"))}</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>{identityGroupId ? tr("我的身份组补损", "My tactical claims") : tr("我的通用补损", "My general reimbursements")}</CardTitle>
+          <CardDescription>{tr("全军团补损请求与审核已统一移动到总监专区的补损窗口。", "Corporation-wide requests and reviews are centralized in the Director reimbursement window.")}</CardDescription>
+        </CardHeader>
         <CardContent className="space-y-4">
-          {(claims.data ?? []).length === 0 ? <p className="text-sm text-muted-foreground">{tr("暂无补损申请", "No reimbursement claims")}</p> : (claims.data ?? []).map((claim) => {
-            const draft = review[claim.id] ?? { status: claim.status, approvedAmount: claim.approvedAmount?.toString() ?? "", reviewerNotes: claim.reviewerNotes ?? "", paymentReference: claim.paymentReference ?? "" };
-            return <div key={claim.id} className="rounded-md border border-border/50 p-4 space-y-3">
+          {(claims.data ?? []).length === 0 ? <p className="text-sm text-muted-foreground">{tr("暂无补损申请", "No reimbursement claims")}</p> : (claims.data ?? []).map((claim) => (
+            <div key={claim.id} className="rounded-md border border-border/50 p-4 space-y-3">
               <div className="flex flex-wrap justify-between gap-3"><div><div className="font-medium">{claim.characterName} · {claim.shipName}</div><div className="text-xs text-muted-foreground">{new Date(claim.lossOccurredAt).toLocaleString()} · {tr("zKill 估值", "zKill value")} {formatIsk(claim.lossValue)}</div></div><Badge variant={claim.status === "rejected" ? "destructive" : claim.status === "paid" ? "default" : "outline"}>{statusLabels[claim.status]}</Badge></div>
               {claim.description && claim.description !== AUTO_DESCRIPTION && <p className="text-sm whitespace-pre-wrap">{claim.description}</p>}
               <div className="flex flex-wrap items-center gap-3 text-xs text-emerald-400"><CheckCircle2 className="h-4 w-4" />{claim.validation.message}<a className="inline-flex items-center gap-1 text-primary hover:underline" href={claim.killmailUrl} target="_blank" rel="noreferrer">zKillboard <ExternalLink className="h-3 w-3" /></a></div>
-              {claim.reviewerNotes && !canManage && <p className="text-sm text-muted-foreground">{tr("审核记录：", "Review notes: ")}{claim.reviewerNotes}</p>}
-              {canManage && <div className="grid gap-2 border-t border-border/50 pt-3 md:grid-cols-2"><select className="h-10 rounded-md border border-input bg-background px-3" value={draft.status} onChange={(event) => setReview((current) => ({ ...current, [claim.id]: { ...draft, status: event.target.value as UpdateReimbursementBodyStatus } }))}>{Object.entries(statusLabels).map(([status, label]) => <option key={status} value={status}>{label}</option>)}</select><Input type="number" min="0" placeholder={tr("批准金额", "Approved amount")} value={draft.approvedAmount} onChange={(event) => setReview((current) => ({ ...current, [claim.id]: { ...draft, approvedAmount: event.target.value } }))} /><Textarea placeholder={tr("审核记录", "Review notes")} value={draft.reviewerNotes} onChange={(event) => setReview((current) => ({ ...current, [claim.id]: { ...draft, reviewerNotes: event.target.value } }))} /><div className="space-y-2"><Input placeholder={tr("打款流水号（可选）", "Payment reference (optional)")} value={draft.paymentReference} onChange={(event) => setReview((current) => ({ ...current, [claim.id]: { ...draft, paymentReference: event.target.value } }))} /><Button className="w-full" disabled={update.isPending || tacticalUpdate.isPending} onClick={() => { const data = { status: draft.status, approvedAmount: draft.approvedAmount ? Number(draft.approvedAmount) : null, reviewerNotes: draft.reviewerNotes, paymentReference: draft.paymentReference }; const options = { onSuccess: refreshClaims, onError: (error: unknown) => toast({ title: getErrorMessage(error), variant: "destructive" as const }) }; if (identityGroupId === undefined) update.mutate({ id: claim.id, data }, options); else tacticalUpdate.mutate({ id: identityGroupId, claimId: claim.id, data }, options); }}>{tr("保存审核", "Save review")}</Button></div></div>}
-            </div>;
-          })}
+              {claim.reviewerNotes && <p className="text-sm text-muted-foreground">{tr("审核记录：", "Review notes: ")}{claim.reviewerNotes}</p>}
+            </div>
+          ))}
         </CardContent>
       </Card>
     </div>

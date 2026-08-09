@@ -2848,6 +2848,114 @@ export const UpdateReimbursementWindowResponse = zod.object({
 });
 
 /**
+ * @summary List all general and tactical reimbursement claims for Director review
+ */
+export const ListReimbursementWindowClaimsResponseItem = zod.object({
+  id: zod.number(),
+  corporationId: zod.number(),
+  submittedBy: zod.number(),
+  characterId: zod.number(),
+  characterName: zod.string(),
+  fleetId: zod.number().nullable(),
+  identityGroupId: zod.number().nullable(),
+  identityGroupName: zod.string().nullable(),
+  killmailId: zod.number(),
+  killmailUrl: zod.string(),
+  lossOccurredAt: zod.coerce.date(),
+  shipTypeId: zod.number(),
+  shipName: zod.string(),
+  lossValue: zod.number(),
+  requestedAmount: zod.number(),
+  approvedAmount: zod.number().nullish(),
+  description: zod.string(),
+  validation: zod.object({
+    killmailVerified: zod.boolean(),
+    characterVerified: zod.boolean(),
+    fleetVerified: zod.boolean().nullable(),
+    checkedAt: zod.coerce.date(),
+    message: zod.string(),
+  }),
+  status: zod.enum([
+    "submitted",
+    "reviewing",
+    "approved",
+    "partially_approved",
+    "rejected",
+    "pending_payment",
+    "paid",
+  ]),
+  reviewerNotes: zod.string().nullish(),
+  paymentReference: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListReimbursementWindowClaimsResponse = zod.array(
+  ListReimbursementWindowClaimsResponseItem,
+);
+
+/**
+ * @summary Review any general or tactical reimbursement claim from the Director window
+ */
+export const UpdateReimbursementWindowClaimParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateReimbursementWindowClaimBody = zod.object({
+  status: zod.enum([
+    "submitted",
+    "reviewing",
+    "approved",
+    "partially_approved",
+    "rejected",
+    "pending_payment",
+    "paid",
+  ]),
+  approvedAmount: zod.number().nullish(),
+  reviewerNotes: zod.string().optional(),
+  paymentReference: zod.string().optional(),
+});
+
+export const UpdateReimbursementWindowClaimResponse = zod.object({
+  id: zod.number(),
+  corporationId: zod.number(),
+  submittedBy: zod.number(),
+  characterId: zod.number(),
+  characterName: zod.string(),
+  fleetId: zod.number().nullable(),
+  identityGroupId: zod.number().nullable(),
+  identityGroupName: zod.string().nullable(),
+  killmailId: zod.number(),
+  killmailUrl: zod.string(),
+  lossOccurredAt: zod.coerce.date(),
+  shipTypeId: zod.number(),
+  shipName: zod.string(),
+  lossValue: zod.number(),
+  requestedAmount: zod.number(),
+  approvedAmount: zod.number().nullish(),
+  description: zod.string(),
+  validation: zod.object({
+    killmailVerified: zod.boolean(),
+    characterVerified: zod.boolean(),
+    fleetVerified: zod.boolean().nullable(),
+    checkedAt: zod.coerce.date(),
+    message: zod.string(),
+  }),
+  status: zod.enum([
+    "submitted",
+    "reviewing",
+    "approved",
+    "partially_approved",
+    "rejected",
+    "pending_payment",
+    "paid",
+  ]),
+  reviewerNotes: zod.string().nullish(),
+  paymentReference: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
  * @summary List recent zKillboard losses for one of the current user's characters
  */
 export const ListReimbursementLossesQueryParams = zod.object({

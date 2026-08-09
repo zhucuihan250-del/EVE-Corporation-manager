@@ -104,7 +104,7 @@ export function Layout({ children }: { children: ReactNode }) {
   }
 
   const tacticalGroups = user?.tacticalGroups ?? [];
-  if (user?.permissions.includes("reimbursement.window.manage") && modules?.reimbursement) {
+  if ((isAdmin || user?.permissions.includes("reimbursement.manage") || user?.permissions.includes("reimbursement.window.manage")) && modules?.reimbursement) {
     directorItems.push({ href: "/reimbursement-settings", label: tr("补损窗口", "Reimbursement window"), icon: LockKeyhole });
   }
 

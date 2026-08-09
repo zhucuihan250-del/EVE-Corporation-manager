@@ -19,6 +19,7 @@ function canManageReimbursements(req: Request): boolean {
   return Boolean(
     req.tenant
     && (hasPermission(req.tenant, "reimbursement.manage")
+      || hasPermission(req.tenant, "reimbursement.window.manage")
       || hasRole(req.tenant.membership.role, "admin")),
   );
 }
@@ -170,11 +171,10 @@ router.get("/tactical-groups/:id/reimbursements", async (req: Request, res: Resp
     res.status(403).json({ error: "You are not a member of this tactical identity group" });
     return;
   }
-  const manager = canManageReimbursements(req);
   const rows = await db.select().from(reimbursementClaimsTable).where(and(
     eq(reimbursementClaimsTable.corporationId, req.tenant!.corporation.id),
     eq(reimbursementClaimsTable.identityGroupId, groupId),
-    ...(manager ? [] : [eq(reimbursementClaimsTable.submittedBy, req.tenant!.user.id)]),
+    eq(reimbursementClaimsTable.submittedBy, req.tenant!.user.id),
   )).orderBy(desc(reimbursementClaimsTable.createdAt));
   res.json(rows.map((row) => ({ ...row, identityGroupName: access.group.name })));
 });

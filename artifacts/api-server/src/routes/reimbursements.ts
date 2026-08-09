@@ -3,6 +3,7 @@ import {
   charactersTable,
   corporationsTable,
   db,
+  identityGroupsTable,
   reimbursementClaimsTable,
 } from "@workspace/db";
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
@@ -20,6 +21,23 @@ const router: IRouter = Router();
 
 router.use("/reimbursements", requireAuth, requireTenant, requireModule("reimbursement"));
 
+function canReviewReimbursements(req: Request): boolean {
+  return Boolean(
+    req.tenant
+    && (hasPermission(req.tenant, "reimbursement.manage")
+      || hasPermission(req.tenant, "reimbursement.window.manage")
+      || hasRole(req.tenant.membership.role, "admin")),
+  );
+}
+
+function requireReimbursementReview(req: Request, res: Response, next: NextFunction): void {
+  if (!canReviewReimbursements(req)) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  next();
+}
+
 router.patch(
   "/reimbursements/window",
   requirePermission("reimbursement.window.manage"),
@@ -34,6 +52,67 @@ router.patch(
       .where(eq(corporationsTable.id, req.tenant!.corporation.id))
       .returning({ open: corporationsTable.reimbursementOpen });
     res.json(updated);
+  },
+);
+
+router.get(
+  "/reimbursements/window/claims",
+  requireReimbursementReview,
+  async (req: Request, res: Response): Promise<void> => {
+    const rows = await db.select({
+      claim: reimbursementClaimsTable,
+      identityGroupName: identityGroupsTable.name,
+    }).from(reimbursementClaimsTable).leftJoin(identityGroupsTable, and(
+      eq(identityGroupsTable.id, reimbursementClaimsTable.identityGroupId),
+      eq(identityGroupsTable.corporationId, req.tenant!.corporation.id),
+    )).where(
+      eq(reimbursementClaimsTable.corporationId, req.tenant!.corporation.id),
+    ).orderBy(desc(reimbursementClaimsTable.createdAt));
+    res.json(rows.map(({ claim, identityGroupName }) => ({ ...claim, identityGroupName })));
+  },
+);
+
+router.patch(
+  "/reimbursements/window/claims/:id",
+  requireReimbursementReview,
+  async (req: Request, res: Response): Promise<void> => {
+    const id = Number(req.params.id);
+    const status = req.body.status;
+    const allowed = ["submitted", "reviewing", "approved", "partially_approved", "rejected", "pending_payment", "paid"];
+    if (!Number.isInteger(id) || !allowed.includes(status)) {
+      res.status(400).json({ error: "Invalid reimbursement update" });
+      return;
+    }
+    const approvedAmount = req.body.approvedAmount === null || req.body.approvedAmount === undefined || req.body.approvedAmount === ""
+      ? null
+      : Number(req.body.approvedAmount);
+    if (approvedAmount !== null && (!Number.isFinite(approvedAmount) || approvedAmount < 0)) {
+      res.status(400).json({ error: "Invalid approved amount" });
+      return;
+    }
+    const [updated] = await db.update(reimbursementClaimsTable).set({
+      status,
+      approvedAmount,
+      reviewerNotes: typeof req.body.reviewerNotes === "string" ? req.body.reviewerNotes.trim().slice(0, 10_000) : null,
+      paymentReference: typeof req.body.paymentReference === "string" ? req.body.paymentReference.trim().slice(0, 500) : null,
+      reviewedBy: req.tenant!.user.id,
+      reviewedAt: new Date(),
+      paidAt: status === "paid" ? new Date() : null,
+    }).where(and(
+      eq(reimbursementClaimsTable.id, id),
+      eq(reimbursementClaimsTable.corporationId, req.tenant!.corporation.id),
+    )).returning();
+    if (!updated) {
+      res.status(404).json({ error: "Reimbursement claim not found" });
+      return;
+    }
+    const identityGroupName = updated.identityGroupId
+      ? await db.select({ name: identityGroupsTable.name }).from(identityGroupsTable).where(and(
+        eq(identityGroupsTable.id, updated.identityGroupId),
+        eq(identityGroupsTable.corporationId, req.tenant!.corporation.id),
+      )).then((rows) => rows[0]?.name ?? null)
+      : null;
+    res.json({ ...updated, identityGroupName });
   },
 );
 
@@ -55,11 +134,7 @@ function requireReimbursementOpen(
 router.use("/reimbursements", requireReimbursementOpen);
 
 function canManage(req: Request): boolean {
-  return Boolean(
-    req.tenant
-    && (hasPermission(req.tenant, "reimbursement.manage")
-      || hasRole(req.tenant.membership.role, "admin")),
-  );
+  return canReviewReimbursements(req);
 }
 
 router.get("/reimbursements/fleets", async (req: Request, res: Response): Promise<void> => {
@@ -71,7 +146,7 @@ router.get("/reimbursements", async (req: Request, res: Response): Promise<void>
   const rows = await db.select().from(reimbursementClaimsTable).where(and(
     eq(reimbursementClaimsTable.corporationId, tenant.corporation.id),
     isNull(reimbursementClaimsTable.identityGroupId),
-    ...(canManage(req) ? [] : [eq(reimbursementClaimsTable.submittedBy, tenant.user.id)]),
+    eq(reimbursementClaimsTable.submittedBy, tenant.user.id),
   )).orderBy(desc(reimbursementClaimsTable.createdAt));
   res.json(rows.map((row) => ({ ...row, identityGroupName: null })));
 });

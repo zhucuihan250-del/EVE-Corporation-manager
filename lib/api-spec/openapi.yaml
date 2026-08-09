@@ -1365,6 +1365,45 @@ paths:
               schema:
                 $ref: "#/components/schemas/ReimbursementWindowStatus"
 
+  /reimbursements/window/claims:
+    get:
+      operationId: listReimbursementWindowClaims
+      tags: [reimbursements]
+      summary: List all general and tactical reimbursement claims for Director review
+      responses:
+        "200":
+          description: All reimbursement claims in the current corporation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReimbursementClaim"
+
+  /reimbursements/window/claims/{id}:
+    patch:
+      operationId: updateReimbursementWindowClaim
+      tags: [reimbursements]
+      summary: Review any general or tactical reimbursement claim from the Director window
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateReimbursementBody"
+      responses:
+        "200":
+          description: Reimbursement claim updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReimbursementClaim"
+
   /reimbursements/losses:
     get:
       operationId: listReimbursementLosses

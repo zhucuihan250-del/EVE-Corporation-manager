@@ -52,6 +52,7 @@ const queryClient = new QueryClient({
 });
 
 const ROLE_LEVELS = ["member", "fc", "admin", "controller"] as const;
+const REIMBURSEMENT_REVIEW_PERMISSIONS = ["reimbursement.manage", "reimbursement.window.manage"];
 type Role = (typeof ROLE_LEVELS)[number];
 
 function hasRole(userRole: string, minRole: Role): boolean {
@@ -73,6 +74,7 @@ function ProtectedRoute({
   module,
   permission,
   permissionAlternative,
+  permissionAlternatives,
   requiresReimbursementOpen,
 }: {
   component: any;
@@ -80,11 +82,17 @@ function ProtectedRoute({
   module?: keyof CorporationModules;
   permission?: string;
   permissionAlternative?: string;
+  permissionAlternatives?: string[];
   requiresReimbursementOpen?: boolean;
 }) {
   const { data: user, isLoading, isError, error } = useGetMe();
   const [, setLocation] = useLocation();
   const isUnauthorized = isUnauthorizedError(error);
+  const hasAlternativePermission = Boolean(
+    user
+    && ((permissionAlternative && user.permissions.includes(permissionAlternative))
+      || permissionAlternatives?.some((candidate) => user.permissions.includes(candidate))),
+  );
 
   useEffect(() => {
     if (isLoading) return;
@@ -100,14 +108,14 @@ function ProtectedRoute({
       setLocation("/");
     } else if (
       user
-      && ((minRole && !hasRole(user.role, minRole) && !(permissionAlternative && user.permissions.includes(permissionAlternative)))
+      && ((minRole && !hasRole(user.role, minRole) && !hasAlternativePermission)
         || (module && !user.modules[module])
         || (requiresReimbursementOpen && !user.reimbursementOpen)
         || (permission && !user.permissions.includes(permission)))
     ) {
       setLocation(defaultLanding(user));
     }
-  }, [isLoading, isError, isUnauthorized, user, setLocation, minRole, module, permission, permissionAlternative, requiresReimbursementOpen]);
+  }, [isLoading, isError, isUnauthorized, user, setLocation, minRole, module, permission, hasAlternativePermission, requiresReimbursementOpen]);
 
   if (isLoading) {
     return (
@@ -129,7 +137,7 @@ function ProtectedRoute({
   if (
     isError
     || !user
-    || (minRole && !hasRole(user.role, minRole) && !(permissionAlternative && user.permissions.includes(permissionAlternative)))
+    || (minRole && !hasRole(user.role, minRole) && !hasAlternativePermission)
     || (module && !user.modules[module])
     || (requiresReimbursementOpen && !user.reimbursementOpen)
     || (permission && !user.permissions.includes(permission))
@@ -191,7 +199,7 @@ function Router() {
         {() => <ProtectedRoute component={TacticalDashboard} module="identity" />}
       </Route>
       <Route path="/reimbursement-settings">
-        {() => <ProtectedRoute component={ReimbursementSettings} module="reimbursement" permission="reimbursement.window.manage" />}
+        {() => <ProtectedRoute component={ReimbursementSettings} minRole="admin" module="reimbursement" permissionAlternatives={REIMBURSEMENT_REVIEW_PERMISSIONS} />}
       </Route>
       <Route path="/economy">
         {() => <ProtectedRoute component={Economy} module="economy" permission="economy.view" />}

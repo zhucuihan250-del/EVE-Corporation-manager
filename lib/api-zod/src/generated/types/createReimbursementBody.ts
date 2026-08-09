@@ -8,6 +8,11 @@
 
 export interface CreateReimbursementBody {
   characterId: number;
+  /**
+   * Tactical identity group requested by its dedicated reimbursement page
+   * @nullable
+   */
+  identityGroupId?: number | null;
   /** zKillboard killmail selected from the recent losses endpoint */
   killmailId?: number;
   /**

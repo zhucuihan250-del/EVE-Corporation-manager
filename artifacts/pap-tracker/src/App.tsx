@@ -34,7 +34,8 @@ import { BattleReportDetail, BattleReports } from "@/pages/battle-reports";
 import { BattleReplayWorkbench, BattleReplays } from "@/pages/battle-replays";
 import { IdentityGroups } from "@/pages/identity-groups";
 import { Diplomacy } from "@/pages/diplomacy";
-import { Reimbursements } from "@/pages/reimbursements";
+import { Reimbursements, TacticalReimbursements } from "@/pages/reimbursements";
+import { TacticalDashboard } from "@/pages/tactical-dashboard";
 import { Economy } from "@/pages/economy";
 import { ReimbursementSettings } from "@/pages/reimbursement-settings";
 import type { CorporationModules, CurrentUser } from "@workspace/api-client-react";
@@ -176,6 +177,12 @@ function Router() {
       </Route>
       <Route path="/reimbursements">
         {() => <ProtectedRoute component={Reimbursements} module="reimbursement" requiresReimbursementOpen />}
+      </Route>
+      <Route path="/tactical/:id/reimbursements">
+        {() => <ProtectedRoute component={TacticalReimbursements} module="reimbursement" requiresReimbursementOpen />}
+      </Route>
+      <Route path="/tactical/:id">
+        {() => <ProtectedRoute component={TacticalDashboard} module="identity" />}
       </Route>
       <Route path="/reimbursement-settings">
         {() => <ProtectedRoute component={ReimbursementSettings} module="reimbursement" permission="reimbursement.window.manage" />}

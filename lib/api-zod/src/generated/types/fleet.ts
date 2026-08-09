@@ -17,6 +17,10 @@ export interface Fleet {
   papValue: number;
   isActive: boolean;
   fleetFunction: string;
+  /** @nullable */
+  identityGroupId: number | null;
+  /** @nullable */
+  identityGroupName: string | null;
   reimbursementEnabled: boolean;
   reimbursementRule?: FleetReimbursementRule | null;
   /** @nullable */

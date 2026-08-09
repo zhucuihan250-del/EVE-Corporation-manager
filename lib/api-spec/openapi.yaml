@@ -36,6 +36,8 @@ tags:
     description: Corporation diplomacy cases
   - name: reimbursements
     description: Corporation ship reimbursement claims
+  - name: tactical
+    description: Tactical identity-group dashboard and isolated reimbursement claims
   - name: economy
     description: Director-only corporation economy
 
@@ -1371,6 +1373,11 @@ paths:
           name: characterId
           required: true
           schema: { type: integer }
+        - in: query
+          name: identityGroupId
+          required: false
+          description: Limit losses to recorded fleet participation for this tactical identity group
+          schema: { type: integer }
       responses:
         "200":
           description: Recent verified losses that can be submitted with one click
@@ -1414,6 +1421,76 @@ paths:
       responses:
         "200":
           description: Reimbursement claim updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReimbursementClaim"
+
+  /tactical-groups/{id}:
+    get:
+      operationId: getTacticalGroupDashboard
+      tags: [tactical]
+      summary: Get the dedicated dashboard for a tactical identity group
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Tactical identity-group dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TacticalGroupDashboard"
+        "403":
+          description: Membership or management access required
+        "404":
+          description: Tactical identity group not found
+
+  /tactical-groups/{id}/reimbursements:
+    get:
+      operationId: listTacticalGroupReimbursements
+      tags: [tactical]
+      summary: List claims isolated to one tactical identity group
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Tactical identity-group reimbursement claims
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReimbursementClaim"
+
+  /tactical-groups/{id}/reimbursements/{claimId}:
+    patch:
+      operationId: updateTacticalGroupReimbursement
+      tags: [tactical]
+      summary: Review a claim isolated to one tactical identity group
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+        - in: path
+          name: claimId
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateReimbursementBody"
+      responses:
+        "200":
+          description: Updated tactical identity-group reimbursement claim
           content:
             application/json:
               schema:
@@ -1521,6 +1598,10 @@ components:
           $ref: "#/components/schemas/CorporationModules"
         reimbursementOpen:
           type: boolean
+        tacticalGroups:
+          type: array
+          items:
+            $ref: "#/components/schemas/TacticalGroupSummary"
         totalPap:
           type: number
         redeemablePap:
@@ -1535,6 +1616,7 @@ components:
         - permissions
         - modules
         - reimbursementOpen
+        - tacticalGroups
         - totalPap
         - redeemablePap
         - createdAt
@@ -1933,6 +2015,10 @@ components:
           type: boolean
         fleetFunction:
           type: string
+        identityGroupId:
+          type: ["integer", "null"]
+        identityGroupName:
+          type: ["string", "null"]
         reimbursementEnabled:
           type: boolean
         reimbursementRule:
@@ -1960,6 +2046,8 @@ components:
         - papValue
         - isActive
         - fleetFunction
+        - identityGroupId
+        - identityGroupName
         - reimbursementEnabled
         - createdAt
 
@@ -1978,6 +2066,8 @@ components:
           type: ["string", "null"]
         fleetFunction:
           type: string
+        identityGroupId:
+          type: ["integer", "null"]
         reimbursementEnabled:
           type: boolean
         reimbursementRule:
@@ -2579,6 +2669,8 @@ components:
           type: ["string", "null"]
         fleetFunction:
           type: string
+        identityGroupId:
+          type: ["integer", "null"]
         reimbursementEnabled:
           type: boolean
         reimbursementRule:
@@ -3235,6 +3327,8 @@ components:
         characterId: { type: integer }
         characterName: { type: string }
         fleetId: { type: ["integer", "null"] }
+        identityGroupId: { type: ["integer", "null"] }
+        identityGroupName: { type: ["string", "null"] }
         killmailId: { type: integer }
         killmailUrl: { type: string }
         lossOccurredAt: { type: string, format: date-time }
@@ -3251,12 +3345,15 @@ components:
         paymentReference: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
-      required: [id, corporationId, submittedBy, characterId, characterName, killmailId, killmailUrl, lossOccurredAt, shipTypeId, shipName, lossValue, requestedAmount, description, validation, status, createdAt, updatedAt]
+      required: [id, corporationId, submittedBy, characterId, characterName, fleetId, identityGroupId, identityGroupName, killmailId, killmailUrl, lossOccurredAt, shipTypeId, shipName, lossValue, requestedAmount, description, validation, status, createdAt, updatedAt]
 
     CreateReimbursementBody:
       type: object
       properties:
         characterId: { type: integer }
+        identityGroupId:
+          type: ["integer", "null"]
+          description: Tactical identity group requested by its dedicated reimbursement page
         killmailId:
           type: integer
           description: zKillboard killmail selected from the recent losses endpoint
@@ -3277,6 +3374,34 @@ components:
           deprecated: true
           description: Optional legacy note
       required: [characterId]
+
+    TacticalGroupSummary:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        description: { type: string }
+        joinedAt: { type: ["string", "null"], format: date-time }
+      required: [id, name, description, joinedAt]
+
+    TacticalGroupDashboard:
+      type: object
+      properties:
+        group:
+          $ref: "#/components/schemas/TacticalGroupSummary"
+        canManageReimbursements: { type: boolean }
+        memberCount: { type: integer }
+        activeFleetCount: { type: integer }
+        totalFleetCount: { type: integer }
+        myFleetCount: { type: integer }
+        myPap: { type: number }
+        openClaimCount: { type: integer }
+        paidClaimCount: { type: integer }
+        recentFleets:
+          type: array
+          items:
+            $ref: "#/components/schemas/Fleet"
+      required: [group, canManageReimbursements, memberCount, activeFleetCount, totalFleetCount, myFleetCount, myPap, openClaimCount, paidClaimCount, recentFleets]
 
     ReimbursementLoss:
       type: object

@@ -1,5 +1,6 @@
 import {
   useListFleets, useCreateFleet, useUpdateFleet, useScanFleetMembers,
+  useGetMe, useListIdentityGroups,
   getListFleetsQueryKey, getGetRecentFleetsQueryKey, getGetAdminSummaryQueryKey,
   getGetDashboardSummaryQueryKey, getListUsersQueryKey, getListAllPapRecordsQueryKey,
   type Fleet,
@@ -33,6 +34,10 @@ export function AdminFleets() {
   const { t, i18n } = useTranslation();
   const tr = (cn: string, en: string) => i18n.language.startsWith("zh") ? cn : en;
   const { data: fleets, isLoading } = useListFleets();
+  const { data: currentUser } = useGetMe();
+  const identityGroups = useListIdentityGroups(undefined, {
+    query: { enabled: Boolean(currentUser?.modules.identity), queryKey: ["/api/identity-groups"] },
+  });
   const createFleet = useCreateFleet();
   const updateFleet = useUpdateFleet();
   const scanFleet = useScanFleetMembers();
@@ -45,13 +50,16 @@ export function AdminFleets() {
   const [papValue, setPapValue] = useState("");
   const [eveFleetId, setEveFleetId] = useState("");
   const [fleetFunction, setFleetFunction] = useState("general");
+  const [identityGroupId, setIdentityGroupId] = useState("");
   const [scanningId, setScanningId] = useState<number | null>(null);
   const [fetchingCreateId, setFetchingCreateId] = useState(false);
   const [updatingFleetId, setUpdatingFleetId] = useState<number | null>(null);
   const [standingDownId, setStandingDownId] = useState<number | null>(null);
   const [configuringFleet, setConfiguringFleet] = useState<Fleet | null>(null);
   const [configFunction, setConfigFunction] = useState("");
+  const [configIdentityGroupId, setConfigIdentityGroupId] = useState("");
   const fleetList = Array.isArray(fleets) ? fleets : [];
+  const tacticalGroups = (identityGroups.data ?? []).filter((group) => group.category === "combat" && group.isActive);
 
   const { liveCounts, scanFleet: scanFleetLive } = useLiveFleetCounts(fleetList);
 
@@ -129,6 +137,7 @@ export function AdminFleets() {
         papValue: Number(papValue),
         eveFleetId: eveFleetId || null,
         fleetFunction: fleetFunction.trim() || "general",
+        identityGroupId: identityGroupId ? Number(identityGroupId) : null,
       } },
       {
         onSuccess: () => {
@@ -140,6 +149,7 @@ export function AdminFleets() {
           setPapValue("");
           setEveFleetId("");
           setFleetFunction("general");
+          setIdentityGroupId("");
         }
       }
     );
@@ -206,12 +216,14 @@ export function AdminFleets() {
   const openFleetConfiguration = (fleet: Fleet) => {
     setConfiguringFleet(fleet);
     setConfigFunction(fleet.fleetFunction);
+    setConfigIdentityGroupId(fleet.identityGroupId ? String(fleet.identityGroupId) : "");
   };
 
   const saveFleetConfiguration = () => {
     if (!configuringFleet || !configFunction.trim()) return;
     updateFleet.mutate({ id: configuringFleet.id, data: {
       fleetFunction: configFunction.trim(),
+      identityGroupId: configIdentityGroupId ? Number(configIdentityGroupId) : null,
     } }, { onSuccess: () => {
       setConfiguringFleet(null);
       queryClient.invalidateQueries({ queryKey: getListFleetsQueryKey() });
@@ -272,6 +284,7 @@ export function AdminFleets() {
                       <div className="flex flex-col">
                         <span>{fleet.name}</span>
                         <span className="text-[10px] text-primary/80 mt-0.5">{tr("职能", "Function")}: {fleet.fleetFunction}</span>
+                        {fleet.identityGroupName && <Badge variant="outline" className="mt-1 w-fit border-violet-500/40 text-violet-300">{fleet.identityGroupName}</Badge>}
                         <span className="text-xs text-muted-foreground">{format(new Date(fleet.createdAt), "MMM dd, HH:mm")}</span>
                         {fleet.eveFleetId ? (
                           <span className="text-[10px] text-muted-foreground/60 font-mono mt-0.5">ID: {fleet.eveFleetId}</span>
@@ -426,6 +439,14 @@ export function AdminFleets() {
               <p className="text-[10px] text-muted-foreground">{tr("该职能由创建舰队的 FC/管理员指定，用于区分舰队任务。", "Assigned by the creating FC/administrator to identify the fleet's purpose.")}</p>
             </div>
             <div className="flex flex-col gap-1.5">
+              <Label htmlFor="identityGroupId" className="text-xs tracking-widest">{tr("战术身份组", "TACTICAL IDENTITY GROUP")}</Label>
+              <select id="identityGroupId" className="h-10 rounded-sm border border-border/50 bg-background/50 px-3 text-sm" value={identityGroupId} onChange={(event) => setIdentityGroupId(event.target.value)}>
+                <option value="">{tr("通用舰队（不归属身份组）", "General fleet (no identity group)")}</option>
+                {tacticalGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+              </select>
+              <p className="text-[10px] text-muted-foreground">{tr("组内成员的相关补损会进入该身份组专属模块；非组员仍进入通用补损。", "Matching claims from group members go to the dedicated module; non-members remain in general reimbursement.")}</p>
+            </div>
+            <div className="flex flex-col gap-1.5">
               <Label htmlFor="eveFleetId" className="text-xs tracking-widest">
                 {t("fleets.eveFleetId")}
               </Label>
@@ -469,6 +490,7 @@ export function AdminFleets() {
           <DialogHeader><DialogTitle>{tr("舰队职能设置", "FLEET FUNCTION")}</DialogTitle><DialogDescription>{configuringFleet?.name}</DialogDescription></DialogHeader>
           <div className="space-y-4 py-3">
             <div className="space-y-2"><Label>{tr("舰队职能", "Fleet function")}</Label><Input value={configFunction} onChange={(event) => setConfigFunction(event.target.value)} placeholder={tr("例如：值守舰队", "e.g. Standing fleet")} /></div>
+            <div className="space-y-2"><Label>{tr("战术身份组", "Tactical identity group")}</Label><select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={configIdentityGroupId} onChange={(event) => setConfigIdentityGroupId(event.target.value)}><option value="">{tr("通用舰队", "General fleet")}</option>{tacticalGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></div>
           </div>
           <DialogFooter><Button variant="outline" onClick={() => setConfiguringFleet(null)}>{tr("取消", "Cancel")}</Button><Button onClick={saveFleetConfiguration} disabled={updateFleet.isPending || !configFunction.trim()}>{tr("保存", "Save")}</Button></DialogFooter>
         </DialogContent>

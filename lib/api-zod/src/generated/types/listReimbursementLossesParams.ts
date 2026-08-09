@@ -8,4 +8,8 @@
 
 export type ListReimbursementLossesParams = {
   characterId: number;
+  /**
+   * Limit losses to recorded fleet participation for this tactical identity group
+   */
+  identityGroupId?: number;
 };

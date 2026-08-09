@@ -17,6 +17,8 @@ export interface UpdateFleetBody {
   /** @nullable */
   eveFleetId?: string | null;
   fleetFunction?: string;
+  /** @nullable */
+  identityGroupId?: number | null;
   reimbursementEnabled?: boolean;
   reimbursementRule?: FleetReimbursementRule | null;
 }

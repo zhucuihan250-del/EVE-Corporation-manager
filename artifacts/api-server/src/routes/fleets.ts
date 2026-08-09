@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { db, fleetsTable, usersTable, papRecordsTable, charactersTable } from "@workspace/db";
+import { db, fleetsTable, usersTable, papRecordsTable, charactersTable, identityGroupsTable } from "@workspace/db";
 import { eq, desc, sql, inArray, and, isNull } from "drizzle-orm";
 import { refreshAccessToken } from "../lib/eve-sso";
 import { requireAuth, hasRole } from "../middlewares/auth";
@@ -20,6 +20,17 @@ router.use("/fleets", requireAuth, requireTenant, requireModule("fleet"));
 
 function canManageFleet(req: Request): boolean {
   return hasRole(req.tenant!.membership.role, "fc") || hasPermission(req.tenant!, "fleet.manage");
+}
+
+async function getTacticalGroup(corporationId: number, identityGroupId: number | null | undefined) {
+  if (identityGroupId === null || identityGroupId === undefined) return null;
+  const [group] = await db.select().from(identityGroupsTable).where(and(
+    eq(identityGroupsTable.id, identityGroupId),
+    eq(identityGroupsTable.corporationId, corporationId),
+    eq(identityGroupsTable.category, "combat"),
+    eq(identityGroupsTable.isActive, true),
+  ));
+  return group ?? null;
 }
 
 function normalizeReimbursementRule(value: unknown): (typeof fleetsTable.$inferInsert)["reimbursementRule"] {
@@ -51,6 +62,8 @@ router.get("/fleets", requireAuth, async (req: Request, res: Response): Promise<
       papValue: fleetsTable.papValue,
       isActive: fleetsTable.isActive,
       fleetFunction: fleetsTable.fleetFunction,
+      identityGroupId: fleetsTable.identityGroupId,
+      identityGroupName: identityGroupsTable.name,
       reimbursementEnabled: fleetsTable.reimbursementEnabled,
       reimbursementRule: fleetsTable.reimbursementRule,
       startedAt: fleetsTable.startedAt,
@@ -68,6 +81,10 @@ router.get("/fleets", requireAuth, async (req: Request, res: Response): Promise<
       )`,
     })
     .from(fleetsTable)
+    .leftJoin(identityGroupsTable, and(
+      eq(identityGroupsTable.id, fleetsTable.identityGroupId),
+      eq(identityGroupsTable.corporationId, req.tenant!.corporation.id),
+    ))
     .where(eq(fleetsTable.corporationId, req.tenant!.corporation.id))
     .orderBy(desc(fleetsTable.createdAt));
 
@@ -96,6 +113,18 @@ router.post("/fleets", requireAuth, async (req: Request, res: Response): Promise
     res.status(400).json({ error: error instanceof Error ? error.message : "Invalid reimbursement rule" });
     return;
   }
+  const tacticalGroup = await getTacticalGroup(
+    req.tenant!.corporation.id,
+    body.data.identityGroupId,
+  );
+  if (body.data.identityGroupId !== undefined && body.data.identityGroupId !== null && !req.tenant!.corporation.identityEnabled) {
+    res.status(400).json({ error: "Tactical identity groups are not enabled for this corporation" });
+    return;
+  }
+  if (body.data.identityGroupId !== undefined && body.data.identityGroupId !== null && !tacticalGroup) {
+    res.status(400).json({ error: "Invalid tactical identity group" });
+    return;
+  }
 
   const [fleet] = await db
     .insert(fleetsTable)
@@ -106,13 +135,18 @@ router.post("/fleets", requireAuth, async (req: Request, res: Response): Promise
       fleetCommander: body.data.fleetCommander,
       papValue: body.data.papValue,
       fleetFunction: body.data.fleetFunction?.trim().slice(0, 80) || "general",
+      identityGroupId: tacticalGroup?.id ?? null,
       reimbursementEnabled: body.data.reimbursementEnabled === true,
       reimbursementRule,
       startedAt: body.data.startedAt ? new Date(body.data.startedAt) : new Date(),
     })
     .returning();
 
-  res.status(201).json({ ...fleet, participantCount: 0 });
+  res.status(201).json({
+    ...fleet,
+    identityGroupName: tacticalGroup?.name ?? null,
+    participantCount: 0,
+  });
 });
 
 // GET /api/fleets/esi-my-fleet - fetch the current user's in-game fleet ID from ESI
@@ -202,6 +236,8 @@ router.get("/fleets/:id", requireAuth, async (req: Request, res: Response): Prom
       papValue: fleetsTable.papValue,
       isActive: fleetsTable.isActive,
       fleetFunction: fleetsTable.fleetFunction,
+      identityGroupId: fleetsTable.identityGroupId,
+      identityGroupName: identityGroupsTable.name,
       reimbursementEnabled: fleetsTable.reimbursementEnabled,
       reimbursementRule: fleetsTable.reimbursementRule,
       startedAt: fleetsTable.startedAt,
@@ -219,6 +255,10 @@ router.get("/fleets/:id", requireAuth, async (req: Request, res: Response): Prom
       )`,
     })
     .from(fleetsTable)
+    .leftJoin(identityGroupsTable, and(
+      eq(identityGroupsTable.id, fleetsTable.identityGroupId),
+      eq(identityGroupsTable.corporationId, req.tenant!.corporation.id),
+    ))
     .where(and(
       eq(fleetsTable.id, params.data.id),
       eq(fleetsTable.corporationId, req.tenant!.corporation.id),
@@ -261,6 +301,19 @@ router.patch("/fleets/:id", requireAuth, async (req: Request, res: Response): Pr
   if (body.data.isActive === false && body.data.endedAt === undefined) updates.endedAt = new Date();
   if (body.data.eveFleetId !== undefined) updates.eveFleetId = body.data.eveFleetId ?? null;
   if (body.data.fleetFunction !== undefined) updates.fleetFunction = body.data.fleetFunction.trim().slice(0, 80) || "general";
+  let tacticalGroup: Awaited<ReturnType<typeof getTacticalGroup>> | undefined;
+  if (body.data.identityGroupId !== undefined) {
+    if (body.data.identityGroupId !== null && !req.tenant!.corporation.identityEnabled) {
+      res.status(400).json({ error: "Tactical identity groups are not enabled for this corporation" });
+      return;
+    }
+    tacticalGroup = await getTacticalGroup(req.tenant!.corporation.id, body.data.identityGroupId);
+    if (body.data.identityGroupId !== null && !tacticalGroup) {
+      res.status(400).json({ error: "Invalid tactical identity group" });
+      return;
+    }
+    updates.identityGroupId = tacticalGroup?.id ?? null;
+  }
   if (body.data.reimbursementEnabled !== undefined) updates.reimbursementEnabled = body.data.reimbursementEnabled;
   if (body.data.reimbursementRule !== undefined) {
     try {
@@ -296,7 +349,15 @@ router.patch("/fleets/:id", requireAuth, async (req: Request, res: Response): Pr
     if (battleReportId) queueBattleReportGeneration(battleReportId);
   }
 
-  res.json({ ...fleet, participantCount: null, battleReportId });
+  if (tacticalGroup === undefined && fleet.identityGroupId) {
+    tacticalGroup = await getTacticalGroup(req.tenant!.corporation.id, fleet.identityGroupId) ?? undefined;
+  }
+  res.json({
+    ...fleet,
+    identityGroupName: tacticalGroup?.name ?? null,
+    participantCount: null,
+    battleReportId,
+  });
 });
 
 // POST /api/fleets/:id/scan - scan ESI fleet members and auto-award PAP

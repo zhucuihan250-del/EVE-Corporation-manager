@@ -35,6 +35,14 @@ export const GetMeResponse = zod.object({
     diplomacy: zod.boolean(),
   }),
   reimbursementOpen: zod.boolean(),
+  tacticalGroups: zod.array(
+    zod.object({
+      id: zod.number(),
+      name: zod.string(),
+      description: zod.string(),
+      joinedAt: zod.coerce.date().nullable(),
+    }),
+  ),
   totalPap: zod.number(),
   redeemablePap: zod.number(),
   createdAt: zod.coerce.date(),
@@ -444,6 +452,8 @@ export const ListFleetsResponseItem = zod.object({
   papValue: zod.number(),
   isActive: zod.boolean(),
   fleetFunction: zod.string(),
+  identityGroupId: zod.number().nullable(),
+  identityGroupName: zod.string().nullable(),
   reimbursementEnabled: zod.boolean(),
   reimbursementRule: zod
     .union([
@@ -473,6 +483,7 @@ export const CreateFleetBody = zod.object({
   papValue: zod.number(),
   startedAt: zod.string().nullish(),
   fleetFunction: zod.string().optional(),
+  identityGroupId: zod.number().nullish(),
   reimbursementEnabled: zod.boolean().optional(),
   reimbursementRule: zod
     .union([
@@ -502,6 +513,8 @@ export const GetFleetResponse = zod.object({
   papValue: zod.number(),
   isActive: zod.boolean(),
   fleetFunction: zod.string(),
+  identityGroupId: zod.number().nullable(),
+  identityGroupName: zod.string().nullable(),
   reimbursementEnabled: zod.boolean(),
   reimbursementRule: zod
     .union([
@@ -535,6 +548,7 @@ export const UpdateFleetBody = zod.object({
   endedAt: zod.string().nullish(),
   eveFleetId: zod.string().nullish(),
   fleetFunction: zod.string().optional(),
+  identityGroupId: zod.number().nullish(),
   reimbursementEnabled: zod.boolean().optional(),
   reimbursementRule: zod
     .union([
@@ -557,6 +571,8 @@ export const UpdateFleetResponse = zod.object({
   papValue: zod.number(),
   isActive: zod.boolean(),
   fleetFunction: zod.string(),
+  identityGroupId: zod.number().nullable(),
+  identityGroupName: zod.string().nullable(),
   reimbursementEnabled: zod.boolean(),
   reimbursementRule: zod
     .union([
@@ -1932,6 +1948,8 @@ export const GetRecentFleetsResponseItem = zod.object({
   papValue: zod.number(),
   isActive: zod.boolean(),
   fleetFunction: zod.string(),
+  identityGroupId: zod.number().nullable(),
+  identityGroupName: zod.string().nullable(),
   reimbursementEnabled: zod.boolean(),
   reimbursementRule: zod
     .union([
@@ -2751,7 +2769,9 @@ export const ListReimbursementsResponseItem = zod.object({
   submittedBy: zod.number(),
   characterId: zod.number(),
   characterName: zod.string(),
-  fleetId: zod.number().nullish(),
+  fleetId: zod.number().nullable(),
+  identityGroupId: zod.number().nullable(),
+  identityGroupName: zod.string().nullable(),
   killmailId: zod.number(),
   killmailUrl: zod.string(),
   lossOccurredAt: zod.coerce.date(),
@@ -2788,6 +2808,12 @@ export const ListReimbursementsResponse = zod.array(
 
 export const CreateReimbursementBody = zod.object({
   characterId: zod.number(),
+  identityGroupId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Tactical identity group requested by its dedicated reimbursement page",
+    ),
   killmailId: zod
     .number()
     .optional()
@@ -2825,6 +2851,12 @@ export const UpdateReimbursementWindowResponse = zod.object({
  */
 export const ListReimbursementLossesQueryParams = zod.object({
   characterId: zod.coerce.number(),
+  identityGroupId: zod.coerce
+    .number()
+    .optional()
+    .describe(
+      "Limit losses to recorded fleet participation for this tactical identity group",
+    ),
 });
 
 export const ListReimbursementLossesResponseItem = zod.object({
@@ -2865,6 +2897,8 @@ export const ListReimbursementFleetsResponseItem = zod.object({
   papValue: zod.number(),
   isActive: zod.boolean(),
   fleetFunction: zod.string(),
+  identityGroupId: zod.number().nullable(),
+  identityGroupName: zod.string().nullable(),
   reimbursementEnabled: zod.boolean(),
   reimbursementRule: zod
     .union([
@@ -2911,7 +2945,176 @@ export const UpdateReimbursementResponse = zod.object({
   submittedBy: zod.number(),
   characterId: zod.number(),
   characterName: zod.string(),
-  fleetId: zod.number().nullish(),
+  fleetId: zod.number().nullable(),
+  identityGroupId: zod.number().nullable(),
+  identityGroupName: zod.string().nullable(),
+  killmailId: zod.number(),
+  killmailUrl: zod.string(),
+  lossOccurredAt: zod.coerce.date(),
+  shipTypeId: zod.number(),
+  shipName: zod.string(),
+  lossValue: zod.number(),
+  requestedAmount: zod.number(),
+  approvedAmount: zod.number().nullish(),
+  description: zod.string(),
+  validation: zod.object({
+    killmailVerified: zod.boolean(),
+    characterVerified: zod.boolean(),
+    fleetVerified: zod.boolean().nullable(),
+    checkedAt: zod.coerce.date(),
+    message: zod.string(),
+  }),
+  status: zod.enum([
+    "submitted",
+    "reviewing",
+    "approved",
+    "partially_approved",
+    "rejected",
+    "pending_payment",
+    "paid",
+  ]),
+  reviewerNotes: zod.string().nullish(),
+  paymentReference: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Get the dedicated dashboard for a tactical identity group
+ */
+export const GetTacticalGroupDashboardParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetTacticalGroupDashboardResponse = zod.object({
+  group: zod.object({
+    id: zod.number(),
+    name: zod.string(),
+    description: zod.string(),
+    joinedAt: zod.coerce.date().nullable(),
+  }),
+  canManageReimbursements: zod.boolean(),
+  memberCount: zod.number(),
+  activeFleetCount: zod.number(),
+  totalFleetCount: zod.number(),
+  myFleetCount: zod.number(),
+  myPap: zod.number(),
+  openClaimCount: zod.number(),
+  paidClaimCount: zod.number(),
+  recentFleets: zod.array(
+    zod.object({
+      id: zod.number(),
+      corporationId: zod.number(),
+      eveFleetId: zod.string().nullish(),
+      name: zod.string(),
+      fleetCommander: zod.string(),
+      papValue: zod.number(),
+      isActive: zod.boolean(),
+      fleetFunction: zod.string(),
+      identityGroupId: zod.number().nullable(),
+      identityGroupName: zod.string().nullable(),
+      reimbursementEnabled: zod.boolean(),
+      reimbursementRule: zod
+        .union([
+          zod.object({
+            description: zod.string().optional(),
+            maximumAmount: zod.number().nullish(),
+            eligibleShips: zod.array(zod.string()).optional(),
+          }),
+          zod.null(),
+        ])
+        .optional(),
+      startedAt: zod.coerce.date().nullish(),
+      endedAt: zod.coerce.date().nullish(),
+      createdAt: zod.coerce.date(),
+      participantCount: zod.number().nullish(),
+      battleReportId: zod.number().nullish(),
+    }),
+  ),
+});
+
+/**
+ * @summary List claims isolated to one tactical identity group
+ */
+export const ListTacticalGroupReimbursementsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListTacticalGroupReimbursementsResponseItem = zod.object({
+  id: zod.number(),
+  corporationId: zod.number(),
+  submittedBy: zod.number(),
+  characterId: zod.number(),
+  characterName: zod.string(),
+  fleetId: zod.number().nullable(),
+  identityGroupId: zod.number().nullable(),
+  identityGroupName: zod.string().nullable(),
+  killmailId: zod.number(),
+  killmailUrl: zod.string(),
+  lossOccurredAt: zod.coerce.date(),
+  shipTypeId: zod.number(),
+  shipName: zod.string(),
+  lossValue: zod.number(),
+  requestedAmount: zod.number(),
+  approvedAmount: zod.number().nullish(),
+  description: zod.string(),
+  validation: zod.object({
+    killmailVerified: zod.boolean(),
+    characterVerified: zod.boolean(),
+    fleetVerified: zod.boolean().nullable(),
+    checkedAt: zod.coerce.date(),
+    message: zod.string(),
+  }),
+  status: zod.enum([
+    "submitted",
+    "reviewing",
+    "approved",
+    "partially_approved",
+    "rejected",
+    "pending_payment",
+    "paid",
+  ]),
+  reviewerNotes: zod.string().nullish(),
+  paymentReference: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListTacticalGroupReimbursementsResponse = zod.array(
+  ListTacticalGroupReimbursementsResponseItem,
+);
+
+/**
+ * @summary Review a claim isolated to one tactical identity group
+ */
+export const UpdateTacticalGroupReimbursementParams = zod.object({
+  id: zod.coerce.number(),
+  claimId: zod.coerce.number(),
+});
+
+export const UpdateTacticalGroupReimbursementBody = zod.object({
+  status: zod.enum([
+    "submitted",
+    "reviewing",
+    "approved",
+    "partially_approved",
+    "rejected",
+    "pending_payment",
+    "paid",
+  ]),
+  approvedAmount: zod.number().nullish(),
+  reviewerNotes: zod.string().optional(),
+  paymentReference: zod.string().optional(),
+});
+
+export const UpdateTacticalGroupReimbursementResponse = zod.object({
+  id: zod.number(),
+  corporationId: zod.number(),
+  submittedBy: zod.number(),
+  characterId: zod.number(),
+  characterName: zod.string(),
+  fleetId: zod.number().nullable(),
+  identityGroupId: zod.number().nullable(),
+  identityGroupName: zod.string().nullable(),
   killmailId: zod.number(),
   killmailUrl: zod.string(),
   lossOccurredAt: zod.coerce.date(),

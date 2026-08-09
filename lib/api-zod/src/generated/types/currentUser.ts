@@ -7,6 +7,7 @@
  */
 import type { CorporationModules } from "./corporationModules";
 import type { CurrentUserRole } from "./currentUserRole";
+import type { TacticalGroupSummary } from "./tacticalGroupSummary";
 
 export interface CurrentUser {
   id: number;
@@ -23,6 +24,7 @@ export interface CurrentUser {
   permissions: string[];
   modules: CorporationModules;
   reimbursementOpen: boolean;
+  tacticalGroups: TacticalGroupSummary[];
   totalPap: number;
   redeemablePap: number;
   createdAt: Date;

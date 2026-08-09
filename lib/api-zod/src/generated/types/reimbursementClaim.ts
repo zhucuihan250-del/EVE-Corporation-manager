@@ -15,7 +15,11 @@ export interface ReimbursementClaim {
   characterId: number;
   characterName: string;
   /** @nullable */
-  fleetId?: number | null;
+  fleetId: number | null;
+  /** @nullable */
+  identityGroupId: number | null;
+  /** @nullable */
+  identityGroupName: string | null;
   killmailId: number;
   killmailUrl: string;
   lossOccurredAt: Date;

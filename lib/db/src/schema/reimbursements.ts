@@ -3,6 +3,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  index,
   serial,
   text,
   timestamp,
@@ -11,6 +12,7 @@ import {
 import { corporationsTable } from "./corporations";
 import { fleetsTable } from "./fleets";
 import { usersTable } from "./users";
+import { identityGroupsTable } from "./identity_groups";
 
 export type ReimbursementValidation = {
   killmailVerified: boolean;
@@ -33,6 +35,9 @@ export const reimbursementClaimsTable = pgTable(
     characterId: integer("character_id").notNull(),
     characterName: text("character_name").notNull(),
     fleetId: integer("fleet_id").references(() => fleetsTable.id, {
+      onDelete: "restrict",
+    }),
+    identityGroupId: integer("identity_group_id").references(() => identityGroupsTable.id, {
       onDelete: "restrict",
     }),
     killmailId: integer("killmail_id").notNull(),
@@ -68,6 +73,10 @@ export const reimbursementClaimsTable = pgTable(
     uniqueIndex("reimbursement_claims_corporation_killmail_unique").on(
       table.corporationId,
       table.killmailId,
+    ),
+    index("reimbursement_claims_corporation_identity_group_idx").on(
+      table.corporationId,
+      table.identityGroupId,
     ),
   ],
 );

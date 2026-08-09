@@ -7,6 +7,8 @@ import {
   usersTable,
   charactersTable,
   papRecordsTable,
+  identityGroupMembershipsTable,
+  identityGroupsTable,
 } from "@workspace/db";
 import { and, desc, eq, gt, isNotNull, isNull, sql } from "drizzle-orm";
 import { generateOauthState, getAuthorizationUrl, getLinkAltAuthorizationUrl, exchangeCode, getCharacterInfo, getCorporationName } from "../lib/eve-sso";
@@ -742,6 +744,27 @@ router.get("/auth/me", requireAuth, async (req: Request, res: Response): Promise
     res.status(401).json({ error: "User not found" });
     return;
   }
+  const tacticalGroups = tenant.corporation.identityEnabled
+    ? await db
+      .select({
+        id: identityGroupsTable.id,
+        name: identityGroupsTable.name,
+        description: identityGroupsTable.description,
+        joinedAt: identityGroupMembershipsTable.createdAt,
+      })
+      .from(identityGroupMembershipsTable)
+      .innerJoin(identityGroupsTable, and(
+        eq(identityGroupsTable.id, identityGroupMembershipsTable.groupId),
+        eq(identityGroupsTable.corporationId, tenant.corporation.id),
+        eq(identityGroupsTable.category, "combat"),
+        eq(identityGroupsTable.isActive, true),
+      ))
+      .where(and(
+        eq(identityGroupMembershipsTable.corporationId, tenant.corporation.id),
+        eq(identityGroupMembershipsTable.userId, tenant.user.id),
+      ))
+      .orderBy(identityGroupsTable.name)
+    : [];
 
   res.json({
     id: tenant.user.id,
@@ -753,6 +776,7 @@ router.get("/auth/me", requireAuth, async (req: Request, res: Response): Promise
     role: tenant.membership.role,
     permissions: tenant.permissions,
     reimbursementOpen: tenant.corporation.reimbursementOpen,
+    tacticalGroups,
     modules: {
       pap: tenant.corporation.papEnabled,
       identity: tenant.corporation.identityEnabled,

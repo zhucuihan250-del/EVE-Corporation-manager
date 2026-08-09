@@ -16,6 +16,8 @@ export interface CreateFleetBody {
   /** @nullable */
   startedAt?: string | null;
   fleetFunction?: string;
+  /** @nullable */
+  identityGroupId?: number | null;
   reimbursementEnabled?: boolean;
   reimbursementRule?: FleetReimbursementRule | null;
 }

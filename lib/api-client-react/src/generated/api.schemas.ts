@@ -38,6 +38,14 @@ export interface CorporationModules {
   diplomacy: boolean;
 }
 
+export interface TacticalGroupSummary {
+  id: number;
+  name: string;
+  description: string;
+  /** @nullable */
+  joinedAt: string | null;
+}
+
 export interface CurrentUser {
   id: number;
   /** @nullable */
@@ -53,6 +61,7 @@ export interface CurrentUser {
   permissions: string[];
   modules: CorporationModules;
   reimbursementOpen: boolean;
+  tacticalGroups: TacticalGroupSummary[];
   totalPap: number;
   redeemablePap: number;
   createdAt: string;
@@ -320,6 +329,10 @@ export interface Fleet {
   papValue: number;
   isActive: boolean;
   fleetFunction: string;
+  /** @nullable */
+  identityGroupId: number | null;
+  /** @nullable */
+  identityGroupName: string | null;
   reimbursementEnabled: boolean;
   reimbursementRule?: FleetReimbursementRule | null;
   /** @nullable */
@@ -342,6 +355,8 @@ export interface CreateFleetBody {
   /** @nullable */
   startedAt?: string | null;
   fleetFunction?: string;
+  /** @nullable */
+  identityGroupId?: number | null;
   reimbursementEnabled?: boolean;
   reimbursementRule?: FleetReimbursementRule | null;
 }
@@ -741,6 +756,8 @@ export interface UpdateFleetBody {
   /** @nullable */
   eveFleetId?: string | null;
   fleetFunction?: string;
+  /** @nullable */
+  identityGroupId?: number | null;
   reimbursementEnabled?: boolean;
   reimbursementRule?: FleetReimbursementRule | null;
 }
@@ -1331,7 +1348,11 @@ export interface ReimbursementClaim {
   characterId: number;
   characterName: string;
   /** @nullable */
-  fleetId?: number | null;
+  fleetId: number | null;
+  /** @nullable */
+  identityGroupId: number | null;
+  /** @nullable */
+  identityGroupName: string | null;
   killmailId: number;
   killmailUrl: string;
   lossOccurredAt: string;
@@ -1354,6 +1375,11 @@ export interface ReimbursementClaim {
 
 export interface CreateReimbursementBody {
   characterId: number;
+  /**
+   * Tactical identity group requested by its dedicated reimbursement page
+   * @nullable
+   */
+  identityGroupId?: number | null;
   /** zKillboard killmail selected from the recent losses endpoint */
   killmailId?: number;
   /**
@@ -1377,6 +1403,19 @@ export interface CreateReimbursementBody {
    * @deprecated
    */
   description?: string;
+}
+
+export interface TacticalGroupDashboard {
+  group: TacticalGroupSummary;
+  canManageReimbursements: boolean;
+  memberCount: number;
+  activeFleetCount: number;
+  totalFleetCount: number;
+  myFleetCount: number;
+  myPap: number;
+  openClaimCount: number;
+  paidClaimCount: number;
+  recentFleets: Fleet[];
 }
 
 /**
@@ -1590,6 +1629,10 @@ export type UpdateDiplomacyCaseBody = {
 
 export type ListReimbursementLossesParams = {
   characterId: number;
+  /**
+   * Limit losses to recorded fleet participation for this tactical identity group
+   */
+  identityGroupId?: number;
 };
 
 export type SyncCorporationWallet200 = {

@@ -11,6 +11,7 @@ import { corporationPlatformModulesMigration } from "./0009-corporation-platform
 import { reimbursementWindowMigration } from "./0010-reimbursement-window";
 import { activityIdentityManagementMigration } from "./0011-activity-identity-management";
 import { corporationRosterAuditMigration } from "./0012-corporation-roster-audit";
+import { tacticalIdentityModulesMigration } from "./0013-tactical-identity-modules";
 
 type Migration = {
   id: string;
@@ -30,6 +31,7 @@ const migrations: Migration[] = [
   reimbursementWindowMigration,
   activityIdentityManagementMigration,
   corporationRosterAuditMigration,
+  tacticalIdentityModulesMigration,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {

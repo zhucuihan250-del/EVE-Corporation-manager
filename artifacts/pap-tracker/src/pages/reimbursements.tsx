@@ -2,15 +2,19 @@ import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useCreateReimbursement,
+  useGetTacticalGroupDashboard,
   useGetMe,
   useListCharacters,
   useListReimbursementLosses,
   useListReimbursements,
+  useListTacticalGroupReimbursements,
+  useUpdateTacticalGroupReimbursement,
   useUpdateReimbursement,
   type ReimbursementLoss,
   type UpdateReimbursementBodyStatus,
 } from "@workspace/api-client-react";
 import { useTranslation } from "react-i18next";
+import { useParams } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,16 +33,36 @@ const VISIBLE_LOSS_STEP = 40;
 const formatIsk = (value: number) => `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value)} ISK`;
 
 export function Reimbursements() {
+  return <ReimbursementWorkspace />;
+}
+
+export function TacticalReimbursements() {
+  const params = useParams<{ id: string }>();
+  const identityGroupId = Number(params.id);
+  const dashboard = useGetTacticalGroupDashboard(identityGroupId);
+  if (dashboard.isLoading) return <div className="p-6 text-sm text-muted-foreground">Loading tactical reimbursement…</div>;
+  if (dashboard.isError || !dashboard.data) return <div className="p-6 text-sm text-destructive">{getErrorMessage(dashboard.error)}</div>;
+  return <ReimbursementWorkspace identityGroupId={identityGroupId} groupName={dashboard.data.group.name} />;
+}
+
+function ReimbursementWorkspace({ identityGroupId, groupName }: { identityGroupId?: number; groupName?: string }) {
   const { i18n } = useTranslation();
   const zh = i18n.language.startsWith("zh");
   const tr = (cn: string, en: string) => zh ? cn : en;
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { data: user } = useGetMe();
-  const claims = useListReimbursements();
+  const generalClaims = useListReimbursements({
+    query: { enabled: identityGroupId === undefined, queryKey: ["/api/reimbursements"] },
+  });
+  const tacticalClaims = useListTacticalGroupReimbursements(identityGroupId ?? 0, {
+    query: { enabled: identityGroupId !== undefined, queryKey: [`/api/tactical-groups/${identityGroupId ?? 0}/reimbursements`] },
+  });
+  const claims = identityGroupId === undefined ? generalClaims : tacticalClaims;
   const characters = useListCharacters();
   const create = useCreateReimbursement();
   const update = useUpdateReimbursement();
+  const tacticalUpdate = useUpdateTacticalGroupReimbursement();
   const [characterId, setCharacterId] = useState("");
   const [submittingKillmailId, setSubmittingKillmailId] = useState<number | null>(null);
   const [visibleLossCount, setVisibleLossCount] = useState(INITIAL_VISIBLE_LOSSES);
@@ -46,10 +70,14 @@ export function Reimbursements() {
   const canManage = Boolean(user?.permissions.includes("reimbursement.manage") || ROLE_LEVELS.indexOf(user?.role ?? "member") >= ROLE_LEVELS.indexOf("admin"));
   const selectedCharacter = (characters.data ?? []).find((character) => character.id === Number(characterId));
   const losses = useListReimbursementLosses(
-    { characterId: Number(characterId) || 0 },
-    { query: { enabled: Boolean(characterId), queryKey: ["reimbursementLosses", Number(characterId) || 0] } },
+    { characterId: Number(characterId) || 0, identityGroupId },
+    { query: { enabled: Boolean(characterId), queryKey: ["reimbursementLosses", Number(characterId) || 0, identityGroupId ?? "general"] } },
   );
-  const refreshClaims = () => queryClient.invalidateQueries({ queryKey: ["/api/reimbursements"] });
+  const refreshClaims = () => queryClient.invalidateQueries({
+    queryKey: identityGroupId === undefined
+      ? ["/api/reimbursements"]
+      : [`/api/tactical-groups/${identityGroupId}/reimbursements`],
+  });
 
   useEffect(() => {
     if (characterId || !(characters.data?.length)) return;
@@ -83,10 +111,15 @@ export function Reimbursements() {
   const submitLoss = (loss: ReimbursementLoss) => {
     if (!characterId || loss.alreadySubmitted) return;
     setSubmittingKillmailId(loss.killmailId);
-    create.mutate({ data: { characterId: Number(characterId), killmailId: loss.killmailId } }, {
-      onSuccess: async () => {
+    create.mutate({ data: { characterId: Number(characterId), killmailId: loss.killmailId, identityGroupId } }, {
+      onSuccess: async (created) => {
         await Promise.all([refreshClaims(), losses.refetch()]);
-        toast({ title: tr("补损申请已提交", "Reimbursement submitted"), description: `${loss.shipName} · ${formatIsk(loss.lossValue)}` });
+        toast({
+          title: tr("补损申请已提交", "Reimbursement submitted"),
+          description: created.identityGroupId
+            ? tr(`${created.identityGroupName ?? groupName ?? "身份组"}专属补损 · ${loss.shipName}`, `${created.identityGroupName ?? groupName ?? "Tactical group"} reimbursement · ${loss.shipName}`)
+            : `${loss.shipName} · ${formatIsk(loss.lossValue)}`,
+        });
       },
       onError: (error) => toast({ title: tr("提交失败", "Submission failed"), description: getErrorMessage(error), variant: "destructive" }),
       onSettled: () => setSubmittingKillmailId(null),
@@ -96,9 +129,11 @@ export function Reimbursements() {
   return (
     <div className="p-6 space-y-6 overflow-auto">
       <div>
-        <h1 className="text-2xl font-bold font-mono tracking-wider">{tr("补损", "REIMBURSEMENT")}</h1>
+        <h1 className="text-2xl font-bold font-mono tracking-wider">{identityGroupId ? tr(`${groupName ?? "身份组"} · 专属补损`, `${groupName ?? "Tactical group"} · REIMBURSEMENT`) : tr("补损", "REIMBURSEMENT")}</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          {tr("补损不限制舰队，也不填写申请金额；系统直接读取并验证角色最近 12 个月内最多 100 条 zKillboard 损失。", "Reimbursement is not fleet-restricted and requires no requested amount; up to 100 zKillboard losses from the last 12 months are read and verified directly.")}
+          {identityGroupId
+            ? tr("仅显示您在该身份组舰队中有 PAP 参与记录且发生于舰队期间的损失；本页申请不会出现在通用补损。", "Only losses during recorded PAP participation in this identity group's fleets are shown; claims submitted here never appear in general reimbursement.")
+            : tr("补损不填写申请金额；身份组成员在身份组舰队期间的损失会自动转入专属补损，非身份组成员仍保留在通用补损。", "No requested amount is required. Tactical-group members' losses during group fleets are routed to dedicated reimbursement, while non-members remain in general reimbursement.")}
         </p>
       </div>
 
@@ -129,7 +164,7 @@ export function Reimbursements() {
           ) : losses.isError ? (
             <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">{getErrorMessage(losses.error)}</div>
           ) : (losses.data ?? []).length === 0 ? (
-            <p className="rounded-md border border-border/50 p-4 text-sm text-muted-foreground">{tr("该角色最近 12 个月内暂时没有可读取的损失。", "No readable losses are currently available for this character in the last 12 months.")}</p>
+            <p className="rounded-md border border-border/50 p-4 text-sm text-muted-foreground">{identityGroupId ? tr("没有找到该角色在本身份组舰队期间、且已有 PAP 参与记录的损失。", "No losses matched this character's recorded PAP participation in the identity group's fleets.") : tr("该角色最近 12 个月内暂时没有可读取的损失。", "No readable losses are currently available for this character in the last 12 months.")}</p>
           ) : (
             <div className="space-y-4">
               <div className="rounded-md border border-border/50 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
@@ -165,7 +200,7 @@ export function Reimbursements() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>{canManage ? tr("本军团补损申请", "Corporation reimbursements") : tr("我的补损", "My reimbursements")}</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{identityGroupId ? (canManage ? tr(`${groupName ?? "身份组"}全部补损`, `All ${groupName ?? "group"} claims`) : tr("我的身份组补损", "My tactical claims")) : (canManage ? tr("本军团通用补损申请", "General corporation reimbursements") : tr("我的通用补损", "My general reimbursements"))}</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           {(claims.data ?? []).length === 0 ? <p className="text-sm text-muted-foreground">{tr("暂无补损申请", "No reimbursement claims")}</p> : (claims.data ?? []).map((claim) => {
             const draft = review[claim.id] ?? { status: claim.status, approvedAmount: claim.approvedAmount?.toString() ?? "", reviewerNotes: claim.reviewerNotes ?? "", paymentReference: claim.paymentReference ?? "" };
@@ -174,7 +209,7 @@ export function Reimbursements() {
               {claim.description && claim.description !== AUTO_DESCRIPTION && <p className="text-sm whitespace-pre-wrap">{claim.description}</p>}
               <div className="flex flex-wrap items-center gap-3 text-xs text-emerald-400"><CheckCircle2 className="h-4 w-4" />{claim.validation.message}<a className="inline-flex items-center gap-1 text-primary hover:underline" href={claim.killmailUrl} target="_blank" rel="noreferrer">zKillboard <ExternalLink className="h-3 w-3" /></a></div>
               {claim.reviewerNotes && !canManage && <p className="text-sm text-muted-foreground">{tr("审核记录：", "Review notes: ")}{claim.reviewerNotes}</p>}
-              {canManage && <div className="grid gap-2 border-t border-border/50 pt-3 md:grid-cols-2"><select className="h-10 rounded-md border border-input bg-background px-3" value={draft.status} onChange={(event) => setReview((current) => ({ ...current, [claim.id]: { ...draft, status: event.target.value as UpdateReimbursementBodyStatus } }))}>{Object.entries(statusLabels).map(([status, label]) => <option key={status} value={status}>{label}</option>)}</select><Input type="number" min="0" placeholder={tr("批准金额", "Approved amount")} value={draft.approvedAmount} onChange={(event) => setReview((current) => ({ ...current, [claim.id]: { ...draft, approvedAmount: event.target.value } }))} /><Textarea placeholder={tr("审核记录", "Review notes")} value={draft.reviewerNotes} onChange={(event) => setReview((current) => ({ ...current, [claim.id]: { ...draft, reviewerNotes: event.target.value } }))} /><div className="space-y-2"><Input placeholder={tr("打款流水号（可选）", "Payment reference (optional)")} value={draft.paymentReference} onChange={(event) => setReview((current) => ({ ...current, [claim.id]: { ...draft, paymentReference: event.target.value } }))} /><Button className="w-full" onClick={() => update.mutate({ id: claim.id, data: { status: draft.status, approvedAmount: draft.approvedAmount ? Number(draft.approvedAmount) : null, reviewerNotes: draft.reviewerNotes, paymentReference: draft.paymentReference } }, { onSuccess: refreshClaims, onError: (error) => toast({ title: getErrorMessage(error), variant: "destructive" }) })}>{tr("保存审核", "Save review")}</Button></div></div>}
+              {canManage && <div className="grid gap-2 border-t border-border/50 pt-3 md:grid-cols-2"><select className="h-10 rounded-md border border-input bg-background px-3" value={draft.status} onChange={(event) => setReview((current) => ({ ...current, [claim.id]: { ...draft, status: event.target.value as UpdateReimbursementBodyStatus } }))}>{Object.entries(statusLabels).map(([status, label]) => <option key={status} value={status}>{label}</option>)}</select><Input type="number" min="0" placeholder={tr("批准金额", "Approved amount")} value={draft.approvedAmount} onChange={(event) => setReview((current) => ({ ...current, [claim.id]: { ...draft, approvedAmount: event.target.value } }))} /><Textarea placeholder={tr("审核记录", "Review notes")} value={draft.reviewerNotes} onChange={(event) => setReview((current) => ({ ...current, [claim.id]: { ...draft, reviewerNotes: event.target.value } }))} /><div className="space-y-2"><Input placeholder={tr("打款流水号（可选）", "Payment reference (optional)")} value={draft.paymentReference} onChange={(event) => setReview((current) => ({ ...current, [claim.id]: { ...draft, paymentReference: event.target.value } }))} /><Button className="w-full" disabled={update.isPending || tacticalUpdate.isPending} onClick={() => { const data = { status: draft.status, approvedAmount: draft.approvedAmount ? Number(draft.approvedAmount) : null, reviewerNotes: draft.reviewerNotes, paymentReference: draft.paymentReference }; const options = { onSuccess: refreshClaims, onError: (error: unknown) => toast({ title: getErrorMessage(error), variant: "destructive" as const }) }; if (identityGroupId === undefined) update.mutate({ id: claim.id, data }, options); else tacticalUpdate.mutate({ id: identityGroupId, claimId: claim.id, data }, options); }}>{tr("保存审核", "Save review")}</Button></div></div>}
             </div>;
           })}
         </CardContent>

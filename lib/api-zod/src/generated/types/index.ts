@@ -147,6 +147,8 @@ export * from "./skillAuditResultMatchMode";
 export * from "./skillPlanAuditResult";
 export * from "./successResponse";
 export * from "./syncCorporationWallet200";
+export * from "./tacticalGroupDashboard";
+export * from "./tacticalGroupSummary";
 export * from "./topContributor";
 export * from "./updateBattleReplayBody";
 export * from "./updateBattleReplayBodyStatus";

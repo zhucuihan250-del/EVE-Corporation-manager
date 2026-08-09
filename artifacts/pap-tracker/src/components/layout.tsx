@@ -97,6 +97,8 @@ export function Layout({ children }: { children: ReactNode }) {
   if (user?.permissions.includes("economy.view") && modules?.economy) {
     directorItems.push({ href: "/economy", label: tr("军团经济", "Corporation economy"), icon: Landmark });
   }
+
+  const tacticalGroups = user?.tacticalGroups ?? [];
   if (user?.permissions.includes("reimbursement.window.manage") && modules?.reimbursement) {
     directorItems.push({ href: "/reimbursement-settings", label: tr("补损窗口", "Reimbursement window"), icon: LockKeyhole });
   }
@@ -132,6 +134,16 @@ export function Layout({ children }: { children: ReactNode }) {
               <SidebarGroupLabel className="text-xs uppercase tracking-widest text-muted-foreground font-mono">{tr("功能", "Services")}</SidebarGroupLabel>
               <SidebarGroupContent><SidebarMenu>{renderItems(serviceItems)}</SidebarMenu></SidebarGroupContent>
             </SidebarGroup>
+
+            {tacticalGroups.map((group) => (
+              <SidebarGroup key={group.id}>
+                <SidebarGroupLabel className="text-xs uppercase tracking-widest text-violet-300 font-mono">{group.name}</SidebarGroupLabel>
+                <SidebarGroupContent><SidebarMenu>{renderItems([
+                  { href: `/tactical/${group.id}`, label: tr("战术面板", "Tactical dashboard"), icon: Swords, exact: true },
+                  { href: `/tactical/${group.id}/reimbursements`, label: tr("专属补损", "Dedicated reimbursement"), icon: ReceiptText, disabled: user?.reimbursementOpen === false },
+                ])}</SidebarMenu></SidebarGroupContent>
+              </SidebarGroup>
+            ))}
 
             {directorItems.length > 0 && (
               <SidebarGroup>

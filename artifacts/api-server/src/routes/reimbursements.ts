@@ -8,6 +8,12 @@ import {
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { hasRole, requireAuth } from "../middlewares/auth";
 import { KillmailValidationError, listCharacterLosses, verifyKillmail } from "../lib/reimbursements";
+import {
+  getActiveTacticalMembership,
+  listUserTacticalFleetWindows,
+  lossMatchesTacticalFleet,
+  resolveTacticalClaimRoute,
+} from "../lib/tactical-groups";
 import { hasPermission, requireModule, requirePermission, requireTenant } from "../lib/tenant";
 
 const router: IRouter = Router();
@@ -64,15 +70,38 @@ router.get("/reimbursements", async (req: Request, res: Response): Promise<void>
   const tenant = req.tenant!;
   const rows = await db.select().from(reimbursementClaimsTable).where(and(
     eq(reimbursementClaimsTable.corporationId, tenant.corporation.id),
+    isNull(reimbursementClaimsTable.identityGroupId),
     ...(canManage(req) ? [] : [eq(reimbursementClaimsTable.submittedBy, tenant.user.id)]),
   )).orderBy(desc(reimbursementClaimsTable.createdAt));
-  res.json(rows);
+  res.json(rows.map((row) => ({ ...row, identityGroupName: null })));
 });
 
 router.get("/reimbursements/losses", async (req: Request, res: Response): Promise<void> => {
   const characterId = Number(req.query.characterId);
+  const requestedIdentityGroupId = req.query.identityGroupId === undefined
+    ? undefined
+    : Number(req.query.identityGroupId);
   if (!Number.isInteger(characterId)) {
     res.status(400).json({ error: "请选择需要查询的损失角色" });
+    return;
+  }
+  if (requestedIdentityGroupId !== undefined && !Number.isInteger(requestedIdentityGroupId)) {
+    res.status(400).json({ error: "Invalid tactical identity group" });
+    return;
+  }
+  if (requestedIdentityGroupId !== undefined && !req.tenant!.corporation.identityEnabled) {
+    res.status(403).json({ error: "Tactical identity groups are not enabled for this corporation" });
+    return;
+  }
+  if (
+    requestedIdentityGroupId !== undefined
+    && !await getActiveTacticalMembership(
+      req.tenant!.corporation.id,
+      req.tenant!.user.id,
+      requestedIdentityGroupId,
+    )
+  ) {
+    res.status(403).json({ error: "You are not a member of this tactical identity group" });
     return;
   }
   const [character] = await db.select().from(charactersTable).where(and(
@@ -88,7 +117,16 @@ router.get("/reimbursements/losses", async (req: Request, res: Response): Promis
 
   try {
     const losses = await listCharacterLosses(character.eveCharacterId);
-    const existing = losses.length === 0
+    const visibleLosses = requestedIdentityGroupId === undefined
+      ? losses
+      : await listUserTacticalFleetWindows(
+        req.tenant!.corporation.id,
+        req.tenant!.user.id,
+        requestedIdentityGroupId,
+      ).then((windows) => losses.filter((loss) => (
+        windows.some((window) => lossMatchesTacticalFleet(loss.occurredAt, window))
+      )));
+    const existing = visibleLosses.length === 0
       ? []
       : await db.select({
         id: reimbursementClaimsTable.id,
@@ -96,10 +134,10 @@ router.get("/reimbursements/losses", async (req: Request, res: Response): Promis
         status: reimbursementClaimsTable.status,
       }).from(reimbursementClaimsTable).where(and(
         eq(reimbursementClaimsTable.corporationId, req.tenant!.corporation.id),
-        inArray(reimbursementClaimsTable.killmailId, losses.map((loss) => loss.killmailId)),
+        inArray(reimbursementClaimsTable.killmailId, visibleLosses.map((loss) => loss.killmailId)),
       ));
     const claimsByKillmail = new Map(existing.map((claim) => [claim.killmailId, claim]));
-    res.json(losses.map((loss) => {
+    res.json(visibleLosses.map((loss) => {
       const claim = claimsByKillmail.get(loss.killmailId);
       return {
         killmailId: loss.killmailId,
@@ -133,11 +171,33 @@ router.post("/reimbursements", async (req: Request, res: Response): Promise<void
   const description = typeof req.body.description === "string" && req.body.description.trim()
     ? req.body.description.trim().slice(0, 10_000)
     : "通过 zKillboard 自动提交";
+  const requestedIdentityGroupId = req.body.identityGroupId === undefined || req.body.identityGroupId === null
+    ? undefined
+    : Number(req.body.identityGroupId);
   if (
     !Number.isInteger(characterId)
     || !killmailReference
   ) {
     res.status(400).json({ error: "Invalid reimbursement claim" });
+    return;
+  }
+  if (requestedIdentityGroupId !== undefined && !Number.isInteger(requestedIdentityGroupId)) {
+    res.status(400).json({ error: "Invalid tactical identity group" });
+    return;
+  }
+  if (requestedIdentityGroupId !== undefined && !tenant.corporation.identityEnabled) {
+    res.status(403).json({ error: "Tactical identity groups are not enabled for this corporation" });
+    return;
+  }
+  if (
+    requestedIdentityGroupId !== undefined
+    && !await getActiveTacticalMembership(
+      tenant.corporation.id,
+      tenant.user.id,
+      requestedIdentityGroupId,
+    )
+  ) {
+    res.status(403).json({ error: "You are not a member of this tactical identity group" });
     return;
   }
 
@@ -159,12 +219,25 @@ router.post("/reimbursements", async (req: Request, res: Response): Promise<void
       res.status(409).json({ error: "击杀报告中的损失角色与申请角色不一致" });
       return;
     }
+    const tacticalRoute = tenant.corporation.identityEnabled
+      ? await resolveTacticalClaimRoute(
+        tenant.corporation.id,
+        tenant.user.id,
+        killmail.occurredAt,
+        requestedIdentityGroupId,
+      )
+      : null;
+    if (requestedIdentityGroupId !== undefined && !tacticalRoute) {
+      res.status(409).json({ error: "未找到该损失对应的身份组舰队参与记录，请在通用补损中提交" });
+      return;
+    }
     const [created] = await db.insert(reimbursementClaimsTable).values({
       corporationId: tenant.corporation.id,
       submittedBy: tenant.user.id,
       characterId: character.eveCharacterId,
       characterName: character.eveCharacterName,
-      fleetId: null,
+      fleetId: tacticalRoute?.fleetId ?? null,
+      identityGroupId: tacticalRoute?.identityGroupId ?? null,
       killmailId: killmail.killmailId,
       killmailHash: killmail.killmailHash,
       killmailUrl: `https://zkillboard.com/kill/${killmail.killmailId}/`,
@@ -182,7 +255,10 @@ router.post("/reimbursements", async (req: Request, res: Response): Promise<void
         message: "zKillboard 击杀报告和损失角色已自动验证",
       },
     }).returning();
-    res.status(201).json(created);
+    res.status(201).json({
+      ...created,
+      identityGroupName: tacticalRoute?.identityGroupName ?? null,
+    });
   } catch (error) {
     if (error instanceof KillmailValidationError) {
       res.status(409).json({ error: error.message });
@@ -226,12 +302,13 @@ router.patch("/reimbursements/:id", async (req: Request, res: Response): Promise
   }).where(and(
     eq(reimbursementClaimsTable.id, id),
     eq(reimbursementClaimsTable.corporationId, req.tenant!.corporation.id),
+    isNull(reimbursementClaimsTable.identityGroupId),
   )).returning();
   if (!updated) {
     res.status(404).json({ error: "Reimbursement claim not found" });
     return;
   }
-  res.json(updated);
+  res.json({ ...updated, identityGroupName: null });
 });
 
 export default router;

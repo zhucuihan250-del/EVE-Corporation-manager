@@ -99,6 +99,7 @@ export function AdminIdentity() {
       queryClient.invalidateQueries({ queryKey: ["/api/identity-groups"] }),
       queryClient.invalidateQueries({ queryKey: ["/api/identity-applications"] }),
       queryClient.invalidateQueries({ queryKey: ["/api/identity-skill-plans"] }),
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] }),
     ]);
   };
 

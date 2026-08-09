@@ -17,6 +17,7 @@ import diplomacyRouter from "./diplomacy";
 import reimbursementsRouter from "./reimbursements";
 import economyRouter from "./economy";
 import activityRouter from "./activity";
+import tacticalGroupsRouter from "./tactical-groups";
 
 const router: IRouter = Router();
 
@@ -38,5 +39,6 @@ router.use(diplomacyRouter);
 router.use(reimbursementsRouter);
 router.use(economyRouter);
 router.use(activityRouter);
+router.use(tacticalGroupsRouter);
 
 export default router;

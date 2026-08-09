@@ -75,6 +75,7 @@ import type {
   SearchFittingCatalogParams,
   SuccessResponse,
   SyncCorporationWallet200,
+  TacticalGroupDashboard,
   TopContributor,
   UpdateBattleReplayBody,
   UpdateDiplomacyCaseBody,
@@ -5815,6 +5816,290 @@ export const useUpdateReimbursement = <
   TContext
 > => {
   return useMutation(getUpdateReimbursementMutationOptions(options));
+};
+
+/**
+ * @summary Get the dedicated dashboard for a tactical identity group
+ */
+export const getGetTacticalGroupDashboardUrl = (id: number) => {
+  return `/api/tactical-groups/${id}`;
+};
+
+export const getTacticalGroupDashboard = async (
+  id: number,
+  options?: RequestInit,
+): Promise<TacticalGroupDashboard> => {
+  return customFetch<TacticalGroupDashboard>(
+    getGetTacticalGroupDashboardUrl(id),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetTacticalGroupDashboardQueryKey = (id: number) => {
+  return [`/api/tactical-groups/${id}`] as const;
+};
+
+export const getGetTacticalGroupDashboardQueryOptions = <
+  TData = Awaited<ReturnType<typeof getTacticalGroupDashboard>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getTacticalGroupDashboard>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetTacticalGroupDashboardQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getTacticalGroupDashboard>>
+  > = ({ signal }) =>
+    getTacticalGroupDashboard(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getTacticalGroupDashboard>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetTacticalGroupDashboardQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getTacticalGroupDashboard>>
+>;
+export type GetTacticalGroupDashboardQueryError = ErrorType<void>;
+
+/**
+ * @summary Get the dedicated dashboard for a tactical identity group
+ */
+
+export function useGetTacticalGroupDashboard<
+  TData = Awaited<ReturnType<typeof getTacticalGroupDashboard>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getTacticalGroupDashboard>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetTacticalGroupDashboardQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List claims isolated to one tactical identity group
+ */
+export const getListTacticalGroupReimbursementsUrl = (id: number) => {
+  return `/api/tactical-groups/${id}/reimbursements`;
+};
+
+export const listTacticalGroupReimbursements = async (
+  id: number,
+  options?: RequestInit,
+): Promise<ReimbursementClaim[]> => {
+  return customFetch<ReimbursementClaim[]>(
+    getListTacticalGroupReimbursementsUrl(id),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListTacticalGroupReimbursementsQueryKey = (id: number) => {
+  return [`/api/tactical-groups/${id}/reimbursements`] as const;
+};
+
+export const getListTacticalGroupReimbursementsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listTacticalGroupReimbursements>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listTacticalGroupReimbursements>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListTacticalGroupReimbursementsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listTacticalGroupReimbursements>>
+  > = ({ signal }) =>
+    listTacticalGroupReimbursements(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listTacticalGroupReimbursements>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListTacticalGroupReimbursementsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listTacticalGroupReimbursements>>
+>;
+export type ListTacticalGroupReimbursementsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List claims isolated to one tactical identity group
+ */
+
+export function useListTacticalGroupReimbursements<
+  TData = Awaited<ReturnType<typeof listTacticalGroupReimbursements>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listTacticalGroupReimbursements>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListTacticalGroupReimbursementsQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Review a claim isolated to one tactical identity group
+ */
+export const getUpdateTacticalGroupReimbursementUrl = (
+  id: number,
+  claimId: number,
+) => {
+  return `/api/tactical-groups/${id}/reimbursements/${claimId}`;
+};
+
+export const updateTacticalGroupReimbursement = async (
+  id: number,
+  claimId: number,
+  updateReimbursementBody: UpdateReimbursementBody,
+  options?: RequestInit,
+): Promise<ReimbursementClaim> => {
+  return customFetch<ReimbursementClaim>(
+    getUpdateTacticalGroupReimbursementUrl(id, claimId),
+    {
+      ...options,
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(updateReimbursementBody),
+    },
+  );
+};
+
+export const getUpdateTacticalGroupReimbursementMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateTacticalGroupReimbursement>>,
+    TError,
+    { id: number; claimId: number; data: BodyType<UpdateReimbursementBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateTacticalGroupReimbursement>>,
+  TError,
+  { id: number; claimId: number; data: BodyType<UpdateReimbursementBody> },
+  TContext
+> => {
+  const mutationKey = ["updateTacticalGroupReimbursement"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateTacticalGroupReimbursement>>,
+    { id: number; claimId: number; data: BodyType<UpdateReimbursementBody> }
+  > = (props) => {
+    const { id, claimId, data } = props ?? {};
+
+    return updateTacticalGroupReimbursement(id, claimId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateTacticalGroupReimbursementMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateTacticalGroupReimbursement>>
+>;
+export type UpdateTacticalGroupReimbursementMutationBody =
+  BodyType<UpdateReimbursementBody>;
+export type UpdateTacticalGroupReimbursementMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Review a claim isolated to one tactical identity group
+ */
+export const useUpdateTacticalGroupReimbursement = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateTacticalGroupReimbursement>>,
+    TError,
+    { id: number; claimId: number; data: BodyType<UpdateReimbursementBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateTacticalGroupReimbursement>>,
+  TError,
+  { id: number; claimId: number; data: BodyType<UpdateReimbursementBody> },
+  TContext
+> => {
+  return useMutation(
+    getUpdateTacticalGroupReimbursementMutationOptions(options),
+  );
 };
 
 export const getGetEconomySummaryUrl = () => {

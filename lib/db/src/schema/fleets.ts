@@ -1,7 +1,8 @@
-import { pgTable, text, serial, timestamp, boolean, real, integer, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, boolean, real, integer, jsonb, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { corporationsTable } from "./corporations";
+import { identityGroupsTable } from "./identity_groups";
 
 export type FleetReimbursementRule = {
   description?: string;
@@ -20,13 +21,18 @@ export const fleetsTable = pgTable("fleets", {
   papValue: real("pap_value").notNull().default(1),
   isActive: boolean("is_active").notNull().default(true),
   fleetFunction: text("fleet_function").notNull().default("general"),
+  identityGroupId: integer("identity_group_id").references(() => identityGroupsTable.id, {
+    onDelete: "set null",
+  }),
   reimbursementEnabled: boolean("reimbursement_enabled").notNull().default(false),
   reimbursementRule: jsonb("reimbursement_rule").$type<FleetReimbursementRule | null>(),
   startedAt: timestamp("started_at", { withTimezone: true }),
   endedAt: timestamp("ended_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
-});
+}, (table) => [
+  index("fleets_corporation_identity_group_idx").on(table.corporationId, table.identityGroupId),
+]);
 
 export const insertFleetSchema = createInsertSchema(fleetsTable).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertFleet = z.infer<typeof insertFleetSchema>;

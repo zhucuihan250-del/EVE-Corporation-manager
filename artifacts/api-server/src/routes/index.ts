@@ -18,6 +18,7 @@ import reimbursementsRouter from "./reimbursements";
 import economyRouter from "./economy";
 import activityRouter from "./activity";
 import tacticalGroupsRouter from "./tactical-groups";
+import courierRouter from "./courier";
 
 const router: IRouter = Router();
 
@@ -40,5 +41,6 @@ router.use(reimbursementsRouter);
 router.use(economyRouter);
 router.use(activityRouter);
 router.use(tacticalGroupsRouter);
+router.use(courierRouter);
 
 export default router;

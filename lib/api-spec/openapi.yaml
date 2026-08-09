@@ -38,6 +38,8 @@ tags:
     description: Corporation ship reimbursement claims
   - name: tactical
     description: Tactical identity-group dashboard and isolated reimbursement claims
+  - name: courier
+    description: Corporation courier routes, quotes, orders, and administration
   - name: economy
     description: Director-only corporation economy
 
@@ -1495,6 +1497,249 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ReimbursementClaim"
+
+  /courier/routes:
+    get:
+      operationId: listCourierRoutes
+      tags: [courier]
+      summary: List active courier routes for the current corporation
+      responses:
+        "200":
+          description: Active courier routes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CourierRoute"
+    post:
+      operationId: createMyCourierRoute
+      tags: [courier]
+      summary: Create a route owned by the current courier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMyCourierRouteBody"
+      responses:
+        "201":
+          description: Courier-owned route created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourierRoute"
+
+  /courier/routes/{id}:
+    patch:
+      operationId: updateMyCourierRoute
+      tags: [courier]
+      summary: Update a route owned by the current courier
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMyCourierRouteBody"
+      responses:
+        "200":
+          description: Courier-owned route updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourierRoute"
+
+  /courier/profile:
+    get:
+      operationId: getMyCourierProfile
+      tags: [courier]
+      summary: Get the current member's courier profile and owned routes
+      responses:
+        "200":
+          description: Current member courier profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourierProfile"
+
+  /courier/quote:
+    post:
+      operationId: quoteCourierOrder
+      tags: [courier]
+      summary: Calculate an authoritative courier fee
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CourierQuoteInput"
+      responses:
+        "200":
+          description: Calculated courier quote
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourierQuote"
+
+  /courier/orders:
+    get:
+      operationId: listCourierOrders
+      tags: [courier]
+      summary: List visible courier orders
+      responses:
+        "200":
+          description: Member, assigned courier, or administrator order view
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CourierOrder"
+    post:
+      operationId: createCourierOrder
+      tags: [courier]
+      summary: Create a courier order using the current route price
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCourierOrderBody"
+      responses:
+        "201":
+          description: Courier order created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourierOrder"
+
+  /courier/orders/{id}:
+    patch:
+      operationId: updateCourierOrder
+      tags: [courier]
+      summary: Advance or cancel a courier order
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCourierOrderBody"
+      responses:
+        "200":
+          description: Courier order updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourierOrder"
+
+  /courier/admin:
+    get:
+      operationId: getCourierAdminData
+      tags: [courier]
+      summary: Get courier agents, route configuration, and member candidates
+      responses:
+        "200":
+          description: Courier administration data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourierAdminData"
+
+  /courier/admin/agents:
+    post:
+      operationId: createCourierAgent
+      tags: [courier]
+      summary: Add a corporation member as a courier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCourierAgentBody"
+      responses:
+        "201":
+          description: Courier added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourierAgent"
+
+  /courier/admin/agents/{id}:
+    patch:
+      operationId: updateCourierAgent
+      tags: [courier]
+      summary: Rename or enable a courier
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCourierAgentBody"
+      responses:
+        "200":
+          description: Courier updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourierAgent"
+
+  /courier/admin/routes:
+    post:
+      operationId: createCourierRoute
+      tags: [courier]
+      summary: Create a courier route and pricing rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCourierRouteBody"
+      responses:
+        "201":
+          description: Courier route created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourierRoute"
+
+  /courier/admin/routes/{id}:
+    patch:
+      operationId: updateCourierRoute
+      tags: [courier]
+      summary: Update a courier route and pricing rule
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCourierRouteBody"
+      responses:
+        "200":
+          description: Courier route updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourierRoute"
 
   /economy:
     get:
@@ -3076,7 +3321,8 @@ components:
         fleet: { type: boolean }
         reimbursement: { type: boolean }
         diplomacy: { type: boolean }
-      required: [pap, identity, economy, fleet, reimbursement, diplomacy]
+        courier: { type: boolean }
+      required: [pap, identity, economy, fleet, reimbursement, diplomacy, courier]
 
     RequiredSkill:
       type: object
@@ -3402,6 +3648,200 @@ components:
           items:
             $ref: "#/components/schemas/Fleet"
       required: [group, canManageReimbursements, memberCount, activeFleetCount, totalFleetCount, myFleetCount, myPap, openClaimCount, paidClaimCount, recentFleets]
+
+    CourierPricingMethod:
+      type: string
+      enum: [fixed, volume, collateral, volume_collateral]
+
+    CourierRoute:
+      type: object
+      properties:
+        id: { type: integer }
+        corporationId: { type: integer }
+        courierAgentId: { type: integer }
+        courierName: { type: string }
+        origin: { type: string }
+        destination: { type: string }
+        pricingMethod:
+          $ref: "#/components/schemas/CourierPricingMethod"
+        baseFee: { type: number }
+        pricePerM3: { type: number }
+        collateralRate: { type: number }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, corporationId, courierAgentId, courierName, origin, destination, pricingMethod, baseFee, pricePerM3, collateralRate, isActive, createdAt, updatedAt]
+
+    CourierQuoteInput:
+      type: object
+      properties:
+        routeId: { type: integer }
+        volumeM3: { type: number, exclusiveMinimum: 0 }
+        collateral: { type: number, minimum: 0 }
+      required: [routeId, volumeM3, collateral]
+
+    CourierQuote:
+      type: object
+      properties:
+        routeId: { type: integer }
+        courierName: { type: string }
+        origin: { type: string }
+        destination: { type: string }
+        volumeM3: { type: number }
+        collateral: { type: number }
+        calculatedFee: { type: number }
+        formula: { type: string }
+      required: [routeId, courierName, origin, destination, volumeM3, collateral, calculatedFee, formula]
+
+    CourierOrder:
+      type: object
+      properties:
+        id: { type: integer }
+        corporationId: { type: integer }
+        routeId: { type: integer }
+        courierAgentId: { type: integer }
+        submittedBy: { type: ["integer", "null"] }
+        submitterName: { type: string }
+        courierName: { type: string }
+        origin: { type: string }
+        destination: { type: string }
+        pricingMethod:
+          $ref: "#/components/schemas/CourierPricingMethod"
+        baseFee: { type: number }
+        pricePerM3: { type: number }
+        collateralRate: { type: number }
+        volumeM3: { type: number }
+        collateral: { type: number }
+        calculatedFee: { type: number }
+        note: { type: ["string", "null"] }
+        internalNotes: { type: ["string", "null"] }
+        canManageStatus: { type: boolean }
+        status:
+          type: string
+          enum: [submitted, accepted, in_transit, completed, rejected, cancelled]
+        acceptedAt: { type: ["string", "null"], format: date-time }
+        completedAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, corporationId, routeId, courierAgentId, submittedBy, submitterName, courierName, origin, destination, pricingMethod, baseFee, pricePerM3, collateralRate, volumeM3, collateral, calculatedFee, note, internalNotes, canManageStatus, status, acceptedAt, completedAt, createdAt, updatedAt]
+
+    CreateCourierOrderBody:
+      type: object
+      properties:
+        routeId: { type: integer }
+        volumeM3: { type: number, exclusiveMinimum: 0 }
+        collateral: { type: number, minimum: 0 }
+        quotedFee:
+          type: number
+          minimum: 0
+          description: Fee returned by the latest authoritative quote
+        note: { type: string, maxLength: 5000 }
+      required: [routeId, volumeM3, collateral, quotedFee]
+
+    UpdateCourierOrderBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [submitted, accepted, in_transit, completed, rejected, cancelled]
+        internalNotes: { type: string, maxLength: 5000 }
+      required: [status]
+
+    CourierCandidate:
+      type: object
+      properties:
+        userId: { type: integer }
+        name: { type: string }
+        isCourier: { type: boolean }
+      required: [userId, name, isCourier]
+
+    CourierAgent:
+      type: object
+      properties:
+        id: { type: integer }
+        corporationId: { type: integer }
+        userId: { type: ["integer", "null"] }
+        name: { type: string }
+        isActive: { type: boolean }
+        routeCount: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, corporationId, userId, name, isActive, routeCount, createdAt, updatedAt]
+
+    CourierAdminData:
+      type: object
+      properties:
+        candidates:
+          type: array
+          items:
+            $ref: "#/components/schemas/CourierCandidate"
+        agents:
+          type: array
+          items:
+            $ref: "#/components/schemas/CourierAgent"
+        routes:
+          type: array
+          items:
+            $ref: "#/components/schemas/CourierRoute"
+      required: [candidates, agents, routes]
+
+    CourierProfile:
+      type: object
+      properties:
+        isCourier: { type: boolean }
+        agent:
+          $ref: "#/components/schemas/CourierAgent"
+        routes:
+          type: array
+          items:
+            $ref: "#/components/schemas/CourierRoute"
+      required: [isCourier, routes]
+
+    CreateCourierAgentBody:
+      type: object
+      properties:
+        userId: { type: integer }
+      required: [userId]
+
+    UpdateCourierAgentBody:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        isActive: { type: boolean }
+      required: [name, isActive]
+
+    CreateCourierRouteBody:
+      type: object
+      properties:
+        courierAgentId: { type: integer }
+        origin: { type: string, minLength: 1, maxLength: 200 }
+        destination: { type: string, minLength: 1, maxLength: 200 }
+        pricingMethod:
+          $ref: "#/components/schemas/CourierPricingMethod"
+        baseFee: { type: number, minimum: 0 }
+        pricePerM3: { type: number, minimum: 0 }
+        collateralRate: { type: number, minimum: 0, maximum: 100 }
+        isActive: { type: boolean }
+      required: [courierAgentId, origin, destination, pricingMethod, baseFee, pricePerM3, collateralRate, isActive]
+
+    UpdateCourierRouteBody:
+      $ref: "#/components/schemas/CreateCourierRouteBody"
+
+    CreateMyCourierRouteBody:
+      type: object
+      properties:
+        origin: { type: string, minLength: 1, maxLength: 200 }
+        destination: { type: string, minLength: 1, maxLength: 200 }
+        pricingMethod:
+          $ref: "#/components/schemas/CourierPricingMethod"
+        baseFee: { type: number, minimum: 0 }
+        pricePerM3: { type: number, minimum: 0 }
+        collateralRate: { type: number, minimum: 0, maximum: 100 }
+        isActive: { type: boolean }
+      required: [origin, destination, pricingMethod, baseFee, pricePerM3, collateralRate, isActive]
+
+    UpdateMyCourierRouteBody:
+      $ref: "#/components/schemas/CreateMyCourierRouteBody"
 
     ReimbursementLoss:
       type: object

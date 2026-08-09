@@ -36,6 +36,7 @@ export interface CorporationModules {
   fleet: boolean;
   reimbursement: boolean;
   diplomacy: boolean;
+  courier: boolean;
 }
 
 export interface TacticalGroupSummary {
@@ -1417,6 +1418,224 @@ export interface TacticalGroupDashboard {
   paidClaimCount: number;
   recentFleets: Fleet[];
 }
+
+export type CourierPricingMethod =
+  (typeof CourierPricingMethod)[keyof typeof CourierPricingMethod];
+
+export const CourierPricingMethod = {
+  fixed: "fixed",
+  volume: "volume",
+  collateral: "collateral",
+  volume_collateral: "volume_collateral",
+} as const;
+
+export interface CourierRoute {
+  id: number;
+  corporationId: number;
+  courierAgentId: number;
+  courierName: string;
+  origin: string;
+  destination: string;
+  pricingMethod: CourierPricingMethod;
+  baseFee: number;
+  pricePerM3: number;
+  collateralRate: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CourierQuoteInput {
+  routeId: number;
+  /** @exclusiveMinimum 0 */
+  volumeM3: number;
+  /** @minimum 0 */
+  collateral: number;
+}
+
+export interface CourierQuote {
+  routeId: number;
+  courierName: string;
+  origin: string;
+  destination: string;
+  volumeM3: number;
+  collateral: number;
+  calculatedFee: number;
+  formula: string;
+}
+
+export type CourierOrderStatus =
+  (typeof CourierOrderStatus)[keyof typeof CourierOrderStatus];
+
+export const CourierOrderStatus = {
+  submitted: "submitted",
+  accepted: "accepted",
+  in_transit: "in_transit",
+  completed: "completed",
+  rejected: "rejected",
+  cancelled: "cancelled",
+} as const;
+
+export interface CourierOrder {
+  id: number;
+  corporationId: number;
+  routeId: number;
+  courierAgentId: number;
+  /** @nullable */
+  submittedBy: number | null;
+  submitterName: string;
+  courierName: string;
+  origin: string;
+  destination: string;
+  pricingMethod: CourierPricingMethod;
+  baseFee: number;
+  pricePerM3: number;
+  collateralRate: number;
+  volumeM3: number;
+  collateral: number;
+  calculatedFee: number;
+  /** @nullable */
+  note: string | null;
+  /** @nullable */
+  internalNotes: string | null;
+  canManageStatus: boolean;
+  status: CourierOrderStatus;
+  /** @nullable */
+  acceptedAt: string | null;
+  /** @nullable */
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateCourierOrderBody {
+  routeId: number;
+  /** @exclusiveMinimum 0 */
+  volumeM3: number;
+  /** @minimum 0 */
+  collateral: number;
+  /**
+   * Fee returned by the latest authoritative quote
+   * @minimum 0
+   */
+  quotedFee: number;
+  /** @maxLength 5000 */
+  note?: string;
+}
+
+export type UpdateCourierOrderBodyStatus =
+  (typeof UpdateCourierOrderBodyStatus)[keyof typeof UpdateCourierOrderBodyStatus];
+
+export const UpdateCourierOrderBodyStatus = {
+  submitted: "submitted",
+  accepted: "accepted",
+  in_transit: "in_transit",
+  completed: "completed",
+  rejected: "rejected",
+  cancelled: "cancelled",
+} as const;
+
+export interface UpdateCourierOrderBody {
+  status: UpdateCourierOrderBodyStatus;
+  /** @maxLength 5000 */
+  internalNotes?: string;
+}
+
+export interface CourierCandidate {
+  userId: number;
+  name: string;
+  isCourier: boolean;
+}
+
+export interface CourierAgent {
+  id: number;
+  corporationId: number;
+  /** @nullable */
+  userId: number | null;
+  name: string;
+  isActive: boolean;
+  routeCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CourierAdminData {
+  candidates: CourierCandidate[];
+  agents: CourierAgent[];
+  routes: CourierRoute[];
+}
+
+export interface CourierProfile {
+  isCourier: boolean;
+  agent?: CourierAgent;
+  routes: CourierRoute[];
+}
+
+export interface CreateCourierAgentBody {
+  userId: number;
+}
+
+export interface UpdateCourierAgentBody {
+  /**
+   * @minLength 1
+   * @maxLength 200
+   */
+  name: string;
+  isActive: boolean;
+}
+
+export interface CreateCourierRouteBody {
+  courierAgentId: number;
+  /**
+   * @minLength 1
+   * @maxLength 200
+   */
+  origin: string;
+  /**
+   * @minLength 1
+   * @maxLength 200
+   */
+  destination: string;
+  pricingMethod: CourierPricingMethod;
+  /** @minimum 0 */
+  baseFee: number;
+  /** @minimum 0 */
+  pricePerM3: number;
+  /**
+   * @minimum 0
+   * @maximum 100
+   */
+  collateralRate: number;
+  isActive: boolean;
+}
+
+export type UpdateCourierRouteBody = CreateCourierRouteBody;
+
+export interface CreateMyCourierRouteBody {
+  /**
+   * @minLength 1
+   * @maxLength 200
+   */
+  origin: string;
+  /**
+   * @minLength 1
+   * @maxLength 200
+   */
+  destination: string;
+  pricingMethod: CourierPricingMethod;
+  /** @minimum 0 */
+  baseFee: number;
+  /** @minimum 0 */
+  pricePerM3: number;
+  /**
+   * @minimum 0
+   * @maximum 100
+   */
+  collateralRate: number;
+  isActive: boolean;
+}
+
+export type UpdateMyCourierRouteBody = CreateMyCourierRouteBody;
 
 /**
  * @nullable

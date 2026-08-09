@@ -33,6 +33,7 @@ export const GetMeResponse = zod.object({
     fleet: zod.boolean(),
     reimbursement: zod.boolean(),
     diplomacy: zod.boolean(),
+    courier: zod.boolean(),
   }),
   reimbursementOpen: zod.boolean(),
   tacticalGroups: zod.array(
@@ -3142,6 +3143,487 @@ export const UpdateTacticalGroupReimbursementResponse = zod.object({
   ]),
   reviewerNotes: zod.string().nullish(),
   paymentReference: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary List active courier routes for the current corporation
+ */
+export const ListCourierRoutesResponseItem = zod.object({
+  id: zod.number(),
+  corporationId: zod.number(),
+  courierAgentId: zod.number(),
+  courierName: zod.string(),
+  origin: zod.string(),
+  destination: zod.string(),
+  pricingMethod: zod.enum([
+    "fixed",
+    "volume",
+    "collateral",
+    "volume_collateral",
+  ]),
+  baseFee: zod.number(),
+  pricePerM3: zod.number(),
+  collateralRate: zod.number(),
+  isActive: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListCourierRoutesResponse = zod.array(
+  ListCourierRoutesResponseItem,
+);
+
+/**
+ * @summary Create a route owned by the current courier
+ */
+export const createMyCourierRouteBodyOriginMax = 200;
+
+export const createMyCourierRouteBodyDestinationMax = 200;
+
+export const createMyCourierRouteBodyBaseFeeMin = 0;
+
+export const createMyCourierRouteBodyPricePerM3Min = 0;
+
+export const createMyCourierRouteBodyCollateralRateMin = 0;
+export const createMyCourierRouteBodyCollateralRateMax = 100;
+
+export const CreateMyCourierRouteBody = zod.object({
+  origin: zod.string().min(1).max(createMyCourierRouteBodyOriginMax),
+  destination: zod.string().min(1).max(createMyCourierRouteBodyDestinationMax),
+  pricingMethod: zod.enum([
+    "fixed",
+    "volume",
+    "collateral",
+    "volume_collateral",
+  ]),
+  baseFee: zod.number().min(createMyCourierRouteBodyBaseFeeMin),
+  pricePerM3: zod.number().min(createMyCourierRouteBodyPricePerM3Min),
+  collateralRate: zod
+    .number()
+    .min(createMyCourierRouteBodyCollateralRateMin)
+    .max(createMyCourierRouteBodyCollateralRateMax),
+  isActive: zod.boolean(),
+});
+
+/**
+ * @summary Update a route owned by the current courier
+ */
+export const UpdateMyCourierRouteParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const updateMyCourierRouteBodyOriginMax = 200;
+
+export const updateMyCourierRouteBodyDestinationMax = 200;
+
+export const updateMyCourierRouteBodyBaseFeeMin = 0;
+
+export const updateMyCourierRouteBodyPricePerM3Min = 0;
+
+export const updateMyCourierRouteBodyCollateralRateMin = 0;
+export const updateMyCourierRouteBodyCollateralRateMax = 100;
+
+export const UpdateMyCourierRouteBody = zod.object({
+  origin: zod.string().min(1).max(updateMyCourierRouteBodyOriginMax),
+  destination: zod.string().min(1).max(updateMyCourierRouteBodyDestinationMax),
+  pricingMethod: zod.enum([
+    "fixed",
+    "volume",
+    "collateral",
+    "volume_collateral",
+  ]),
+  baseFee: zod.number().min(updateMyCourierRouteBodyBaseFeeMin),
+  pricePerM3: zod.number().min(updateMyCourierRouteBodyPricePerM3Min),
+  collateralRate: zod
+    .number()
+    .min(updateMyCourierRouteBodyCollateralRateMin)
+    .max(updateMyCourierRouteBodyCollateralRateMax),
+  isActive: zod.boolean(),
+});
+
+export const UpdateMyCourierRouteResponse = zod.object({
+  id: zod.number(),
+  corporationId: zod.number(),
+  courierAgentId: zod.number(),
+  courierName: zod.string(),
+  origin: zod.string(),
+  destination: zod.string(),
+  pricingMethod: zod.enum([
+    "fixed",
+    "volume",
+    "collateral",
+    "volume_collateral",
+  ]),
+  baseFee: zod.number(),
+  pricePerM3: zod.number(),
+  collateralRate: zod.number(),
+  isActive: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Get the current member's courier profile and owned routes
+ */
+export const GetMyCourierProfileResponse = zod.object({
+  isCourier: zod.boolean(),
+  agent: zod
+    .object({
+      id: zod.number(),
+      corporationId: zod.number(),
+      userId: zod.number().nullable(),
+      name: zod.string(),
+      isActive: zod.boolean(),
+      routeCount: zod.number(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    })
+    .optional(),
+  routes: zod.array(
+    zod.object({
+      id: zod.number(),
+      corporationId: zod.number(),
+      courierAgentId: zod.number(),
+      courierName: zod.string(),
+      origin: zod.string(),
+      destination: zod.string(),
+      pricingMethod: zod.enum([
+        "fixed",
+        "volume",
+        "collateral",
+        "volume_collateral",
+      ]),
+      baseFee: zod.number(),
+      pricePerM3: zod.number(),
+      collateralRate: zod.number(),
+      isActive: zod.boolean(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    }),
+  ),
+});
+
+/**
+ * @summary Calculate an authoritative courier fee
+ */
+export const quoteCourierOrderBodyVolumeM3ExclusiveMin = 0;
+
+export const quoteCourierOrderBodyCollateralMin = 0;
+
+export const QuoteCourierOrderBody = zod.object({
+  routeId: zod.number(),
+  volumeM3: zod.number().gt(quoteCourierOrderBodyVolumeM3ExclusiveMin),
+  collateral: zod.number().min(quoteCourierOrderBodyCollateralMin),
+});
+
+export const QuoteCourierOrderResponse = zod.object({
+  routeId: zod.number(),
+  courierName: zod.string(),
+  origin: zod.string(),
+  destination: zod.string(),
+  volumeM3: zod.number(),
+  collateral: zod.number(),
+  calculatedFee: zod.number(),
+  formula: zod.string(),
+});
+
+/**
+ * @summary List visible courier orders
+ */
+export const ListCourierOrdersResponseItem = zod.object({
+  id: zod.number(),
+  corporationId: zod.number(),
+  routeId: zod.number(),
+  courierAgentId: zod.number(),
+  submittedBy: zod.number().nullable(),
+  submitterName: zod.string(),
+  courierName: zod.string(),
+  origin: zod.string(),
+  destination: zod.string(),
+  pricingMethod: zod.enum([
+    "fixed",
+    "volume",
+    "collateral",
+    "volume_collateral",
+  ]),
+  baseFee: zod.number(),
+  pricePerM3: zod.number(),
+  collateralRate: zod.number(),
+  volumeM3: zod.number(),
+  collateral: zod.number(),
+  calculatedFee: zod.number(),
+  note: zod.string().nullable(),
+  internalNotes: zod.string().nullable(),
+  canManageStatus: zod.boolean(),
+  status: zod.enum([
+    "submitted",
+    "accepted",
+    "in_transit",
+    "completed",
+    "rejected",
+    "cancelled",
+  ]),
+  acceptedAt: zod.coerce.date().nullable(),
+  completedAt: zod.coerce.date().nullable(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListCourierOrdersResponse = zod.array(
+  ListCourierOrdersResponseItem,
+);
+
+/**
+ * @summary Create a courier order using the current route price
+ */
+export const createCourierOrderBodyVolumeM3ExclusiveMin = 0;
+
+export const createCourierOrderBodyCollateralMin = 0;
+
+export const createCourierOrderBodyQuotedFeeMin = 0;
+
+export const createCourierOrderBodyNoteMax = 5000;
+
+export const CreateCourierOrderBody = zod.object({
+  routeId: zod.number(),
+  volumeM3: zod.number().gt(createCourierOrderBodyVolumeM3ExclusiveMin),
+  collateral: zod.number().min(createCourierOrderBodyCollateralMin),
+  quotedFee: zod
+    .number()
+    .min(createCourierOrderBodyQuotedFeeMin)
+    .describe("Fee returned by the latest authoritative quote"),
+  note: zod.string().max(createCourierOrderBodyNoteMax).optional(),
+});
+
+/**
+ * @summary Advance or cancel a courier order
+ */
+export const UpdateCourierOrderParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const updateCourierOrderBodyInternalNotesMax = 5000;
+
+export const UpdateCourierOrderBody = zod.object({
+  status: zod.enum([
+    "submitted",
+    "accepted",
+    "in_transit",
+    "completed",
+    "rejected",
+    "cancelled",
+  ]),
+  internalNotes: zod
+    .string()
+    .max(updateCourierOrderBodyInternalNotesMax)
+    .optional(),
+});
+
+export const UpdateCourierOrderResponse = zod.object({
+  id: zod.number(),
+  corporationId: zod.number(),
+  routeId: zod.number(),
+  courierAgentId: zod.number(),
+  submittedBy: zod.number().nullable(),
+  submitterName: zod.string(),
+  courierName: zod.string(),
+  origin: zod.string(),
+  destination: zod.string(),
+  pricingMethod: zod.enum([
+    "fixed",
+    "volume",
+    "collateral",
+    "volume_collateral",
+  ]),
+  baseFee: zod.number(),
+  pricePerM3: zod.number(),
+  collateralRate: zod.number(),
+  volumeM3: zod.number(),
+  collateral: zod.number(),
+  calculatedFee: zod.number(),
+  note: zod.string().nullable(),
+  internalNotes: zod.string().nullable(),
+  canManageStatus: zod.boolean(),
+  status: zod.enum([
+    "submitted",
+    "accepted",
+    "in_transit",
+    "completed",
+    "rejected",
+    "cancelled",
+  ]),
+  acceptedAt: zod.coerce.date().nullable(),
+  completedAt: zod.coerce.date().nullable(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Get courier agents, route configuration, and member candidates
+ */
+export const GetCourierAdminDataResponse = zod.object({
+  candidates: zod.array(
+    zod.object({
+      userId: zod.number(),
+      name: zod.string(),
+      isCourier: zod.boolean(),
+    }),
+  ),
+  agents: zod.array(
+    zod.object({
+      id: zod.number(),
+      corporationId: zod.number(),
+      userId: zod.number().nullable(),
+      name: zod.string(),
+      isActive: zod.boolean(),
+      routeCount: zod.number(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    }),
+  ),
+  routes: zod.array(
+    zod.object({
+      id: zod.number(),
+      corporationId: zod.number(),
+      courierAgentId: zod.number(),
+      courierName: zod.string(),
+      origin: zod.string(),
+      destination: zod.string(),
+      pricingMethod: zod.enum([
+        "fixed",
+        "volume",
+        "collateral",
+        "volume_collateral",
+      ]),
+      baseFee: zod.number(),
+      pricePerM3: zod.number(),
+      collateralRate: zod.number(),
+      isActive: zod.boolean(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    }),
+  ),
+});
+
+/**
+ * @summary Add a corporation member as a courier
+ */
+export const CreateCourierAgentBody = zod.object({
+  userId: zod.number(),
+});
+
+/**
+ * @summary Rename or enable a courier
+ */
+export const UpdateCourierAgentParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const updateCourierAgentBodyNameMax = 200;
+
+export const UpdateCourierAgentBody = zod.object({
+  name: zod.string().min(1).max(updateCourierAgentBodyNameMax),
+  isActive: zod.boolean(),
+});
+
+export const UpdateCourierAgentResponse = zod.object({
+  id: zod.number(),
+  corporationId: zod.number(),
+  userId: zod.number().nullable(),
+  name: zod.string(),
+  isActive: zod.boolean(),
+  routeCount: zod.number(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Create a courier route and pricing rule
+ */
+export const createCourierRouteBodyOriginMax = 200;
+
+export const createCourierRouteBodyDestinationMax = 200;
+
+export const createCourierRouteBodyBaseFeeMin = 0;
+
+export const createCourierRouteBodyPricePerM3Min = 0;
+
+export const createCourierRouteBodyCollateralRateMin = 0;
+export const createCourierRouteBodyCollateralRateMax = 100;
+
+export const CreateCourierRouteBody = zod.object({
+  courierAgentId: zod.number(),
+  origin: zod.string().min(1).max(createCourierRouteBodyOriginMax),
+  destination: zod.string().min(1).max(createCourierRouteBodyDestinationMax),
+  pricingMethod: zod.enum([
+    "fixed",
+    "volume",
+    "collateral",
+    "volume_collateral",
+  ]),
+  baseFee: zod.number().min(createCourierRouteBodyBaseFeeMin),
+  pricePerM3: zod.number().min(createCourierRouteBodyPricePerM3Min),
+  collateralRate: zod
+    .number()
+    .min(createCourierRouteBodyCollateralRateMin)
+    .max(createCourierRouteBodyCollateralRateMax),
+  isActive: zod.boolean(),
+});
+
+/**
+ * @summary Update a courier route and pricing rule
+ */
+export const UpdateCourierRouteParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const updateCourierRouteBodyOriginMax = 200;
+
+export const updateCourierRouteBodyDestinationMax = 200;
+
+export const updateCourierRouteBodyBaseFeeMin = 0;
+
+export const updateCourierRouteBodyPricePerM3Min = 0;
+
+export const updateCourierRouteBodyCollateralRateMin = 0;
+export const updateCourierRouteBodyCollateralRateMax = 100;
+
+export const UpdateCourierRouteBody = zod.object({
+  courierAgentId: zod.number(),
+  origin: zod.string().min(1).max(updateCourierRouteBodyOriginMax),
+  destination: zod.string().min(1).max(updateCourierRouteBodyDestinationMax),
+  pricingMethod: zod.enum([
+    "fixed",
+    "volume",
+    "collateral",
+    "volume_collateral",
+  ]),
+  baseFee: zod.number().min(updateCourierRouteBodyBaseFeeMin),
+  pricePerM3: zod.number().min(updateCourierRouteBodyPricePerM3Min),
+  collateralRate: zod
+    .number()
+    .min(updateCourierRouteBodyCollateralRateMin)
+    .max(updateCourierRouteBodyCollateralRateMax),
+  isActive: zod.boolean(),
+});
+
+export const UpdateCourierRouteResponse = zod.object({
+  id: zod.number(),
+  corporationId: zod.number(),
+  courierAgentId: zod.number(),
+  courierName: zod.string(),
+  origin: zod.string(),
+  destination: zod.string(),
+  pricingMethod: zod.enum([
+    "fixed",
+    "volume",
+    "collateral",
+    "volume_collateral",
+  ]),
+  baseFee: zod.number(),
+  pricePerM3: zod.number(),
+  collateralRate: zod.number(),
+  isActive: zod.boolean(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });

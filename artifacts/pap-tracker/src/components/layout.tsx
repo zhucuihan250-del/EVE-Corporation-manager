@@ -7,6 +7,7 @@ import {
   Activity, BookOpen, BrainCircuit, ClipboardList, Crosshair, Database, Gift, Handshake,
   History, Inbox, Languages, Landmark, LayoutDashboard, LogOut, Radio, ReceiptText,
   LockKeyhole, ShieldAlert, ShieldCheck, Swords, UserSquare2, Users, Wrench,
+  Truck,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent,
@@ -51,6 +52,7 @@ export function Layout({ children }: { children: ReactNode }) {
     disabled: user?.reimbursementOpen === false,
   });
   if (modules?.diplomacy) serviceItems.push({ href: "/diplomacy", label: tr("外交", "Diplomacy"), icon: Handshake });
+  if (modules?.courier) serviceItems.push({ href: "/courier", label: tr("快递", "Courier"), icon: Truck });
   if (modules?.fleet) {
     serviceItems.push(
       { href: "/battle-reports", label: t("nav.battleReports"), icon: Crosshair },
@@ -77,6 +79,9 @@ export function Layout({ children }: { children: ReactNode }) {
   }
   if (isIdentityManager && modules?.identity) {
     commandItems.push({ href: "/admin/identity", label: tr("身份组审核", "Identity review"), icon: ShieldCheck });
+  }
+  if (isAdmin && modules?.courier) {
+    commandItems.push({ href: "/admin/courier", label: tr("快递管理", "Courier management"), icon: Truck });
   }
   if (isFleetManager && modules?.fleet) {
     commandItems.push(

@@ -38,6 +38,8 @@ import { Reimbursements, TacticalReimbursements } from "@/pages/reimbursements";
 import { TacticalDashboard } from "@/pages/tactical-dashboard";
 import { Economy } from "@/pages/economy";
 import { ReimbursementSettings } from "@/pages/reimbursement-settings";
+import { Courier } from "@/pages/courier";
+import { AdminCourier } from "@/pages/admin/courier";
 import type { CorporationModules, CurrentUser } from "@workspace/api-client-react";
 
 const queryClient = new QueryClient({
@@ -61,6 +63,7 @@ function defaultLanding(user: CurrentUser): string {
   if (user.modules.reimbursement && user.reimbursementOpen) return "/reimbursements";
   if (user.modules.reimbursement && user.permissions.includes("reimbursement.window.manage")) return "/reimbursement-settings";
   if (user.modules.diplomacy) return "/diplomacy";
+  if (user.modules.courier) return "/courier";
   return "/";
 }
 
@@ -175,6 +178,9 @@ function Router() {
       <Route path="/diplomacy">
         {() => <ProtectedRoute component={Diplomacy} module="diplomacy" />}
       </Route>
+      <Route path="/courier">
+        {() => <ProtectedRoute component={Courier} module="courier" />}
+      </Route>
       <Route path="/reimbursements">
         {() => <ProtectedRoute component={Reimbursements} module="reimbursement" requiresReimbursementOpen />}
       </Route>
@@ -220,6 +226,9 @@ function Router() {
       </Route>
       <Route path="/admin/identity">
         {() => <ProtectedRoute component={AdminIdentity} minRole="admin" module="identity" permissionAlternative="identity.manage" />}
+      </Route>
+      <Route path="/admin/courier">
+        {() => <ProtectedRoute component={AdminCourier} minRole="admin" module="courier" />}
       </Route>
       {/* FC Routes - fc, admin & controller */}
       <Route path="/admin/fleets">

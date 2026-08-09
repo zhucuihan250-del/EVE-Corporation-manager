@@ -34,10 +34,21 @@ import type {
   Character,
   CorporationSkillPlan,
   CorporationSkillPlanInput,
+  CourierAdminData,
+  CourierAgent,
+  CourierOrder,
+  CourierProfile,
+  CourierQuote,
+  CourierQuoteInput,
+  CourierRoute,
   CreateAnnouncementBody,
+  CreateCourierAgentBody,
+  CreateCourierOrderBody,
+  CreateCourierRouteBody,
   CreateDiplomacyCaseBody,
   CreateFleetBody,
   CreateManualPapBody,
+  CreateMyCourierRouteBody,
   CreateRedemptionBody,
   CreateReimbursementBody,
   CreateRewardBody,
@@ -78,6 +89,8 @@ import type {
   TacticalGroupDashboard,
   TopContributor,
   UpdateBattleReplayBody,
+  UpdateCourierAgentBody,
+  UpdateCourierOrderBody,
   UpdateDiplomacyCaseBody,
   UpdateFleetBody,
   UpdateRedemptionBody,
@@ -6100,6 +6113,1086 @@ export const useUpdateTacticalGroupReimbursement = <
   return useMutation(
     getUpdateTacticalGroupReimbursementMutationOptions(options),
   );
+};
+
+/**
+ * @summary List active courier routes for the current corporation
+ */
+export const getListCourierRoutesUrl = () => {
+  return `/api/courier/routes`;
+};
+
+export const listCourierRoutes = async (
+  options?: RequestInit,
+): Promise<CourierRoute[]> => {
+  return customFetch<CourierRoute[]>(getListCourierRoutesUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListCourierRoutesQueryKey = () => {
+  return [`/api/courier/routes`] as const;
+};
+
+export const getListCourierRoutesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listCourierRoutes>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listCourierRoutes>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListCourierRoutesQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listCourierRoutes>>
+  > = ({ signal }) => listCourierRoutes({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listCourierRoutes>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListCourierRoutesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listCourierRoutes>>
+>;
+export type ListCourierRoutesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List active courier routes for the current corporation
+ */
+
+export function useListCourierRoutes<
+  TData = Awaited<ReturnType<typeof listCourierRoutes>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listCourierRoutes>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListCourierRoutesQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a route owned by the current courier
+ */
+export const getCreateMyCourierRouteUrl = () => {
+  return `/api/courier/routes`;
+};
+
+export const createMyCourierRoute = async (
+  createMyCourierRouteBody: CreateMyCourierRouteBody,
+  options?: RequestInit,
+): Promise<CourierRoute> => {
+  return customFetch<CourierRoute>(getCreateMyCourierRouteUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createMyCourierRouteBody),
+  });
+};
+
+export const getCreateMyCourierRouteMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createMyCourierRoute>>,
+    TError,
+    { data: BodyType<CreateMyCourierRouteBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createMyCourierRoute>>,
+  TError,
+  { data: BodyType<CreateMyCourierRouteBody> },
+  TContext
+> => {
+  const mutationKey = ["createMyCourierRoute"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createMyCourierRoute>>,
+    { data: BodyType<CreateMyCourierRouteBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createMyCourierRoute(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateMyCourierRouteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createMyCourierRoute>>
+>;
+export type CreateMyCourierRouteMutationBody =
+  BodyType<CreateMyCourierRouteBody>;
+export type CreateMyCourierRouteMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create a route owned by the current courier
+ */
+export const useCreateMyCourierRoute = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createMyCourierRoute>>,
+    TError,
+    { data: BodyType<CreateMyCourierRouteBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createMyCourierRoute>>,
+  TError,
+  { data: BodyType<CreateMyCourierRouteBody> },
+  TContext
+> => {
+  return useMutation(getCreateMyCourierRouteMutationOptions(options));
+};
+
+/**
+ * @summary Update a route owned by the current courier
+ */
+export const getUpdateMyCourierRouteUrl = (id: number) => {
+  return `/api/courier/routes/${id}`;
+};
+
+export const updateMyCourierRoute = async (
+  id: number,
+  createMyCourierRouteBody: CreateMyCourierRouteBody,
+  options?: RequestInit,
+): Promise<CourierRoute> => {
+  return customFetch<CourierRoute>(getUpdateMyCourierRouteUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createMyCourierRouteBody),
+  });
+};
+
+export const getUpdateMyCourierRouteMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateMyCourierRoute>>,
+    TError,
+    { id: number; data: BodyType<CreateMyCourierRouteBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateMyCourierRoute>>,
+  TError,
+  { id: number; data: BodyType<CreateMyCourierRouteBody> },
+  TContext
+> => {
+  const mutationKey = ["updateMyCourierRoute"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateMyCourierRoute>>,
+    { id: number; data: BodyType<CreateMyCourierRouteBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateMyCourierRoute(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateMyCourierRouteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateMyCourierRoute>>
+>;
+export type UpdateMyCourierRouteMutationBody =
+  BodyType<CreateMyCourierRouteBody>;
+export type UpdateMyCourierRouteMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update a route owned by the current courier
+ */
+export const useUpdateMyCourierRoute = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateMyCourierRoute>>,
+    TError,
+    { id: number; data: BodyType<CreateMyCourierRouteBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateMyCourierRoute>>,
+  TError,
+  { id: number; data: BodyType<CreateMyCourierRouteBody> },
+  TContext
+> => {
+  return useMutation(getUpdateMyCourierRouteMutationOptions(options));
+};
+
+/**
+ * @summary Get the current member's courier profile and owned routes
+ */
+export const getGetMyCourierProfileUrl = () => {
+  return `/api/courier/profile`;
+};
+
+export const getMyCourierProfile = async (
+  options?: RequestInit,
+): Promise<CourierProfile> => {
+  return customFetch<CourierProfile>(getGetMyCourierProfileUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetMyCourierProfileQueryKey = () => {
+  return [`/api/courier/profile`] as const;
+};
+
+export const getGetMyCourierProfileQueryOptions = <
+  TData = Awaited<ReturnType<typeof getMyCourierProfile>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMyCourierProfile>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetMyCourierProfileQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getMyCourierProfile>>
+  > = ({ signal }) => getMyCourierProfile({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getMyCourierProfile>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetMyCourierProfileQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getMyCourierProfile>>
+>;
+export type GetMyCourierProfileQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get the current member's courier profile and owned routes
+ */
+
+export function useGetMyCourierProfile<
+  TData = Awaited<ReturnType<typeof getMyCourierProfile>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMyCourierProfile>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetMyCourierProfileQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Calculate an authoritative courier fee
+ */
+export const getQuoteCourierOrderUrl = () => {
+  return `/api/courier/quote`;
+};
+
+export const quoteCourierOrder = async (
+  courierQuoteInput: CourierQuoteInput,
+  options?: RequestInit,
+): Promise<CourierQuote> => {
+  return customFetch<CourierQuote>(getQuoteCourierOrderUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(courierQuoteInput),
+  });
+};
+
+export const getQuoteCourierOrderMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof quoteCourierOrder>>,
+    TError,
+    { data: BodyType<CourierQuoteInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof quoteCourierOrder>>,
+  TError,
+  { data: BodyType<CourierQuoteInput> },
+  TContext
+> => {
+  const mutationKey = ["quoteCourierOrder"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof quoteCourierOrder>>,
+    { data: BodyType<CourierQuoteInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return quoteCourierOrder(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type QuoteCourierOrderMutationResult = NonNullable<
+  Awaited<ReturnType<typeof quoteCourierOrder>>
+>;
+export type QuoteCourierOrderMutationBody = BodyType<CourierQuoteInput>;
+export type QuoteCourierOrderMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Calculate an authoritative courier fee
+ */
+export const useQuoteCourierOrder = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof quoteCourierOrder>>,
+    TError,
+    { data: BodyType<CourierQuoteInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof quoteCourierOrder>>,
+  TError,
+  { data: BodyType<CourierQuoteInput> },
+  TContext
+> => {
+  return useMutation(getQuoteCourierOrderMutationOptions(options));
+};
+
+/**
+ * @summary List visible courier orders
+ */
+export const getListCourierOrdersUrl = () => {
+  return `/api/courier/orders`;
+};
+
+export const listCourierOrders = async (
+  options?: RequestInit,
+): Promise<CourierOrder[]> => {
+  return customFetch<CourierOrder[]>(getListCourierOrdersUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListCourierOrdersQueryKey = () => {
+  return [`/api/courier/orders`] as const;
+};
+
+export const getListCourierOrdersQueryOptions = <
+  TData = Awaited<ReturnType<typeof listCourierOrders>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listCourierOrders>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListCourierOrdersQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listCourierOrders>>
+  > = ({ signal }) => listCourierOrders({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listCourierOrders>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListCourierOrdersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listCourierOrders>>
+>;
+export type ListCourierOrdersQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List visible courier orders
+ */
+
+export function useListCourierOrders<
+  TData = Awaited<ReturnType<typeof listCourierOrders>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listCourierOrders>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListCourierOrdersQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a courier order using the current route price
+ */
+export const getCreateCourierOrderUrl = () => {
+  return `/api/courier/orders`;
+};
+
+export const createCourierOrder = async (
+  createCourierOrderBody: CreateCourierOrderBody,
+  options?: RequestInit,
+): Promise<CourierOrder> => {
+  return customFetch<CourierOrder>(getCreateCourierOrderUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createCourierOrderBody),
+  });
+};
+
+export const getCreateCourierOrderMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createCourierOrder>>,
+    TError,
+    { data: BodyType<CreateCourierOrderBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createCourierOrder>>,
+  TError,
+  { data: BodyType<CreateCourierOrderBody> },
+  TContext
+> => {
+  const mutationKey = ["createCourierOrder"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createCourierOrder>>,
+    { data: BodyType<CreateCourierOrderBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createCourierOrder(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateCourierOrderMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createCourierOrder>>
+>;
+export type CreateCourierOrderMutationBody = BodyType<CreateCourierOrderBody>;
+export type CreateCourierOrderMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create a courier order using the current route price
+ */
+export const useCreateCourierOrder = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createCourierOrder>>,
+    TError,
+    { data: BodyType<CreateCourierOrderBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createCourierOrder>>,
+  TError,
+  { data: BodyType<CreateCourierOrderBody> },
+  TContext
+> => {
+  return useMutation(getCreateCourierOrderMutationOptions(options));
+};
+
+/**
+ * @summary Advance or cancel a courier order
+ */
+export const getUpdateCourierOrderUrl = (id: number) => {
+  return `/api/courier/orders/${id}`;
+};
+
+export const updateCourierOrder = async (
+  id: number,
+  updateCourierOrderBody: UpdateCourierOrderBody,
+  options?: RequestInit,
+): Promise<CourierOrder> => {
+  return customFetch<CourierOrder>(getUpdateCourierOrderUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateCourierOrderBody),
+  });
+};
+
+export const getUpdateCourierOrderMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateCourierOrder>>,
+    TError,
+    { id: number; data: BodyType<UpdateCourierOrderBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateCourierOrder>>,
+  TError,
+  { id: number; data: BodyType<UpdateCourierOrderBody> },
+  TContext
+> => {
+  const mutationKey = ["updateCourierOrder"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateCourierOrder>>,
+    { id: number; data: BodyType<UpdateCourierOrderBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateCourierOrder(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateCourierOrderMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateCourierOrder>>
+>;
+export type UpdateCourierOrderMutationBody = BodyType<UpdateCourierOrderBody>;
+export type UpdateCourierOrderMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Advance or cancel a courier order
+ */
+export const useUpdateCourierOrder = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateCourierOrder>>,
+    TError,
+    { id: number; data: BodyType<UpdateCourierOrderBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateCourierOrder>>,
+  TError,
+  { id: number; data: BodyType<UpdateCourierOrderBody> },
+  TContext
+> => {
+  return useMutation(getUpdateCourierOrderMutationOptions(options));
+};
+
+/**
+ * @summary Get courier agents, route configuration, and member candidates
+ */
+export const getGetCourierAdminDataUrl = () => {
+  return `/api/courier/admin`;
+};
+
+export const getCourierAdminData = async (
+  options?: RequestInit,
+): Promise<CourierAdminData> => {
+  return customFetch<CourierAdminData>(getGetCourierAdminDataUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetCourierAdminDataQueryKey = () => {
+  return [`/api/courier/admin`] as const;
+};
+
+export const getGetCourierAdminDataQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCourierAdminData>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getCourierAdminData>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetCourierAdminDataQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getCourierAdminData>>
+  > = ({ signal }) => getCourierAdminData({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCourierAdminData>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetCourierAdminDataQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCourierAdminData>>
+>;
+export type GetCourierAdminDataQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get courier agents, route configuration, and member candidates
+ */
+
+export function useGetCourierAdminData<
+  TData = Awaited<ReturnType<typeof getCourierAdminData>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getCourierAdminData>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetCourierAdminDataQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Add a corporation member as a courier
+ */
+export const getCreateCourierAgentUrl = () => {
+  return `/api/courier/admin/agents`;
+};
+
+export const createCourierAgent = async (
+  createCourierAgentBody: CreateCourierAgentBody,
+  options?: RequestInit,
+): Promise<CourierAgent> => {
+  return customFetch<CourierAgent>(getCreateCourierAgentUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createCourierAgentBody),
+  });
+};
+
+export const getCreateCourierAgentMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createCourierAgent>>,
+    TError,
+    { data: BodyType<CreateCourierAgentBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createCourierAgent>>,
+  TError,
+  { data: BodyType<CreateCourierAgentBody> },
+  TContext
+> => {
+  const mutationKey = ["createCourierAgent"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createCourierAgent>>,
+    { data: BodyType<CreateCourierAgentBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createCourierAgent(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateCourierAgentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createCourierAgent>>
+>;
+export type CreateCourierAgentMutationBody = BodyType<CreateCourierAgentBody>;
+export type CreateCourierAgentMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Add a corporation member as a courier
+ */
+export const useCreateCourierAgent = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createCourierAgent>>,
+    TError,
+    { data: BodyType<CreateCourierAgentBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createCourierAgent>>,
+  TError,
+  { data: BodyType<CreateCourierAgentBody> },
+  TContext
+> => {
+  return useMutation(getCreateCourierAgentMutationOptions(options));
+};
+
+/**
+ * @summary Rename or enable a courier
+ */
+export const getUpdateCourierAgentUrl = (id: number) => {
+  return `/api/courier/admin/agents/${id}`;
+};
+
+export const updateCourierAgent = async (
+  id: number,
+  updateCourierAgentBody: UpdateCourierAgentBody,
+  options?: RequestInit,
+): Promise<CourierAgent> => {
+  return customFetch<CourierAgent>(getUpdateCourierAgentUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateCourierAgentBody),
+  });
+};
+
+export const getUpdateCourierAgentMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateCourierAgent>>,
+    TError,
+    { id: number; data: BodyType<UpdateCourierAgentBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateCourierAgent>>,
+  TError,
+  { id: number; data: BodyType<UpdateCourierAgentBody> },
+  TContext
+> => {
+  const mutationKey = ["updateCourierAgent"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateCourierAgent>>,
+    { id: number; data: BodyType<UpdateCourierAgentBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateCourierAgent(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateCourierAgentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateCourierAgent>>
+>;
+export type UpdateCourierAgentMutationBody = BodyType<UpdateCourierAgentBody>;
+export type UpdateCourierAgentMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Rename or enable a courier
+ */
+export const useUpdateCourierAgent = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateCourierAgent>>,
+    TError,
+    { id: number; data: BodyType<UpdateCourierAgentBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateCourierAgent>>,
+  TError,
+  { id: number; data: BodyType<UpdateCourierAgentBody> },
+  TContext
+> => {
+  return useMutation(getUpdateCourierAgentMutationOptions(options));
+};
+
+/**
+ * @summary Create a courier route and pricing rule
+ */
+export const getCreateCourierRouteUrl = () => {
+  return `/api/courier/admin/routes`;
+};
+
+export const createCourierRoute = async (
+  createCourierRouteBody: CreateCourierRouteBody,
+  options?: RequestInit,
+): Promise<CourierRoute> => {
+  return customFetch<CourierRoute>(getCreateCourierRouteUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createCourierRouteBody),
+  });
+};
+
+export const getCreateCourierRouteMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createCourierRoute>>,
+    TError,
+    { data: BodyType<CreateCourierRouteBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createCourierRoute>>,
+  TError,
+  { data: BodyType<CreateCourierRouteBody> },
+  TContext
+> => {
+  const mutationKey = ["createCourierRoute"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createCourierRoute>>,
+    { data: BodyType<CreateCourierRouteBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createCourierRoute(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateCourierRouteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createCourierRoute>>
+>;
+export type CreateCourierRouteMutationBody = BodyType<CreateCourierRouteBody>;
+export type CreateCourierRouteMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create a courier route and pricing rule
+ */
+export const useCreateCourierRoute = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createCourierRoute>>,
+    TError,
+    { data: BodyType<CreateCourierRouteBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createCourierRoute>>,
+  TError,
+  { data: BodyType<CreateCourierRouteBody> },
+  TContext
+> => {
+  return useMutation(getCreateCourierRouteMutationOptions(options));
+};
+
+/**
+ * @summary Update a courier route and pricing rule
+ */
+export const getUpdateCourierRouteUrl = (id: number) => {
+  return `/api/courier/admin/routes/${id}`;
+};
+
+export const updateCourierRoute = async (
+  id: number,
+  createCourierRouteBody: CreateCourierRouteBody,
+  options?: RequestInit,
+): Promise<CourierRoute> => {
+  return customFetch<CourierRoute>(getUpdateCourierRouteUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createCourierRouteBody),
+  });
+};
+
+export const getUpdateCourierRouteMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateCourierRoute>>,
+    TError,
+    { id: number; data: BodyType<CreateCourierRouteBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateCourierRoute>>,
+  TError,
+  { id: number; data: BodyType<CreateCourierRouteBody> },
+  TContext
+> => {
+  const mutationKey = ["updateCourierRoute"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateCourierRoute>>,
+    { id: number; data: BodyType<CreateCourierRouteBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateCourierRoute(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateCourierRouteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateCourierRoute>>
+>;
+export type UpdateCourierRouteMutationBody = BodyType<CreateCourierRouteBody>;
+export type UpdateCourierRouteMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update a courier route and pricing rule
+ */
+export const useUpdateCourierRoute = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateCourierRoute>>,
+    TError,
+    { id: number; data: BodyType<CreateCourierRouteBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateCourierRoute>>,
+  TError,
+  { id: number; data: BodyType<CreateCourierRouteBody> },
+  TContext
+> => {
+  return useMutation(getUpdateCourierRouteMutationOptions(options));
 };
 
 export const getGetEconomySummaryUrl = () => {

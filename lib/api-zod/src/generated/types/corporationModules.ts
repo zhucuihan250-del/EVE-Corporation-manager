@@ -13,4 +13,5 @@ export interface CorporationModules {
   fleet: boolean;
   reimbursement: boolean;
   diplomacy: boolean;
+  courier: boolean;
 }

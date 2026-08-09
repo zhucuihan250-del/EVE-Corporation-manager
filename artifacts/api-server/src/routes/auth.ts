@@ -784,6 +784,7 @@ router.get("/auth/me", requireAuth, async (req: Request, res: Response): Promise
       fleet: tenant.corporation.fleetEnabled,
       reimbursement: tenant.corporation.reimbursementEnabled,
       diplomacy: tenant.corporation.diplomacyEnabled,
+      courier: tenant.corporation.courierEnabled,
     },
     totalPap: tenant.corporation.papEnabled ? tenant.user.totalPap : 0,
     redeemablePap: tenant.corporation.papEnabled ? tenant.user.redeemablePap : 0,

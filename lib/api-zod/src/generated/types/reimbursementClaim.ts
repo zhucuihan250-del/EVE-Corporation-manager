@@ -5,6 +5,7 @@
  * EVE Online PAP Tracking System API
  * OpenAPI spec version: 0.1.0
  */
+import type { ReimbursementClaimReferencePriceStatus } from "./reimbursementClaimReferencePriceStatus";
 import type { ReimbursementClaimStatus } from "./reimbursementClaimStatus";
 import type { ReimbursementValidation } from "./reimbursementValidation";
 
@@ -27,6 +28,16 @@ export interface ReimbursementClaim {
   shipName: string;
   lossValue: number;
   requestedAmount: number;
+  /** @nullable */
+  jitaMidValue: number | null;
+  /** @nullable */
+  maximumInsurancePayout: number | null;
+  /** @nullable */
+  referenceReimbursementAmount: number | null;
+  referencePriceStatus: ReimbursementClaimReferencePriceStatus;
+  referencePriceMissingTypeCount: number;
+  /** @nullable */
+  referencePriceCalculatedAt: Date | null;
   /** @nullable */
   approvedAmount?: number | null;
   description: string;

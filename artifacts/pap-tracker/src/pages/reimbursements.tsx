@@ -192,7 +192,6 @@ function ReimbursementWorkspace({ identityGroupId, groupName }: { identityGroupI
       <Card>
         <CardHeader>
           <CardTitle>{identityGroupId ? tr("我的身份组补损", "My tactical claims") : tr("我的通用补损", "My general reimbursements")}</CardTitle>
-          <CardDescription>{tr("全军团补损请求与审核已统一移动到总监专区的补损窗口。", "Corporation-wide requests and reviews are centralized in the Director reimbursement window.")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {(claims.data ?? []).length === 0 ? <p className="text-sm text-muted-foreground">{tr("暂无补损申请", "No reimbursement claims")}</p> : (claims.data ?? []).map((claim) => (

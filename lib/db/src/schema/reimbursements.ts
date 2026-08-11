@@ -48,6 +48,16 @@ export const reimbursementClaimsTable = pgTable(
     shipName: text("ship_name").notNull(),
     lossValue: doublePrecision("loss_value").notNull().default(0),
     requestedAmount: doublePrecision("requested_amount").notNull(),
+    jitaMidValue: doublePrecision("jita_mid_value"),
+    maximumInsurancePayout: doublePrecision("maximum_insurance_payout"),
+    referenceReimbursementAmount: doublePrecision("reference_reimbursement_amount"),
+    referencePriceStatus: text("reference_price_status", {
+      enum: ["pending", "calculated", "partial", "unavailable"],
+    })
+      .notNull()
+      .default("pending"),
+    referencePriceMissingTypeCount: integer("reference_price_missing_type_count").notNull().default(0),
+    referencePriceCalculatedAt: timestamp("reference_price_calculated_at", { withTimezone: true }),
     approvedAmount: doublePrecision("approved_amount"),
     description: text("description").notNull(),
     validation: jsonb("validation").$type<ReimbursementValidation>().notNull(),

@@ -5,6 +5,7 @@ import {
   getListReimbursementWindowClaimsQueryKey,
   useGetMe,
   useListReimbursementWindowClaims,
+  useRefreshReimbursementReferencePricing,
   useUpdateReimbursementWindow,
   useUpdateReimbursementWindowClaim,
   type CurrentUser,
@@ -18,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/api-error";
-import { CheckCircle2, ExternalLink, Layers3, Loader2, LockKeyhole, ReceiptText, UnlockKeyhole } from "lucide-react";
+import { Calculator, CheckCircle2, ExternalLink, Layers3, Loader2, LockKeyhole, ReceiptText, RefreshCw, TriangleAlert, UnlockKeyhole } from "lucide-react";
 
 const AUTO_DESCRIPTION = "通过 zKillboard 自动提交";
 const formatIsk = (value: number) => `${new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 0 }).format(value)} ISK`;
@@ -33,9 +34,11 @@ export function ReimbursementSettings() {
   const { toast } = useToast();
   const updateWindow = useUpdateReimbursementWindow();
   const updateClaim = useUpdateReimbursementWindowClaim();
+  const refreshReferencePricing = useRefreshReimbursementReferencePricing();
   const isOpen = user?.reimbursementOpen !== false;
   const canManageWindow = Boolean(user?.permissions.includes("reimbursement.window.manage"));
   const [scope, setScope] = useState<"all" | "general" | "tactical">("all");
+  const [pricingClaimId, setPricingClaimId] = useState<number | null>(null);
   const [review, setReview] = useState<Record<number, { status: UpdateReimbursementBodyStatus; approvedAmount: string; reviewerNotes: string; paymentReference: string }>>({});
 
   const statusLabels = useMemo<Record<string, string>>(() => ({
@@ -73,6 +76,18 @@ export function ReimbursementSettings() {
     });
   };
 
+  const refreshReference = (claimId: number) => {
+    setPricingClaimId(claimId);
+    refreshReferencePricing.mutate({ id: claimId }, {
+      onSuccess: async () => {
+        await refreshClaims();
+        toast({ title: tr("参考补损额已更新", "Reference reimbursement updated") });
+      },
+      onError: (error) => toast({ title: tr("估价失败", "Pricing failed"), description: getErrorMessage(error), variant: "destructive" }),
+      onSettled: () => setPricingClaimId(null),
+    });
+  };
+
   return (
     <div className="p-6 space-y-6 overflow-auto">
       <div>
@@ -106,6 +121,35 @@ export function ReimbursementSettings() {
               <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2 font-medium"><span>#{claim.id} · {claim.characterName} · {claim.shipName}</span><Badge variant={claim.identityGroupId ? "secondary" : "outline"}><Layers3 className="mr-1 h-3 w-3" />{claim.identityGroupName ?? tr("通用补损", "General")}</Badge></div><div className="mt-1 text-xs text-muted-foreground">{new Date(claim.lossOccurredAt).toLocaleString()} · {tr("提交于", "submitted")} {new Date(claim.createdAt).toLocaleString()} · {formatIsk(claim.lossValue)}</div></div><Badge variant={claim.status === "rejected" ? "destructive" : claim.status === "paid" ? "default" : "outline"}>{statusLabels[claim.status]}</Badge></div>
               {claim.description && claim.description !== AUTO_DESCRIPTION && <p className="whitespace-pre-wrap text-sm">{claim.description}</p>}
               <div className="flex flex-wrap items-center gap-3 text-xs text-emerald-400"><CheckCircle2 className="h-4 w-4" />{claim.validation.message}<a className="inline-flex items-center gap-1 text-primary hover:underline" href={claim.killmailUrl} target="_blank" rel="noreferrer">zKillboard <ExternalLink className="h-3 w-3" /></a></div>
+              <div className="space-y-3 rounded-md border border-primary/30 bg-primary/5 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2 text-sm font-medium"><Calculator className="h-4 w-4 text-primary" />{tr("参考补损额", "Reference reimbursement")}</div>
+                    <div className="mt-1 text-xl font-bold">
+                      {claim.referencePriceStatus === "pending"
+                        ? tr("等待自动估价", "Awaiting automatic pricing")
+                        : claim.referencePriceStatus === "unavailable"
+                          ? tr("暂无可用估价", "No price available")
+                          : formatIsk(claim.referenceReimbursementAmount ?? 0)}
+                    </div>
+                  </div>
+                  <Button size="sm" variant="outline" disabled={pricingClaimId !== null} onClick={() => refreshReference(claim.id)}>
+                    {pricingClaimId === claim.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                    {claim.referencePriceStatus === "pending" ? tr("立即计算", "Calculate now") : tr("刷新价格", "Refresh prices")}
+                  </Button>
+                </div>
+                {claim.jitaMidValue !== null && claim.maximumInsurancePayout !== null && (
+                  <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
+                    <div><span className="block">{tr("损失 Jita 中间价", "Jita midpoint loss")}</span><span className="text-sm font-medium text-foreground">{formatIsk(claim.jitaMidValue)}</span></div>
+                    <div><span className="block">{tr("减：舰船最高保险赔付", "Less: maximum ship insurance")}</span><span className="text-sm font-medium text-foreground">− {formatIsk(claim.maximumInsurancePayout)}</span></div>
+                    <div><span className="block">{tr("参考补损额", "Reference reimbursement")}</span><span className="text-sm font-medium text-primary">= {formatIsk(claim.referenceReimbursementAmount ?? 0)}</span></div>
+                  </div>
+                )}
+                {(claim.referencePriceStatus === "partial" || claim.referencePriceStatus === "unavailable") && (
+                  <div className="flex items-start gap-2 text-xs text-amber-400"><TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />{claim.referencePriceStatus === "unavailable" ? tr("全部损失物品都缺少可用的 Jita 4-4 订单，暂时无法估价。", "No lost items have usable Jita 4-4 orders, so pricing is currently unavailable.") : tr(`有 ${claim.referencePriceMissingTypeCount} 类损失物品缺少完整的 Jita 4-4 双边订单，当前结果为部分估价。`, `${claim.referencePriceMissingTypeCount} lost item types lack complete two-sided Jita 4-4 orders; this is a partial estimate.`)}</div>
+                )}
+                <p className="text-xs text-muted-foreground">{tr("计算口径：舰船与全部损失物品按 Jita 4-4 最高收购价和最低出售价的中间值计价，再减去该舰船最高档保险的赔付；仅供审核参考，不会自动修改批准金额。", "Method: price the hull and all lost items at the midpoint of Jita 4-4 best buy and best sell, then subtract the ship's highest insurance payout. This is advisory and never changes the approved amount automatically.")}{claim.referencePriceCalculatedAt && <> · {tr("更新于", "updated")} {new Date(claim.referencePriceCalculatedAt).toLocaleString()}</>}</p>
+              </div>
               <div className="grid gap-2 border-t border-border/50 pt-3 md:grid-cols-2"><select className="h-10 rounded-md border border-input bg-background px-3" value={draft.status} onChange={(event) => setReview((current) => ({ ...current, [claim.id]: { ...draft, status: event.target.value as UpdateReimbursementBodyStatus } }))}>{Object.entries(statusLabels).map(([status, label]) => <option key={status} value={status}>{label}</option>)}</select><Input type="number" min="0" placeholder={tr("批准金额", "Approved amount")} value={draft.approvedAmount} onChange={(event) => setReview((current) => ({ ...current, [claim.id]: { ...draft, approvedAmount: event.target.value } }))} /><Textarea placeholder={tr("审核记录", "Review notes")} value={draft.reviewerNotes} onChange={(event) => setReview((current) => ({ ...current, [claim.id]: { ...draft, reviewerNotes: event.target.value } }))} /><div className="space-y-2"><Input placeholder={tr("打款流水号（可选）", "Payment reference (optional)")} value={draft.paymentReference} onChange={(event) => setReview((current) => ({ ...current, [claim.id]: { ...draft, paymentReference: event.target.value } }))} /><Button className="w-full" disabled={updateClaim.isPending} onClick={() => saveReview(claim.id, claim.status, claim.approvedAmount ?? null, claim.reviewerNotes ?? null, claim.paymentReference ?? null)}>{tr("保存审核", "Save review")}</Button></div></div>
             </div>;
           })}

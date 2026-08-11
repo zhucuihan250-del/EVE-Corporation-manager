@@ -1329,6 +1329,16 @@ export interface UpdateReimbursementWindowBody {
   open: boolean;
 }
 
+export type ReimbursementClaimReferencePriceStatus =
+  (typeof ReimbursementClaimReferencePriceStatus)[keyof typeof ReimbursementClaimReferencePriceStatus];
+
+export const ReimbursementClaimReferencePriceStatus = {
+  pending: "pending",
+  calculated: "calculated",
+  partial: "partial",
+  unavailable: "unavailable",
+} as const;
+
 export type ReimbursementClaimStatus =
   (typeof ReimbursementClaimStatus)[keyof typeof ReimbursementClaimStatus];
 
@@ -1361,6 +1371,16 @@ export interface ReimbursementClaim {
   shipName: string;
   lossValue: number;
   requestedAmount: number;
+  /** @nullable */
+  jitaMidValue: number | null;
+  /** @nullable */
+  maximumInsurancePayout: number | null;
+  /** @nullable */
+  referenceReimbursementAmount: number | null;
+  referencePriceStatus: ReimbursementClaimReferencePriceStatus;
+  referencePriceMissingTypeCount: number;
+  /** @nullable */
+  referencePriceCalculatedAt: string | null;
   /** @nullable */
   approvedAmount?: number | null;
   description: string;

@@ -8,11 +8,50 @@ const MAX_HISTORY_LOSSES = 100;
 const ESI_VERIFY_CONCURRENCY = 6;
 const ZKILL_REQUEST_DELAY_MS = 500;
 const REQUEST_TIMEOUT_MS = 12_000;
+const JITA_PRICE_CACHE_TTL_MS = 15 * 60_000;
+const INSURANCE_CACHE_TTL_MS = 6 * 60 * 60_000;
+const MARKET_PRICE_CONCURRENCY = 6;
+const THE_FORGE_REGION_ID = 10_000_002;
+const JITA_4_4_STATION_ID = 60_003_760;
 const USER_AGENT = "EVE-Corporation-Manager/1.0 https://zephyr-fleet-track-production.up.railway.app";
 
 type ZkillEntry = {
   killmail_id: number;
   zkb?: { hash?: string; totalValue?: number };
+};
+
+type KillmailItem = {
+  item_type_id: number;
+  quantity_destroyed?: number;
+  quantity_dropped?: number;
+  items?: KillmailItem[];
+};
+
+type EsiKillmail = {
+  killmail_id: number;
+  killmail_time: string;
+  victim: {
+    character_id?: number;
+    ship_type_id: number;
+    items?: KillmailItem[];
+  };
+};
+
+type MarketOrder = {
+  is_buy_order: boolean;
+  location_id: number;
+  price: number;
+  volume_remain: number;
+};
+
+type InsurancePrice = {
+  type_id: number;
+  levels: Array<{ payout: number }>;
+};
+
+type JitaMidPrice = {
+  value: number | null;
+  hasTwoSidedMarket: boolean;
 };
 
 export type VerifiedKillmail = {
@@ -23,13 +62,28 @@ export type VerifiedKillmail = {
   shipTypeId: number;
   shipName: string;
   totalValue: number;
+  victimItems: KillmailItem[];
+};
+
+export type ReimbursementReferencePricing = {
+  jitaMidValue: number;
+  maximumInsurancePayout: number;
+  referenceReimbursementAmount: number;
+  referencePriceStatus: "calculated" | "partial" | "unavailable";
+  referencePriceMissingTypeCount: number;
+  referencePriceCalculatedAt: Date;
 };
 
 export class KillmailValidationError extends Error {}
+export class ReferencePricingError extends Error {}
 
 const verifiedKillmailCache = new Map<number, { expiresAt: number; value: VerifiedKillmail }>();
 const characterLossCache = new Map<number, { expiresAt: number; value: VerifiedKillmail[] }>();
 const shipNameCache = new Map<number, string>();
+const jitaMidPriceCache = new Map<number, { expiresAt: number; value: JitaMidPrice }>();
+const jitaMidPriceRequests = new Map<number, Promise<JitaMidPrice>>();
+let insurancePayoutCache: { expiresAt: number; value: Map<number, number> } | null = null;
+let insurancePayoutRequest: Promise<Map<number, number>> | null = null;
 
 function parseKillmailId(value: string): number | null {
   const trimmed = value.trim();
@@ -76,6 +130,17 @@ async function getShipName(shipTypeId: number): Promise<string> {
   }
 }
 
+async function fetchKillmailDetails(killmailId: number, hash: string): Promise<EsiKillmail> {
+  const killmail = await fetchJson<EsiKillmail>(
+    `${ESI_BASE}/killmails/${killmailId}/${hash}/?datasource=tranquility`,
+    "esi",
+  );
+  if (killmail.killmail_id !== killmailId || !killmail.victim?.ship_type_id) {
+    throw new KillmailValidationError("EVE ESI 返回的击杀报告不完整");
+  }
+  return killmail;
+}
+
 async function verifyZkillEntry(entry: ZkillEntry): Promise<VerifiedKillmail> {
   const killmailId = Number(entry.killmail_id);
   const hash = entry.zkb?.hash;
@@ -85,14 +150,7 @@ async function verifyZkillEntry(entry: ZkillEntry): Promise<VerifiedKillmail> {
   const cached = verifiedKillmailCache.get(killmailId);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
 
-  const killmail = await fetchJson<{
-    killmail_id: number;
-    killmail_time: string;
-    victim: { character_id?: number; ship_type_id: number };
-  }>(`${ESI_BASE}/killmails/${killmailId}/${hash}/?datasource=tranquility`, "esi");
-  if (killmail.killmail_id !== killmailId || !killmail.victim?.ship_type_id) {
-    throw new KillmailValidationError("EVE ESI 返回的击杀报告不完整");
-  }
+  const killmail = await fetchKillmailDetails(killmailId, hash);
   const verified = {
     killmailId,
     killmailHash: hash,
@@ -101,6 +159,7 @@ async function verifyZkillEntry(entry: ZkillEntry): Promise<VerifiedKillmail> {
     shipTypeId: killmail.victim.ship_type_id,
     shipName: await getShipName(killmail.victim.ship_type_id),
     totalValue: Number(entry.zkb?.totalValue ?? 0),
+    victimItems: killmail.victim.items ?? [],
   };
   if (Number.isNaN(verified.occurredAt.getTime())) {
     throw new KillmailValidationError("击杀报告的时间无效");
@@ -192,4 +251,186 @@ export async function verifyKillmail(value: string): Promise<VerifiedKillmail> {
   const entry = entries.find((candidate) => candidate.killmail_id === killmailId);
   if (!entry) throw new KillmailValidationError("无法从 zKillboard 验证该击杀报告");
   return verifyZkillEntry(entry);
+}
+
+async function fetchReferenceResponse(url: string): Promise<Response> {
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: { Accept: "application/json", "User-Agent": USER_AGENT },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch {
+    throw new ReferencePricingError("EVE ESI 市场或保险服务暂时无法连接，请稍后重试");
+  }
+  if (!response.ok) {
+    throw new ReferencePricingError(`EVE ESI 暂时无法提供参考价格（HTTP ${response.status}）`);
+  }
+  return response;
+}
+
+async function parseReferenceJson<T>(response: Response): Promise<T> {
+  try {
+    return await response.json() as T;
+  } catch {
+    throw new ReferencePricingError("EVE ESI 返回了无效的市场或保险数据");
+  }
+}
+
+async function fetchJitaMidPrice(typeId: number): Promise<JitaMidPrice> {
+  const baseUrl = `${ESI_BASE}/markets/${THE_FORGE_REGION_ID}/orders/?datasource=tranquility&order_type=all&type_id=${typeId}`;
+  const firstResponse = await fetchReferenceResponse(`${baseUrl}&page=1`);
+  const pageCountHeader = Number(firstResponse.headers.get("x-pages") ?? 1);
+  const pageCount = Number.isSafeInteger(pageCountHeader) && pageCountHeader > 0 ? pageCountHeader : 1;
+  const firstPage = await parseReferenceJson<MarketOrder[]>(firstResponse);
+  const remainingPages = pageCount > 1
+    ? await Promise.all(Array.from({ length: pageCount - 1 }, async (_, index) => (
+      parseReferenceJson<MarketOrder[]>(await fetchReferenceResponse(`${baseUrl}&page=${index + 2}`))
+    )))
+    : [];
+  const orders = [firstPage, ...remainingPages]
+    .flat()
+    .filter((order) => (
+      order.location_id === JITA_4_4_STATION_ID
+      && Number.isFinite(order.price)
+      && order.price >= 0
+      && order.volume_remain > 0
+    ));
+  let highestBuy: number | null = null;
+  let lowestSell: number | null = null;
+  for (const order of orders) {
+    if (order.is_buy_order) {
+      highestBuy = highestBuy === null ? order.price : Math.max(highestBuy, order.price);
+    } else {
+      lowestSell = lowestSell === null ? order.price : Math.min(lowestSell, order.price);
+    }
+  }
+  if (highestBuy !== null && lowestSell !== null) {
+    return { value: (highestBuy + lowestSell) / 2, hasTwoSidedMarket: true };
+  }
+  return { value: highestBuy ?? lowestSell, hasTwoSidedMarket: false };
+}
+
+async function getJitaMidPrice(typeId: number): Promise<JitaMidPrice> {
+  const cached = jitaMidPriceCache.get(typeId);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  const pending = jitaMidPriceRequests.get(typeId);
+  if (pending) return pending;
+
+  const request = fetchJitaMidPrice(typeId)
+    .then((value) => {
+      jitaMidPriceCache.set(typeId, { expiresAt: Date.now() + JITA_PRICE_CACHE_TTL_MS, value });
+      return value;
+    })
+    .finally(() => jitaMidPriceRequests.delete(typeId));
+  jitaMidPriceRequests.set(typeId, request);
+  return request;
+}
+
+async function getInsurancePayouts(): Promise<Map<number, number>> {
+  if (insurancePayoutCache && insurancePayoutCache.expiresAt > Date.now()) {
+    return insurancePayoutCache.value;
+  }
+  if (insurancePayoutRequest) return insurancePayoutRequest;
+
+  insurancePayoutRequest = fetchReferenceResponse(`${ESI_BASE}/insurance/prices/?datasource=tranquility`)
+    .then((response) => parseReferenceJson<InsurancePrice[]>(response))
+    .then((prices) => {
+      const payouts = new Map<number, number>();
+      for (const price of prices) {
+        const maximumPayout = Math.max(0, ...price.levels
+          .map((level) => Number(level.payout))
+          .filter((payout) => Number.isFinite(payout)));
+        payouts.set(price.type_id, maximumPayout);
+      }
+      insurancePayoutCache = { expiresAt: Date.now() + INSURANCE_CACHE_TTL_MS, value: payouts };
+      return payouts;
+    })
+    .finally(() => {
+      insurancePayoutRequest = null;
+    });
+  return insurancePayoutRequest;
+}
+
+function collectLossTypeQuantities(shipTypeId: number, items: KillmailItem[]): Map<number, number> {
+  const quantities = new Map<number, number>([[shipTypeId, 1]]);
+  const visit = (item: KillmailItem): void => {
+    const quantity = Number(item.quantity_destroyed ?? 0) + Number(item.quantity_dropped ?? 0);
+    if (Number.isSafeInteger(item.item_type_id) && quantity > 0 && Number.isFinite(quantity)) {
+      quantities.set(item.item_type_id, (quantities.get(item.item_type_id) ?? 0) + quantity);
+    }
+    for (const nested of item.items ?? []) visit(nested);
+  };
+  for (const item of items) visit(item);
+  return quantities;
+}
+
+function roundIsk(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+export async function calculateReimbursementReference(input: {
+  killmailId: number;
+  killmailHash: string;
+  shipTypeId: number;
+  victimItems?: KillmailItem[];
+}): Promise<ReimbursementReferencePricing> {
+  let victimItems = input.victimItems;
+  if (!victimItems) {
+    const killmail = await fetchKillmailDetails(input.killmailId, input.killmailHash);
+    if (killmail.victim.ship_type_id !== input.shipTypeId) {
+      throw new ReferencePricingError("击杀报告中的舰船与补损记录不一致");
+    }
+    victimItems = killmail.victim.items ?? [];
+  }
+  const quantities = collectLossTypeQuantities(input.shipTypeId, victimItems);
+  const typeIds = [...quantities.keys()];
+  const prices = new Map<number, JitaMidPrice>();
+  let nextIndex = 0;
+
+  const [insurancePayouts] = await Promise.all([
+    getInsurancePayouts(),
+    Promise.all(Array.from(
+      { length: Math.min(MARKET_PRICE_CONCURRENCY, typeIds.length) },
+      async () => {
+        while (nextIndex < typeIds.length) {
+          const index = nextIndex;
+          nextIndex += 1;
+          const typeId = typeIds[index];
+          prices.set(typeId, await getJitaMidPrice(typeId));
+        }
+      },
+    )),
+  ]);
+
+  let jitaMidValue = 0;
+  let missingTypeCount = 0;
+  let pricedTypeCount = 0;
+  for (const [typeId, quantity] of quantities) {
+    const quote = prices.get(typeId);
+    if (!quote || quote.value === null) {
+      missingTypeCount += 1;
+      continue;
+    }
+    pricedTypeCount += 1;
+    if (!quote.hasTwoSidedMarket) missingTypeCount += 1;
+    jitaMidValue += quote.value * quantity;
+  }
+  const maximumInsurancePayout = insurancePayouts.get(input.shipTypeId) ?? 0;
+  const status = pricedTypeCount === 0
+    ? "unavailable"
+    : missingTypeCount === 0
+    ? "calculated"
+    : "partial";
+  const roundedJitaMidValue = roundIsk(jitaMidValue);
+  const roundedInsurancePayout = roundIsk(maximumInsurancePayout);
+
+  return {
+    jitaMidValue: roundedJitaMidValue,
+    maximumInsurancePayout: roundedInsurancePayout,
+    referenceReimbursementAmount: roundIsk(Math.max(0, roundedJitaMidValue - roundedInsurancePayout)),
+    referencePriceStatus: status,
+    referencePriceMissingTypeCount: missingTypeCount,
+    referencePriceCalculatedAt: new Date(),
+  };
 }

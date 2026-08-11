@@ -1404,6 +1404,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/ReimbursementClaim"
 
+  /reimbursements/window/claims/{id}/reference:
+    post:
+      operationId: refreshReimbursementReferencePricing
+      tags: [reimbursements]
+      summary: Calculate or refresh Jita midpoint loss value, maximum insurance payout, and reference reimbursement amount
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Reimbursement claim with refreshed reference pricing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReimbursementClaim"
+
   /reimbursements/losses:
     get:
       operationId: listReimbursementLosses
@@ -3621,6 +3639,12 @@ components:
         shipName: { type: string }
         lossValue: { type: number }
         requestedAmount: { type: number }
+        jitaMidValue: { type: ["number", "null"] }
+        maximumInsurancePayout: { type: ["number", "null"] }
+        referenceReimbursementAmount: { type: ["number", "null"] }
+        referencePriceStatus: { type: string, enum: [pending, calculated, partial, unavailable] }
+        referencePriceMissingTypeCount: { type: integer }
+        referencePriceCalculatedAt: { type: ["string", "null"], format: date-time }
         approvedAmount: { type: ["number", "null"] }
         description: { type: string }
         validation:
@@ -3630,7 +3654,7 @@ components:
         paymentReference: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
-      required: [id, corporationId, submittedBy, characterId, characterName, fleetId, identityGroupId, identityGroupName, killmailId, killmailUrl, lossOccurredAt, shipTypeId, shipName, lossValue, requestedAmount, description, validation, status, createdAt, updatedAt]
+      required: [id, corporationId, submittedBy, characterId, characterName, fleetId, identityGroupId, identityGroupName, killmailId, killmailUrl, lossOccurredAt, shipTypeId, shipName, lossValue, requestedAmount, jitaMidValue, maximumInsurancePayout, referenceReimbursementAmount, referencePriceStatus, referencePriceMissingTypeCount, referencePriceCalculatedAt, description, validation, status, createdAt, updatedAt]
 
     CreateReimbursementBody:
       type: object

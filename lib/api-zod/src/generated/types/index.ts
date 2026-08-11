@@ -141,6 +141,7 @@ export * from "./redemption";
 export * from "./redemptionStatus";
 export * from "./refreshBattleReport202";
 export * from "./reimbursementClaim";
+export * from "./reimbursementClaimReferencePriceStatus";
 export * from "./reimbursementClaimStatus";
 export * from "./reimbursementLoss";
 export * from "./reimbursementLossClaimStatus";

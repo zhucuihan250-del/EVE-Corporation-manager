@@ -8,7 +8,15 @@ import {
 } from "@workspace/db";
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { hasRole, requireAuth } from "../middlewares/auth";
-import { KillmailValidationError, listCharacterLosses, verifyKillmail } from "../lib/reimbursements";
+import {
+  calculateReimbursementReference,
+  KillmailValidationError,
+  listCharacterLosses,
+  ReferencePricingError,
+  verifyKillmail,
+  type VerifiedKillmail,
+} from "../lib/reimbursements";
+import { logger } from "../lib/logger";
 import {
   getActiveTacticalMembership,
   listUserTacticalFleetWindows,
@@ -36,6 +44,29 @@ function requireReimbursementReview(req: Request, res: Response, next: NextFunct
     return;
   }
   next();
+}
+
+async function persistReferencePricing(
+  corporationId: number,
+  claim: {
+    id: number;
+    killmailId: number;
+    killmailHash: string;
+    shipTypeId: number;
+  },
+  verifiedKillmail?: VerifiedKillmail,
+) {
+  const pricing = await calculateReimbursementReference({
+    killmailId: claim.killmailId,
+    killmailHash: claim.killmailHash,
+    shipTypeId: claim.shipTypeId,
+    victimItems: verifiedKillmail?.victimItems,
+  });
+  const [updated] = await db.update(reimbursementClaimsTable).set(pricing).where(and(
+    eq(reimbursementClaimsTable.id, claim.id),
+    eq(reimbursementClaimsTable.corporationId, corporationId),
+  )).returning();
+  return updated;
 }
 
 router.patch(
@@ -113,6 +144,47 @@ router.patch(
       )).then((rows) => rows[0]?.name ?? null)
       : null;
     res.json({ ...updated, identityGroupName });
+  },
+);
+
+router.post(
+  "/reimbursements/window/claims/:id/reference",
+  requireReimbursementReview,
+  async (req: Request, res: Response): Promise<void> => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      res.status(400).json({ error: "Invalid reimbursement claim" });
+      return;
+    }
+    const [claim] = await db.select().from(reimbursementClaimsTable).where(and(
+      eq(reimbursementClaimsTable.id, id),
+      eq(reimbursementClaimsTable.corporationId, req.tenant!.corporation.id),
+    ));
+    if (!claim) {
+      res.status(404).json({ error: "Reimbursement claim not found" });
+      return;
+    }
+
+    try {
+      const updated = await persistReferencePricing(req.tenant!.corporation.id, claim);
+      if (!updated) {
+        res.status(404).json({ error: "Reimbursement claim not found" });
+        return;
+      }
+      const identityGroupName = updated.identityGroupId
+        ? await db.select({ name: identityGroupsTable.name }).from(identityGroupsTable).where(and(
+          eq(identityGroupsTable.id, updated.identityGroupId),
+          eq(identityGroupsTable.corporationId, req.tenant!.corporation.id),
+        )).then((rows) => rows[0]?.name ?? null)
+        : null;
+      res.json({ ...updated, identityGroupName });
+    } catch (error) {
+      if (error instanceof ReferencePricingError || error instanceof KillmailValidationError) {
+        res.status(502).json({ error: error.message });
+        return;
+      }
+      throw error;
+    }
   },
 );
 
@@ -333,6 +405,12 @@ router.post("/reimbursements", async (req: Request, res: Response): Promise<void
     res.status(201).json({
       ...created,
       identityGroupName: tacticalRoute?.identityGroupName ?? null,
+    });
+    void persistReferencePricing(tenant.corporation.id, created, killmail).catch((error) => {
+      logger.warn(
+        { error, claimId: created.id, corporationId: tenant.corporation.id },
+        "Automatic reimbursement reference pricing failed",
+      );
     });
   } catch (error) {
     if (error instanceof KillmailValidationError) {

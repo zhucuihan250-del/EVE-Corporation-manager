@@ -5743,6 +5743,96 @@ export const useUpdateReimbursementWindowClaim = <
 };
 
 /**
+ * @summary Calculate or refresh Jita midpoint loss value, maximum insurance payout, and reference reimbursement amount
+ */
+export const getRefreshReimbursementReferencePricingUrl = (id: number) => {
+  return `/api/reimbursements/window/claims/${id}/reference`;
+};
+
+export const refreshReimbursementReferencePricing = async (
+  id: number,
+  options?: RequestInit,
+): Promise<ReimbursementClaim> => {
+  return customFetch<ReimbursementClaim>(
+    getRefreshReimbursementReferencePricingUrl(id),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getRefreshReimbursementReferencePricingMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof refreshReimbursementReferencePricing>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof refreshReimbursementReferencePricing>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["refreshReimbursementReferencePricing"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof refreshReimbursementReferencePricing>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return refreshReimbursementReferencePricing(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RefreshReimbursementReferencePricingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof refreshReimbursementReferencePricing>>
+>;
+
+export type RefreshReimbursementReferencePricingMutationError =
+  ErrorType<unknown>;
+
+/**
+ * @summary Calculate or refresh Jita midpoint loss value, maximum insurance payout, and reference reimbursement amount
+ */
+export const useRefreshReimbursementReferencePricing = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof refreshReimbursementReferencePricing>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof refreshReimbursementReferencePricing>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(
+    getRefreshReimbursementReferencePricingMutationOptions(options),
+  );
+};
+
+/**
  * @summary List recent zKillboard losses for one of the current user's characters
  */
 export const getListReimbursementLossesUrl = (

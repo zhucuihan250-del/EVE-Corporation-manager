@@ -9,6 +9,8 @@ export const redemptionsTable = pgTable("redemptions", {
   id: serial("id").primaryKey(),
   corporationId: integer("corporation_id").notNull().references(() => corporationsTable.id, { onDelete: "cascade" }),
   userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  applicantCharacterId: integer("applicant_character_id"),
+  applicantCharacterName: text("applicant_character_name"),
   rewardId: integer("reward_id").notNull().references(() => rewardsTable.id, { onDelete: "cascade" }),
   rewardName: text("reward_name").notNull(),
   papCost: real("pap_cost").notNull(),

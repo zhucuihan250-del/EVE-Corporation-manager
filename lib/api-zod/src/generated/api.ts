@@ -1864,6 +1864,8 @@ export const ListRedemptionsResponseItem = zod.object({
   status: zod.enum(["pending", "fulfilled", "cancelled"]),
   rewardName: zod.string().nullish(),
   userName: zod.string().nullish(),
+  applicantCharacterId: zod.number().nullish(),
+  applicantCharacterName: zod.string().nullish(),
   createdAt: zod.coerce.date(),
 });
 export const ListRedemptionsResponse = zod.array(ListRedemptionsResponseItem);
@@ -1886,6 +1888,8 @@ export const ListAllRedemptionsResponseItem = zod.object({
   status: zod.enum(["pending", "fulfilled", "cancelled"]),
   rewardName: zod.string().nullish(),
   userName: zod.string().nullish(),
+  applicantCharacterId: zod.number().nullish(),
+  applicantCharacterName: zod.string().nullish(),
   createdAt: zod.coerce.date(),
 });
 export const ListAllRedemptionsResponse = zod.array(
@@ -1911,6 +1915,8 @@ export const UpdateRedemptionResponse = zod.object({
   status: zod.enum(["pending", "fulfilled", "cancelled"]),
   rewardName: zod.string().nullish(),
   userName: zod.string().nullish(),
+  applicantCharacterId: zod.number().nullish(),
+  applicantCharacterName: zod.string().nullish(),
   createdAt: zod.coerce.date(),
 });
 

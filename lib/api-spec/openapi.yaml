@@ -3236,6 +3236,10 @@ components:
           type: ["string", "null"]
         userName:
           type: ["string", "null"]
+        applicantCharacterId:
+          type: ["integer", "null"]
+        applicantCharacterName:
+          type: ["string", "null"]
         createdAt:
           type: string
           format: date-time

@@ -30,7 +30,11 @@ function formatRedemption(r: {
   createdAt: Date;
   rewardName?: string | null;
   userName?: string | null;
+  applicantCharacterId?: number | null;
+  applicantCharacterName?: string | null;
 }) {
+  const applicantCharacterName = r.applicantCharacterName ?? r.userName ?? null;
+
   return {
     id: r.id,
     userId: r.userId,
@@ -38,7 +42,9 @@ function formatRedemption(r: {
     papCost: r.papCost,
     status: r.status,
     rewardName: r.rewardName ?? null,
-    userName: r.userName ?? null,
+    userName: applicantCharacterName,
+    applicantCharacterId: r.applicantCharacterId ?? null,
+    applicantCharacterName,
     createdAt: r.createdAt,
   };
 }
@@ -54,15 +60,17 @@ router.get("/redemptions", requireAuth, async (req: Request, res: Response): Pro
       status: redemptionsTable.status,
       createdAt: redemptionsTable.createdAt,
       rewardName: redemptionsTable.rewardName,
-      userName: sql<string | null>`(
-        SELECT c."eve_character_name" FROM "characters" c
-        WHERE c."user_id" = ${redemptionsTable.userId}
-          AND c."corporation_id" = ${req.tenant!.corporation.id}
-          AND c."deleted_at" IS NULL
-        ORDER BY c."is_main" DESC, c."created_at" ASC LIMIT 1
+      applicantCharacterId: sql<number | null>`COALESCE(
+        ${redemptionsTable.applicantCharacterId},
+        ${usersTable.eveCharacterId}
+      )`,
+      applicantCharacterName: sql<string | null>`COALESCE(
+        NULLIF(${redemptionsTable.applicantCharacterName}, ''),
+        ${usersTable.eveCharacterName}
       )`,
     })
     .from(redemptionsTable)
+    .leftJoin(usersTable, eq(redemptionsTable.userId, usersTable.id))
     .where(and(
       eq(redemptionsTable.userId, req.session.userId!),
       eq(redemptionsTable.corporationId, req.tenant!.corporation.id),
@@ -129,6 +137,18 @@ router.post("/redemptions", requireAuth, async (req: Request, res: Response): Pr
         .for("update");
       if (!currentUser) {
         throw new RedemptionRequestError(401, "User not found");
+      }
+
+      const applicantCharacterId = req.tenant!.actorCharacter?.eveCharacterId
+        ?? currentUser.eveCharacterId;
+      const applicantCharacterName = req.tenant!.actorCharacter?.eveCharacterName
+        ?? currentUser.eveCharacterName;
+      if (!applicantCharacterId || !applicantCharacterName) {
+        throw new RedemptionRequestError(
+          409,
+          "Unable to determine the applicant character. Please sign in with EVE again.",
+          "APPLICANT_CHARACTER_UNAVAILABLE",
+        );
       }
 
       if (!currentReward.isAvailable) {
@@ -209,6 +229,8 @@ router.post("/redemptions", requireAuth, async (req: Request, res: Response): Pr
         .values({
           corporationId: req.tenant!.corporation.id,
           userId: currentUser.id,
+          applicantCharacterId,
+          applicantCharacterName,
           rewardId: currentReward.id,
           rewardName: currentReward.name,
           papCost: currentReward.papCost,
@@ -216,10 +238,7 @@ router.post("/redemptions", requireAuth, async (req: Request, res: Response): Pr
         })
         .returning();
 
-      return {
-        ...redemption,
-        userName: req.tenant!.actorCharacter?.eveCharacterName ?? null,
-      };
+      return formatRedemption(redemption);
     });
 
     res.status(201).json(result);
@@ -275,18 +294,14 @@ router.patch("/redemptions/:id", requireAuth, async (req: Request, res: Response
     .returning();
 
   const [member] = await db.select({
-    eveCharacterName: sql<string | null>`(
-      SELECT c."eve_character_name" FROM "characters" c
-      WHERE c."user_id" = ${updated.userId}
-        AND c."corporation_id" = ${req.tenant!.corporation.id}
-        AND c."deleted_at" IS NULL
-      ORDER BY c."is_main" DESC, c."created_at" ASC LIMIT 1
-    )`,
+    eveCharacterId: usersTable.eveCharacterId,
+    eveCharacterName: usersTable.eveCharacterName,
   }).from(usersTable).where(eq(usersTable.id, updated.userId));
 
   res.json(formatRedemption({
     ...updated,
-    userName: member?.eveCharacterName ?? null,
+    applicantCharacterId: updated.applicantCharacterId ?? member?.eveCharacterId ?? null,
+    applicantCharacterName: updated.applicantCharacterName ?? member?.eveCharacterName ?? null,
   }));
 });
 
@@ -307,15 +322,17 @@ router.get("/redemptions/all", requireAuth, async (req: Request, res: Response):
       status: redemptionsTable.status,
       createdAt: redemptionsTable.createdAt,
       rewardName: redemptionsTable.rewardName,
-      userName: sql<string | null>`(
-        SELECT c."eve_character_name" FROM "characters" c
-        WHERE c."user_id" = ${redemptionsTable.userId}
-          AND c."corporation_id" = ${req.tenant!.corporation.id}
-          AND c."deleted_at" IS NULL
-        ORDER BY c."is_main" DESC, c."created_at" ASC LIMIT 1
+      applicantCharacterId: sql<number | null>`COALESCE(
+        ${redemptionsTable.applicantCharacterId},
+        ${usersTable.eveCharacterId}
+      )`,
+      applicantCharacterName: sql<string | null>`COALESCE(
+        NULLIF(${redemptionsTable.applicantCharacterName}, ''),
+        ${usersTable.eveCharacterName}
       )`,
     })
     .from(redemptionsTable)
+    .leftJoin(usersTable, eq(redemptionsTable.userId, usersTable.id))
     .where(eq(redemptionsTable.corporationId, req.tenant!.corporation.id))
     .orderBy(desc(redemptionsTable.createdAt));
 

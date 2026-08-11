@@ -935,6 +935,10 @@ export interface Redemption {
   rewardName?: string | null;
   /** @nullable */
   userName?: string | null;
+  /** @nullable */
+  applicantCharacterId?: number | null;
+  /** @nullable */
+  applicantCharacterName?: string | null;
   createdAt: string;
 }
 

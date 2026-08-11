@@ -17,6 +17,7 @@ import {
   type VerifiedKillmail,
 } from "../lib/reimbursements";
 import { logger } from "../lib/logger";
+import { ReimbursementWorkflowError, updateReimbursementWorkflow } from "../lib/reimbursement-workflow";
 import {
   getActiveTacticalMembership,
   listUserTacticalFleetWindows,
@@ -108,42 +109,30 @@ router.patch(
   requireReimbursementReview,
   async (req: Request, res: Response): Promise<void> => {
     const id = Number(req.params.id);
-    const status = req.body.status;
-    const allowed = ["submitted", "reviewing", "approved", "partially_approved", "rejected", "pending_payment", "paid"];
-    if (!Number.isInteger(id) || !allowed.includes(status)) {
+    if (!Number.isInteger(id)) {
       res.status(400).json({ error: "Invalid reimbursement update" });
       return;
     }
-    const approvedAmount = req.body.approvedAmount === null || req.body.approvedAmount === undefined || req.body.approvedAmount === ""
-      ? null
-      : Number(req.body.approvedAmount);
-    if (approvedAmount !== null && (!Number.isFinite(approvedAmount) || approvedAmount < 0)) {
-      res.status(400).json({ error: "Invalid approved amount" });
-      return;
+    try {
+      const updated = await updateReimbursementWorkflow({
+        corporationId: req.tenant!.corporation.id,
+        claimId: id,
+        reviewerId: req.tenant!.user.id,
+      }, req.body);
+      const identityGroupName = updated.identityGroupId
+        ? await db.select({ name: identityGroupsTable.name }).from(identityGroupsTable).where(and(
+          eq(identityGroupsTable.id, updated.identityGroupId),
+          eq(identityGroupsTable.corporationId, req.tenant!.corporation.id),
+        )).then((rows) => rows[0]?.name ?? null)
+        : null;
+      res.json({ ...updated, identityGroupName });
+    } catch (error) {
+      if (error instanceof ReimbursementWorkflowError) {
+        res.status(error.statusCode).json({ error: error.message });
+        return;
+      }
+      throw error;
     }
-    const [updated] = await db.update(reimbursementClaimsTable).set({
-      status,
-      approvedAmount,
-      reviewerNotes: typeof req.body.reviewerNotes === "string" ? req.body.reviewerNotes.trim().slice(0, 10_000) : null,
-      paymentReference: typeof req.body.paymentReference === "string" ? req.body.paymentReference.trim().slice(0, 500) : null,
-      reviewedBy: req.tenant!.user.id,
-      reviewedAt: new Date(),
-      paidAt: status === "paid" ? new Date() : null,
-    }).where(and(
-      eq(reimbursementClaimsTable.id, id),
-      eq(reimbursementClaimsTable.corporationId, req.tenant!.corporation.id),
-    )).returning();
-    if (!updated) {
-      res.status(404).json({ error: "Reimbursement claim not found" });
-      return;
-    }
-    const identityGroupName = updated.identityGroupId
-      ? await db.select({ name: identityGroupsTable.name }).from(identityGroupsTable).where(and(
-        eq(identityGroupsTable.id, updated.identityGroupId),
-        eq(identityGroupsTable.corporationId, req.tenant!.corporation.id),
-      )).then((rows) => rows[0]?.name ?? null)
-      : null;
-    res.json({ ...updated, identityGroupName });
   },
 );
 
@@ -431,37 +420,25 @@ router.patch("/reimbursements/:id", async (req: Request, res: Response): Promise
     return;
   }
   const id = Number(req.params.id);
-  const status = req.body.status;
-  const allowed = ["submitted", "reviewing", "approved", "partially_approved", "rejected", "pending_payment", "paid"];
-  if (!Number.isInteger(id) || !allowed.includes(status)) {
+  if (!Number.isInteger(id)) {
     res.status(400).json({ error: "Invalid reimbursement update" });
     return;
   }
-  const approvedAmount = req.body.approvedAmount === null || req.body.approvedAmount === undefined || req.body.approvedAmount === ""
-    ? null
-    : Number(req.body.approvedAmount);
-  if (approvedAmount !== null && (!Number.isFinite(approvedAmount) || approvedAmount < 0)) {
-    res.status(400).json({ error: "Invalid approved amount" });
-    return;
+  try {
+    const updated = await updateReimbursementWorkflow({
+      corporationId: req.tenant!.corporation.id,
+      claimId: id,
+      reviewerId: req.tenant!.user.id,
+      identityGroupId: null,
+    }, req.body);
+    res.json({ ...updated, identityGroupName: null });
+  } catch (error) {
+    if (error instanceof ReimbursementWorkflowError) {
+      res.status(error.statusCode).json({ error: error.message });
+      return;
+    }
+    throw error;
   }
-  const [updated] = await db.update(reimbursementClaimsTable).set({
-    status,
-    approvedAmount,
-    reviewerNotes: typeof req.body.reviewerNotes === "string" ? req.body.reviewerNotes.trim().slice(0, 10_000) : null,
-    paymentReference: typeof req.body.paymentReference === "string" ? req.body.paymentReference.trim().slice(0, 500) : null,
-    reviewedBy: req.tenant!.user.id,
-    reviewedAt: new Date(),
-    paidAt: status === "paid" ? new Date() : null,
-  }).where(and(
-    eq(reimbursementClaimsTable.id, id),
-    eq(reimbursementClaimsTable.corporationId, req.tenant!.corporation.id),
-    isNull(reimbursementClaimsTable.identityGroupId),
-  )).returning();
-  if (!updated) {
-    res.status(404).json({ error: "Reimbursement claim not found" });
-    return;
-  }
-  res.json({ ...updated, identityGroupName: null });
 });
 
 export default router;

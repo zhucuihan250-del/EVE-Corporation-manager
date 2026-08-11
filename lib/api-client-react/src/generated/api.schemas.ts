@@ -1688,6 +1688,24 @@ export interface ReimbursementLoss {
   claimStatus: ReimbursementLossClaimStatus;
 }
 
+/**
+ * Workflow action; the server calculates the next status
+ */
+export type UpdateReimbursementBodyAction =
+  (typeof UpdateReimbursementBodyAction)[keyof typeof UpdateReimbursementBodyAction];
+
+export const UpdateReimbursementBodyAction = {
+  start_review: "start_review",
+  approve: "approve",
+  queue_payment: "queue_payment",
+  mark_paid: "mark_paid",
+  reject: "reject",
+} as const;
+
+/**
+ * Legacy compatibility field; mapped to a guarded workflow action and never trusted as the resulting status
+ * @deprecated
+ */
 export type UpdateReimbursementBodyStatus =
   (typeof UpdateReimbursementBodyStatus)[keyof typeof UpdateReimbursementBodyStatus];
 
@@ -1702,7 +1720,13 @@ export const UpdateReimbursementBodyStatus = {
 } as const;
 
 export interface UpdateReimbursementBody {
-  status: UpdateReimbursementBodyStatus;
+  /** Workflow action; the server calculates the next status */
+  action?: UpdateReimbursementBodyAction;
+  /**
+   * Legacy compatibility field; mapped to a guarded workflow action and never trusted as the resulting status
+   * @deprecated
+   */
+  status?: UpdateReimbursementBodyStatus;
   /** @nullable */
   approvedAmount?: number | null;
   reviewerNotes?: string;

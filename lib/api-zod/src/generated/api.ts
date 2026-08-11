@@ -2916,22 +2916,31 @@ export const ListReimbursementWindowClaimsResponse = zod.array(
 );
 
 /**
- * @summary Review any general or tactical reimbursement claim from the Director window
+ * @summary Advance a general or tactical reimbursement claim through the server-controlled workflow
  */
 export const UpdateReimbursementWindowClaimParams = zod.object({
   id: zod.coerce.number(),
 });
 
 export const UpdateReimbursementWindowClaimBody = zod.object({
-  status: zod.enum([
-    "submitted",
-    "reviewing",
-    "approved",
-    "partially_approved",
-    "rejected",
-    "pending_payment",
-    "paid",
-  ]),
+  action: zod
+    .enum(["start_review", "approve", "queue_payment", "mark_paid", "reject"])
+    .optional()
+    .describe("Workflow action; the server calculates the next status"),
+  status: zod
+    .enum([
+      "submitted",
+      "reviewing",
+      "approved",
+      "partially_approved",
+      "rejected",
+      "pending_payment",
+      "paid",
+    ])
+    .optional()
+    .describe(
+      "Legacy compatibility field; mapped to a guarded workflow action and never trusted as the resulting status",
+    ),
   approvedAmount: zod.number().nullish(),
   reviewerNotes: zod.string().optional(),
   paymentReference: zod.string().optional(),
@@ -3125,15 +3134,24 @@ export const UpdateReimbursementParams = zod.object({
 });
 
 export const UpdateReimbursementBody = zod.object({
-  status: zod.enum([
-    "submitted",
-    "reviewing",
-    "approved",
-    "partially_approved",
-    "rejected",
-    "pending_payment",
-    "paid",
-  ]),
+  action: zod
+    .enum(["start_review", "approve", "queue_payment", "mark_paid", "reject"])
+    .optional()
+    .describe("Workflow action; the server calculates the next status"),
+  status: zod
+    .enum([
+      "submitted",
+      "reviewing",
+      "approved",
+      "partially_approved",
+      "rejected",
+      "pending_payment",
+      "paid",
+    ])
+    .optional()
+    .describe(
+      "Legacy compatibility field; mapped to a guarded workflow action and never trusted as the resulting status",
+    ),
   approvedAmount: zod.number().nullish(),
   reviewerNotes: zod.string().optional(),
   paymentReference: zod.string().optional(),
@@ -3314,15 +3332,24 @@ export const UpdateTacticalGroupReimbursementParams = zod.object({
 });
 
 export const UpdateTacticalGroupReimbursementBody = zod.object({
-  status: zod.enum([
-    "submitted",
-    "reviewing",
-    "approved",
-    "partially_approved",
-    "rejected",
-    "pending_payment",
-    "paid",
-  ]),
+  action: zod
+    .enum(["start_review", "approve", "queue_payment", "mark_paid", "reject"])
+    .optional()
+    .describe("Workflow action; the server calculates the next status"),
+  status: zod
+    .enum([
+      "submitted",
+      "reviewing",
+      "approved",
+      "partially_approved",
+      "rejected",
+      "pending_payment",
+      "paid",
+    ])
+    .optional()
+    .describe(
+      "Legacy compatibility field; mapped to a guarded workflow action and never trusted as the resulting status",
+    ),
   approvedAmount: zod.number().nullish(),
   reviewerNotes: zod.string().optional(),
   paymentReference: zod.string().optional(),

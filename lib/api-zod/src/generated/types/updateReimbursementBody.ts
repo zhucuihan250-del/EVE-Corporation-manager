@@ -5,10 +5,17 @@
  * EVE Online PAP Tracking System API
  * OpenAPI spec version: 0.1.0
  */
+import type { UpdateReimbursementBodyAction } from "./updateReimbursementBodyAction";
 import type { UpdateReimbursementBodyStatus } from "./updateReimbursementBodyStatus";
 
 export interface UpdateReimbursementBody {
-  status: UpdateReimbursementBodyStatus;
+  /** Workflow action; the server calculates the next status */
+  action?: UpdateReimbursementBodyAction;
+  /**
+   * Legacy compatibility field; mapped to a guarded workflow action and never trusted as the resulting status
+   * @deprecated
+   */
+  status?: UpdateReimbursementBodyStatus;
   /** @nullable */
   approvedAmount?: number | null;
   reviewerNotes?: string;

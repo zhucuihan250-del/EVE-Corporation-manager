@@ -10,6 +10,7 @@ import {
 import { and, desc, eq, sql } from "drizzle-orm";
 import { hasRole, requireAuth } from "../middlewares/auth";
 import { hasPermission, requireModule, requireTenant } from "../lib/tenant";
+import { ReimbursementWorkflowError, updateReimbursementWorkflow } from "../lib/reimbursement-workflow";
 
 const router: IRouter = Router();
 
@@ -192,37 +193,25 @@ router.patch("/tactical-groups/:id/reimbursements/:claimId", async (req: Request
     res.status(403).json({ error: "Forbidden" });
     return;
   }
-  const status = req.body.status;
-  const allowed = ["submitted", "reviewing", "approved", "partially_approved", "rejected", "pending_payment", "paid"];
-  if (!Number.isInteger(claimId) || !allowed.includes(status)) {
+  if (!Number.isInteger(claimId)) {
     res.status(400).json({ error: "Invalid reimbursement update" });
     return;
   }
-  const approvedAmount = req.body.approvedAmount === null || req.body.approvedAmount === undefined || req.body.approvedAmount === ""
-    ? null
-    : Number(req.body.approvedAmount);
-  if (approvedAmount !== null && (!Number.isFinite(approvedAmount) || approvedAmount < 0)) {
-    res.status(400).json({ error: "Invalid approved amount" });
-    return;
+  try {
+    const updated = await updateReimbursementWorkflow({
+      corporationId: req.tenant!.corporation.id,
+      claimId,
+      reviewerId: req.tenant!.user.id,
+      identityGroupId: groupId,
+    }, req.body);
+    res.json({ ...updated, identityGroupName: access.group.name });
+  } catch (error) {
+    if (error instanceof ReimbursementWorkflowError) {
+      res.status(error.statusCode).json({ error: error.message });
+      return;
+    }
+    throw error;
   }
-  const [updated] = await db.update(reimbursementClaimsTable).set({
-    status,
-    approvedAmount,
-    reviewerNotes: typeof req.body.reviewerNotes === "string" ? req.body.reviewerNotes.trim().slice(0, 10_000) : null,
-    paymentReference: typeof req.body.paymentReference === "string" ? req.body.paymentReference.trim().slice(0, 500) : null,
-    reviewedBy: req.tenant!.user.id,
-    reviewedAt: new Date(),
-    paidAt: status === "paid" ? new Date() : null,
-  }).where(and(
-    eq(reimbursementClaimsTable.id, claimId),
-    eq(reimbursementClaimsTable.corporationId, req.tenant!.corporation.id),
-    eq(reimbursementClaimsTable.identityGroupId, groupId),
-  )).returning();
-  if (!updated) {
-    res.status(404).json({ error: "Reimbursement claim not found" });
-    return;
-  }
-  res.json({ ...updated, identityGroupName: access.group.name });
 });
 
 export default router;

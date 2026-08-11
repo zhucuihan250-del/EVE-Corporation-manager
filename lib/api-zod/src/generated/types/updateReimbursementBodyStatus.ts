@@ -6,6 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
+/**
+ * Legacy compatibility field; mapped to a guarded workflow action and never trusted as the resulting status
+ * @deprecated
+ */
 export type UpdateReimbursementBodyStatus =
   (typeof UpdateReimbursementBodyStatus)[keyof typeof UpdateReimbursementBodyStatus];
 

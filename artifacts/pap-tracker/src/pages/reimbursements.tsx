@@ -18,7 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/api-error";
-import { CheckCircle2, ClipboardCheck, ExternalLink, Loader2, RefreshCw, ShieldCheck } from "lucide-react";
+import { Archive, CheckCircle2, ClipboardCheck, ExternalLink, FileClock, Loader2, RefreshCw, ShieldCheck } from "lucide-react";
 
 const AUTO_DESCRIPTION = "通过 zKillboard 自动提交";
 const INITIAL_VISIBLE_LOSSES = 40;
@@ -55,6 +55,8 @@ function ReimbursementWorkspace({ identityGroupId, groupName }: { identityGroupI
   const claims = identityGroupId === undefined ? generalClaims : tacticalClaims;
   const characters = useListCharacters();
   const create = useCreateReimbursement();
+  const [section, setSection] = useState<"submit" | "claims">("submit");
+  const [claimSection, setClaimSection] = useState<"active" | "history">("active");
   const [characterId, setCharacterId] = useState("");
   const [submittingKillmailId, setSubmittingKillmailId] = useState<number | null>(null);
   const [visibleLossCount, setVisibleLossCount] = useState(INITIAL_VISIBLE_LOSSES);
@@ -88,6 +90,15 @@ function ReimbursementWorkspace({ identityGroupId, groupName }: { identityGroupI
     () => (losses.data ?? []).slice(0, visibleLossCount),
     [losses.data, visibleLossCount],
   );
+  const activeClaims = useMemo(
+    () => (claims.data ?? []).filter((claim) => !["rejected", "paid"].includes(claim.status)),
+    [claims.data],
+  );
+  const historicalClaims = useMemo(
+    () => (claims.data ?? []).filter((claim) => ["rejected", "paid"].includes(claim.status)),
+    [claims.data],
+  );
+  const displayedClaims = claimSection === "active" ? activeClaims : historicalClaims;
   const lossTimeline = useMemo(() => {
     if (!losses.data?.length) return null;
     const timestamps = losses.data.map((loss) => new Date(loss.lossOccurredAt).getTime()).filter(Number.isFinite);
@@ -104,6 +115,8 @@ function ReimbursementWorkspace({ identityGroupId, groupName }: { identityGroupI
     create.mutate({ data: { characterId: Number(characterId), killmailId: loss.killmailId, identityGroupId } }, {
       onSuccess: async (created) => {
         await Promise.all([refreshClaims(), losses.refetch()]);
+        setSection("claims");
+        setClaimSection("active");
         toast({
           title: tr("补损申请已提交", "Reimbursement submitted"),
           description: created.identityGroupId
@@ -127,7 +140,18 @@ function ReimbursementWorkspace({ identityGroupId, groupName }: { identityGroupI
         </p>
       </div>
 
-      <Card>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Button className="h-auto justify-start gap-3 p-4 text-left" variant={section === "submit" ? "default" : "outline"} onClick={() => setSection("submit")}>
+          <ClipboardCheck className="h-5 w-5 shrink-0" />
+          <span><span className="block font-semibold">{tr("提交补损", "Submit reimbursement")}</span><span className="block text-xs opacity-80">{tr("选择损失并一键提交", "Choose a loss and submit")}</span></span>
+        </Button>
+        <Button className="h-auto justify-start gap-3 p-4 text-left" variant={section === "claims" ? "default" : "outline"} onClick={() => setSection("claims")}>
+          <FileClock className="h-5 w-5 shrink-0" />
+          <span><span className="block font-semibold">{tr("我的申请", "My claims")}</span><span className="block text-xs opacity-80">{tr(`${activeClaims.length} 个处理中 · ${historicalClaims.length} 个历史申请`, `${activeClaims.length} active · ${historicalClaims.length} historical`)}</span></span>
+        </Button>
+      </div>
+
+      {section === "submit" && <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><ClipboardCheck className="h-5 w-5 text-primary" />{tr("选择 zKillboard 损失", "Choose a zKillboard loss")}</CardTitle>
           <CardDescription>{tr(`实名提交人：${user?.eveCharacterName ?? "-"}。选择角色后即可一键提交。`, `Named submitter: ${user?.eveCharacterName ?? "-"}. Select a character and submit a loss with one click.`)}</CardDescription>
@@ -187,23 +211,31 @@ function ReimbursementWorkspace({ identityGroupId, groupName }: { identityGroupI
             </div>
           )}
         </CardContent>
-      </Card>
+      </Card>}
 
-      <Card>
+      {section === "claims" && <Card>
         <CardHeader>
-          <CardTitle>{identityGroupId ? tr("我的身份组补损", "My tactical claims") : tr("我的通用补损", "My general reimbursements")}</CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div><CardTitle>{identityGroupId ? tr("我的身份组补损", "My tactical claims") : tr("我的通用补损", "My general reimbursements")}</CardTitle><CardDescription className="mt-1">{tr("查看已经提交、正在处理以及已结束的历史申请。", "Review submitted, in-progress, and completed historical claims.")}</CardDescription></div>
+            <div className="flex gap-2">
+              <Button size="sm" variant={claimSection === "active" ? "default" : "outline"} onClick={() => setClaimSection("active")}><FileClock className="mr-2 h-4 w-4" />{tr(`处理中 (${activeClaims.length})`, `Active (${activeClaims.length})`)}</Button>
+              <Button size="sm" variant={claimSection === "history" ? "default" : "outline"} onClick={() => setClaimSection("history")}><Archive className="mr-2 h-4 w-4" />{tr(`历史申请 (${historicalClaims.length})`, `History (${historicalClaims.length})`)}</Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {(claims.data ?? []).length === 0 ? <p className="text-sm text-muted-foreground">{tr("暂无补损申请", "No reimbursement claims")}</p> : (claims.data ?? []).map((claim) => (
+          {displayedClaims.length === 0 ? <p className="text-sm text-muted-foreground">{claimSection === "active" ? tr("当前没有处理中的补损申请", "No active reimbursement claims") : tr("暂无已结束的历史申请", "No completed claim history")}</p> : displayedClaims.map((claim) => (
             <div key={claim.id} className="rounded-md border border-border/50 p-4 space-y-3">
-              <div className="flex flex-wrap justify-between gap-3"><div><div className="font-medium">{claim.characterName} · {claim.shipName}</div><div className="text-xs text-muted-foreground">{new Date(claim.lossOccurredAt).toLocaleString()} · {tr("zKill 估值", "zKill value")} {formatIsk(claim.lossValue)}</div></div><Badge variant={claim.status === "rejected" ? "destructive" : claim.status === "paid" ? "default" : "outline"}>{statusLabels[claim.status]}</Badge></div>
+              <div className="flex flex-wrap justify-between gap-3"><div><div className="font-medium">#{claim.id} · {claim.characterName} · {claim.shipName}</div><div className="text-xs text-muted-foreground">{new Date(claim.lossOccurredAt).toLocaleString()} · {tr("提交于", "submitted")} {new Date(claim.createdAt).toLocaleString()} · {tr("zKill 估值", "zKill value")} {formatIsk(claim.lossValue)}</div></div><Badge variant={claim.status === "rejected" ? "destructive" : claim.status === "paid" ? "default" : "outline"}>{statusLabels[claim.status]}</Badge></div>
               {claim.description && claim.description !== AUTO_DESCRIPTION && <p className="text-sm whitespace-pre-wrap">{claim.description}</p>}
               <div className="flex flex-wrap items-center gap-3 text-xs text-emerald-400"><CheckCircle2 className="h-4 w-4" />{claim.validation.message}<a className="inline-flex items-center gap-1 text-primary hover:underline" href={claim.killmailUrl} target="_blank" rel="noreferrer">zKillboard <ExternalLink className="h-3 w-3" /></a></div>
+              {claim.approvedAmount != null && <p className="text-sm"><span className="text-muted-foreground">{tr("批准金额：", "Approved amount: ")}</span><span className="font-medium">{formatIsk(claim.approvedAmount)}</span></p>}
               {claim.reviewerNotes && <p className="text-sm text-muted-foreground">{tr("审核记录：", "Review notes: ")}{claim.reviewerNotes}</p>}
+              {claim.paymentReference && <p className="text-sm text-muted-foreground">{tr("打款凭证：", "Payment reference: ")}{claim.paymentReference}</p>}
             </div>
           ))}
         </CardContent>
-      </Card>
+      </Card>}
     </div>
   );
 }

@@ -5652,7 +5652,7 @@ export function useListReimbursementWindowClaims<
 }
 
 /**
- * @summary Review any general or tactical reimbursement claim from the Director window
+ * @summary Advance a general or tactical reimbursement claim through the server-controlled workflow
  */
 export const getUpdateReimbursementWindowClaimUrl = (id: number) => {
   return `/api/reimbursements/window/claims/${id}`;
@@ -5720,7 +5720,7 @@ export type UpdateReimbursementWindowClaimMutationBody =
 export type UpdateReimbursementWindowClaimMutationError = ErrorType<unknown>;
 
 /**
- * @summary Review any general or tactical reimbursement claim from the Director window
+ * @summary Advance a general or tactical reimbursement claim through the server-controlled workflow
  */
 export const useUpdateReimbursementWindowClaim = <
   TError = ErrorType<unknown>,

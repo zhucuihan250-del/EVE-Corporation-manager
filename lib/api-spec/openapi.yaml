@@ -1384,7 +1384,7 @@ paths:
     patch:
       operationId: updateReimbursementWindowClaim
       tags: [reimbursements]
-      summary: Review any general or tactical reimbursement claim from the Director window
+      summary: Advance a general or tactical reimbursement claim through the server-controlled workflow
       parameters:
         - in: path
           name: id
@@ -3925,11 +3925,18 @@ components:
     UpdateReimbursementBody:
       type: object
       properties:
-        status: { type: string, enum: [submitted, reviewing, approved, partially_approved, rejected, pending_payment, paid] }
+        action:
+          type: string
+          enum: [start_review, approve, queue_payment, mark_paid, reject]
+          description: Workflow action; the server calculates the next status
+        status:
+          type: string
+          enum: [submitted, reviewing, approved, partially_approved, rejected, pending_payment, paid]
+          deprecated: true
+          description: Legacy compatibility field; mapped to a guarded workflow action and never trusted as the resulting status
         approvedAmount: { type: ["number", "null"] }
         reviewerNotes: { type: string }
         paymentReference: { type: string }
-      required: [status]
 
     EconomySource:
       type: object

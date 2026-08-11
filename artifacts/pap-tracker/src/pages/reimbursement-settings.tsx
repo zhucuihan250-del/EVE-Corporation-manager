@@ -9,7 +9,8 @@ import {
   useUpdateReimbursementWindow,
   useUpdateReimbursementWindowClaim,
   type CurrentUser,
-  type UpdateReimbursementBodyStatus,
+  type ReimbursementClaim,
+  type UpdateReimbursementBodyAction,
 } from "@workspace/api-client-react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/api-error";
-import { Calculator, CheckCircle2, ExternalLink, Layers3, Loader2, LockKeyhole, ReceiptText, RefreshCw, TriangleAlert, UnlockKeyhole } from "lucide-react";
+import { Calculator, CheckCircle2, CircleDollarSign, ExternalLink, Layers3, Loader2, LockKeyhole, PlayCircle, ReceiptText, RefreshCw, Send, TriangleAlert, UnlockKeyhole, XCircle } from "lucide-react";
 
 const AUTO_DESCRIPTION = "通过 zKillboard 自动提交";
 const formatIsk = (value: number) => `${new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 0 }).format(value)} ISK`;
@@ -39,7 +40,8 @@ export function ReimbursementSettings() {
   const canManageWindow = Boolean(user?.permissions.includes("reimbursement.window.manage"));
   const [scope, setScope] = useState<"all" | "general" | "tactical">("all");
   const [pricingClaimId, setPricingClaimId] = useState<number | null>(null);
-  const [review, setReview] = useState<Record<number, { status: UpdateReimbursementBodyStatus; approvedAmount: string; reviewerNotes: string; paymentReference: string }>>({});
+  const [workflowClaimId, setWorkflowClaimId] = useState<number | null>(null);
+  const [review, setReview] = useState<Record<number, { approvedAmount: string; reviewerNotes: string; paymentReference: string }>>({});
 
   const statusLabels = useMemo<Record<string, string>>(() => ({
     submitted: tr("已提交", "Submitted"), reviewing: tr("审核中", "Reviewing"), approved: tr("已批准", "Approved"),
@@ -68,11 +70,52 @@ export function ReimbursementSettings() {
     });
   };
 
-  const saveReview = (claimId: number, currentStatus: UpdateReimbursementBodyStatus, currentApprovedAmount: number | null, currentReviewerNotes: string | null, currentPaymentReference: string | null) => {
-    const draft = review[claimId] ?? { status: currentStatus, approvedAmount: currentApprovedAmount?.toString() ?? "", reviewerNotes: currentReviewerNotes ?? "", paymentReference: currentPaymentReference ?? "" };
-    updateClaim.mutate({ id: claimId, data: { status: draft.status, approvedAmount: draft.approvedAmount ? Number(draft.approvedAmount) : null, reviewerNotes: draft.reviewerNotes, paymentReference: draft.paymentReference } }, {
-      onSuccess: async () => { await refreshClaims(); toast({ title: tr("补损审核已保存", "Reimbursement review saved") }); },
-      onError: (error) => toast({ title: tr("保存失败", "Save failed"), description: getErrorMessage(error), variant: "destructive" }),
+  const advanceWorkflow = (claim: ReimbursementClaim, action: UpdateReimbursementBodyAction) => {
+    const draft = review[claim.id] ?? {
+      approvedAmount: claim.approvedAmount?.toString() ?? claim.referenceReimbursementAmount?.toString() ?? "",
+      reviewerNotes: claim.reviewerNotes ?? "",
+      paymentReference: claim.paymentReference ?? "",
+    };
+    if (action === "approve" && (!draft.approvedAmount || Number(draft.approvedAmount) <= 0)) {
+      toast({ title: tr("请填写有效的批准金额", "Enter a valid approved amount"), variant: "destructive" });
+      return;
+    }
+    if (action === "reject" && !draft.reviewerNotes.trim()) {
+      toast({ title: tr("拒绝申请前请填写审核说明", "Add review notes before rejecting"), variant: "destructive" });
+      return;
+    }
+    if (action === "mark_paid" && !draft.paymentReference.trim()) {
+      toast({ title: tr("确认打款前请填写流水号或凭证", "Add a payment reference before marking paid"), variant: "destructive" });
+      return;
+    }
+    setWorkflowClaimId(claim.id);
+    updateClaim.mutate({
+      id: claim.id,
+      data: {
+        action,
+        approvedAmount: action === "approve" ? Number(draft.approvedAmount) : undefined,
+        reviewerNotes: draft.reviewerNotes,
+        paymentReference: action === "mark_paid" ? draft.paymentReference : undefined,
+      },
+    }, {
+      onSuccess: async () => {
+        setReview((current) => {
+          const next = { ...current };
+          delete next[claim.id];
+          return next;
+        });
+        await refreshClaims();
+        const titles: Record<UpdateReimbursementBodyAction, string> = {
+          start_review: tr("申请已进入审核", "Claim moved to review"),
+          approve: tr("审核结果已自动确定", "Approval status determined"),
+          queue_payment: tr("申请已转入待打款", "Claim queued for payment"),
+          mark_paid: tr("申请已标记为已打款", "Claim marked paid"),
+          reject: tr("申请已拒绝", "Claim rejected"),
+        };
+        toast({ title: titles[action] });
+      },
+      onError: (error) => toast({ title: tr("处理失败", "Workflow update failed"), description: getErrorMessage(error), variant: "destructive" }),
+      onSettled: () => setWorkflowClaimId(null),
     });
   };
 
@@ -113,10 +156,11 @@ export function ReimbursementSettings() {
       </div>
 
       <Card>
-        <CardHeader><div className="flex flex-wrap items-center justify-between gap-3"><div><CardTitle className="flex items-center gap-2"><ReceiptText className="h-5 w-5 text-primary" />{tr("全军团补损请求", "All corporation reimbursement claims")}</CardTitle><CardDescription>{tr("身份组补损与通用补损在此统一审核，仍保持其原有分类。", "General and tactical claims are reviewed together while retaining their original classification.")}</CardDescription></div><div className="flex gap-2">{(["all", "general", "tactical"] as const).map((value) => <Button key={value} size="sm" variant={scope === value ? "default" : "outline"} onClick={() => setScope(value)}>{value === "all" ? tr("全部", "All") : value === "general" ? tr("通用", "General") : tr("身份组", "Tactical")}</Button>)}</div></div></CardHeader>
+        <CardHeader><div className="flex flex-wrap items-center justify-between gap-3"><div><CardTitle className="flex items-center gap-2"><ReceiptText className="h-5 w-5 text-primary" />{tr("全军团补损请求", "All corporation reimbursement claims")}</CardTitle><CardDescription>{tr("状态由审核动作自动流转；全额或部分批准会比较完整参考补损额，参考估价不完整时回退到已验证损失估值。", "Statuses advance automatically; full or partial approval uses a complete reference amount, falling back to the verified loss value when reference pricing is incomplete.")}</CardDescription></div><div className="flex gap-2">{(["all", "general", "tactical"] as const).map((value) => <Button key={value} size="sm" variant={scope === value ? "default" : "outline"} onClick={() => setScope(value)}>{value === "all" ? tr("全部", "All") : value === "general" ? tr("通用", "General") : tr("身份组", "Tactical")}</Button>)}</div></div></CardHeader>
         <CardContent className="space-y-4">
           {claims.isLoading ? <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" />{tr("正在读取补损请求…", "Loading claims…")}</div> : claims.isError ? <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">{getErrorMessage(claims.error)}</div> : visibleClaims.length === 0 ? <p className="text-sm text-muted-foreground">{tr("当前分类暂无补损请求", "No claims in this category")}</p> : visibleClaims.map((claim) => {
-            const draft = review[claim.id] ?? { status: claim.status, approvedAmount: claim.approvedAmount?.toString() ?? "", reviewerNotes: claim.reviewerNotes ?? "", paymentReference: claim.paymentReference ?? "" };
+            const draft = review[claim.id] ?? { approvedAmount: claim.approvedAmount?.toString() ?? claim.referenceReimbursementAmount?.toString() ?? "", reviewerNotes: claim.reviewerNotes ?? "", paymentReference: claim.paymentReference ?? "" };
+            const approvalComparisonAmount = claim.referencePriceStatus === "calculated" && claim.referenceReimbursementAmount != null ? claim.referenceReimbursementAmount : claim.lossValue;
             return <div key={claim.id} className="space-y-3 rounded-md border border-border/50 p-4">
               <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2 font-medium"><span>#{claim.id} · {claim.characterName} · {claim.shipName}</span><Badge variant={claim.identityGroupId ? "secondary" : "outline"}><Layers3 className="mr-1 h-3 w-3" />{claim.identityGroupName ?? tr("通用补损", "General")}</Badge></div><div className="mt-1 text-xs text-muted-foreground">{new Date(claim.lossOccurredAt).toLocaleString()} · {tr("提交于", "submitted")} {new Date(claim.createdAt).toLocaleString()} · {formatIsk(claim.lossValue)}</div></div><Badge variant={claim.status === "rejected" ? "destructive" : claim.status === "paid" ? "default" : "outline"}>{statusLabels[claim.status]}</Badge></div>
               {claim.description && claim.description !== AUTO_DESCRIPTION && <p className="whitespace-pre-wrap text-sm">{claim.description}</p>}
@@ -150,7 +194,23 @@ export function ReimbursementSettings() {
                 )}
                 <p className="text-xs text-muted-foreground">{tr("计算口径：舰船与全部损失物品按 Jita 4-4 最高收购价和最低出售价的中间值计价，再减去该舰船最高档保险的赔付；仅供审核参考，不会自动修改批准金额。", "Method: price the hull and all lost items at the midpoint of Jita 4-4 best buy and best sell, then subtract the ship's highest insurance payout. This is advisory and never changes the approved amount automatically.")}{claim.referencePriceCalculatedAt && <> · {tr("更新于", "updated")} {new Date(claim.referencePriceCalculatedAt).toLocaleString()}</>}</p>
               </div>
-              <div className="grid gap-2 border-t border-border/50 pt-3 md:grid-cols-2"><select className="h-10 rounded-md border border-input bg-background px-3" value={draft.status} onChange={(event) => setReview((current) => ({ ...current, [claim.id]: { ...draft, status: event.target.value as UpdateReimbursementBodyStatus } }))}>{Object.entries(statusLabels).map(([status, label]) => <option key={status} value={status}>{label}</option>)}</select><Input type="number" min="0" placeholder={tr("批准金额", "Approved amount")} value={draft.approvedAmount} onChange={(event) => setReview((current) => ({ ...current, [claim.id]: { ...draft, approvedAmount: event.target.value } }))} /><Textarea placeholder={tr("审核记录", "Review notes")} value={draft.reviewerNotes} onChange={(event) => setReview((current) => ({ ...current, [claim.id]: { ...draft, reviewerNotes: event.target.value } }))} /><div className="space-y-2"><Input placeholder={tr("打款流水号（可选）", "Payment reference (optional)")} value={draft.paymentReference} onChange={(event) => setReview((current) => ({ ...current, [claim.id]: { ...draft, paymentReference: event.target.value } }))} /><Button className="w-full" disabled={updateClaim.isPending} onClick={() => saveReview(claim.id, claim.status, claim.approvedAmount ?? null, claim.reviewerNotes ?? null, claim.paymentReference ?? null)}>{tr("保存审核", "Save review")}</Button></div></div>
+              {claim.status !== "rejected" && claim.status !== "paid" && <div className="space-y-3 border-t border-border/50 pt-3">
+                <Textarea placeholder={tr("审核说明；拒绝申请时必填", "Review notes; required when rejecting")} value={draft.reviewerNotes} onChange={(event) => setReview((current) => ({ ...current, [claim.id]: { ...draft, reviewerNotes: event.target.value } }))} />
+                {["submitted", "reviewing", "approved", "partially_approved"].includes(claim.status) && <div className="grid gap-2 md:grid-cols-[1fr_auto]">
+                  <div className="space-y-1"><Input type="number" min="0" placeholder={tr("批准金额", "Approved amount")} value={draft.approvedAmount} onChange={(event) => setReview((current) => ({ ...current, [claim.id]: { ...draft, approvedAmount: event.target.value } }))} /><p className="text-xs text-muted-foreground">{tr(`系统比较基准：${formatIsk(approvalComparisonAmount)}`, `Automatic comparison baseline: ${formatIsk(approvalComparisonAmount)}`)}</p></div>
+                  <Button disabled={workflowClaimId !== null} onClick={() => advanceWorkflow(claim, "approve")}><CheckCircle2 className="mr-2 h-4 w-4" />{claim.status === "approved" || claim.status === "partially_approved" ? tr("更新审核结果", "Update approval") : tr("确认审核结果", "Confirm approval")}</Button>
+                </div>}
+                {claim.status === "pending_payment" && <div className="grid gap-2 md:grid-cols-[1fr_auto]">
+                  <Input placeholder={tr("打款流水号或凭证（必填）", "Payment reference (required)")} value={draft.paymentReference} onChange={(event) => setReview((current) => ({ ...current, [claim.id]: { ...draft, paymentReference: event.target.value } }))} />
+                  <Button disabled={workflowClaimId !== null} onClick={() => advanceWorkflow(claim, "mark_paid")}><CircleDollarSign className="mr-2 h-4 w-4" />{tr("确认已打款", "Confirm paid")}</Button>
+                </div>}
+                <div className="flex flex-wrap gap-2">
+                  {(claim.status === "submitted" || claim.status === "reviewing") && <Button variant="outline" disabled={workflowClaimId !== null} onClick={() => advanceWorkflow(claim, "start_review")}><PlayCircle className="mr-2 h-4 w-4" />{claim.status === "submitted" ? tr("开始审核", "Start review") : tr("保存审核记录", "Save review notes")}</Button>}
+                  {(claim.status === "approved" || claim.status === "partially_approved") && <Button disabled={workflowClaimId !== null} onClick={() => advanceWorkflow(claim, "queue_payment")}><Send className="mr-2 h-4 w-4" />{tr("转入待打款", "Queue payment")}</Button>}
+                  <Button variant="destructive" disabled={workflowClaimId !== null} onClick={() => advanceWorkflow(claim, "reject")}><XCircle className="mr-2 h-4 w-4" />{tr("拒绝申请", "Reject claim")}</Button>
+                </div>
+              </div>}
+              {["rejected", "paid"].includes(claim.status) && <div className="space-y-1 border-t border-border/50 pt-3 text-sm text-muted-foreground">{claim.approvedAmount != null && <p>{tr("批准金额：", "Approved amount: ")}{formatIsk(claim.approvedAmount)}</p>}{claim.reviewerNotes && <p>{tr("审核记录：", "Review notes: ")}{claim.reviewerNotes}</p>}{claim.paymentReference && <p>{tr("打款凭证：", "Payment reference: ")}{claim.paymentReference}</p>}</div>}
             </div>;
           })}
         </CardContent>

@@ -177,6 +177,7 @@ export * from "./updateMyCourierRouteBody";
 export * from "./updateRedemptionBody";
 export * from "./updateRedemptionBodyStatus";
 export * from "./updateReimbursementBody";
+export * from "./updateReimbursementBodyAction";
 export * from "./updateReimbursementBodyStatus";
 export * from "./updateReimbursementWindowBody";
 export * from "./updateRewardBody";

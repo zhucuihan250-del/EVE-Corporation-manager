@@ -280,8 +280,7 @@ function buildBattlePhases(
       endedAt: report.endedAt.toISOString(),
       title: "脱离或战斗结束",
       summary: "最后一条公开损失记录至舰队结束之间没有新的匹配击杀邮件。",
-      evidence:
-        "该阶段可能是撤离、追击或停火；公开击杀数据无法区分具体行动。",
+      evidence: "该阶段可能是撤离、追击或停火；公开击杀数据无法区分具体行动。",
       evidenceLevel: "inferred",
       confidence: 0.45,
       relatedKillmailIds: [last.killmailId],
@@ -310,17 +309,32 @@ function buildRuleSuggestions(
       observation: `${worstFriendlyPeak.friendlyLosses} 艘本方舰船在一个 60 秒窗口内损失。`,
       evidence: `时间 ${worstFriendlyPeak.startedAt} 至 ${worstFriendlyPeak.endedAt}，关联 ${worstFriendlyPeak.killmailIds.length} 条击杀记录。`,
       recommendation:
-        "结合 FC 语音、锚点与广播记录，确认是否在该节点需要更早转火、拉开或撤离。",
+        "把这个 60 秒窗口作为战术复核点，确定下一次出现连续损失时由谁、在什么阈值下发出转火或脱离指令。",
       confidence: 0.82,
       relatedKillmailIds: worstFriendlyPeak.killmailIds,
+      priority: worstFriendlyPeak.friendlyLosses >= 3 ? "critical" : "high",
+      timeWindow: `${worstFriendlyPeak.startedAt} — ${worstFriendlyPeak.endedAt}`,
+      actionSteps: [
+        "由 FC 在复盘中对齐该窗口前后各 90 秒的语音、目标广播和锚点记录。",
+        "按时间标出本方连续损失的第一艘、第二艘及当时仍在输出的敌方舰船，确认是否存在可提前识别的共同威胁。",
+        "为下一次行动写入明确触发器：30 秒内出现 2 艘本方损失且没有敌方损失时，FC 必须在 10 秒内宣布继续接战、换目标或脱离三者之一。",
+      ],
+      successMetric:
+        "下一次触发同类条件时，10 秒内有明确决策记录；决策后 60 秒内新增本方损失不超过 1 艘。",
+      verifyWith: ["FC 语音时间轴", "目标广播记录", "锚点或舰队位置记录"],
     });
   }
 
-  const logisticsLosses = report.killmails.filter(
-    (killmail) =>
-      killmail.victimIsFleetMember &&
-      criticalShipScore(killmail.victimShipName) > 0,
-  );
+  const logisticsLosses = report.killmails
+    .filter(
+      (killmail) =>
+        killmail.victimIsFleetMember &&
+        criticalShipScore(killmail.victimShipName) > 0,
+    )
+    .sort(
+      (left, right) =>
+        left.killmailTime.getTime() - right.killmailTime.getTime(),
+    );
   if (logisticsLosses.length > 0) {
     suggestions.push({
       category: "logistics",
@@ -333,11 +347,21 @@ function buildRuleSuggestions(
         )
         .join("；"),
       recommendation:
-        "复查关键舰船是否过早暴露、是否脱离锚点，以及舰队是否及时处理针对关键岗位的敌方火力。",
+        "为已损失的关键岗位逐舰建立保护检查表，并在战前指定锚点、预警广播和受压后的脱离动作。",
       confidence: 0.74,
       relatedKillmailIds: logisticsLosses.map(
         (killmail) => killmail.killmailId,
       ),
+      priority: logisticsLosses.length >= 2 ? "critical" : "high",
+      timeWindow: `${logisticsLosses[0].killmailTime.toISOString()} — ${logisticsLosses.at(-1)!.killmailTime.toISOString()}`,
+      actionSteps: [
+        `逐条复核 ${logisticsLosses.map((killmail) => killmail.victimShipName ?? "未知舰船").join("、")} 损失前 60 秒内的敌方攻击者、广播与锚点距离。`,
+        "战前简报为后勤、指挥、拦截和电子战岗位分别指定主锚点与受压后的备用落点，禁止仅用“跟好锚”作为说明。",
+        "约定关键舰被黄框或受到首轮伤害后 5 秒内广播；FC 在 10 秒内明确给出清除威胁、调整距离或关键舰脱离之一。",
+      ],
+      successMetric:
+        "后续两次同编制行动中，关键职能舰在开场 5 分钟内损失为 0，受压广播到处置指令不超过 10 秒。",
+      verifyWith: ["受压广播记录", "锚点距离或录屏", "FC 语音时间轴"],
     });
   }
 
@@ -388,15 +412,28 @@ function buildRuleSuggestions(
     leadingThreat &&
     (leadingThreat.finalBlows > 0 || leadingThreat.killmailIds.size > 1)
   ) {
+    const threatEvents = report.killmails
+      .filter((killmail) => leadingThreat.killmailIds.has(killmail.killmailId))
+      .sort((left, right) => left.killmailTime.getTime() - right.killmailTime.getTime());
     suggestions.push({
       category: "target_calling",
       title: "复查对敌方高威胁舰船的识别与处理",
       observation: `${leadingThreat.pilotName ?? "未知飞行员"} 驾驶 ${leadingThreat.shipName ?? "未知舰船"}，参与 ${leadingThreat.killmailIds.size} 次本方损失并取得 ${leadingThreat.finalBlows} 次最后一击。`,
       evidence: `攻击者快照记录累计伤害 ${Math.round(leadingThreat.damageDone).toLocaleString()}，关联击杀邮件 ${[...leadingThreat.killmailIds].join("、")}。`,
       recommendation:
-        "结合现场侦察与广播记录，复查是否应更早标记、规避或优先处理该类高威胁舰船。",
+        "把该舰型写入下次战前威胁表，并为再次出现时预设优先处理、电子战压制或保持距离的触发条件。",
       confidence: 0.86,
       relatedKillmailIds: [...leadingThreat.killmailIds],
+      priority: leadingThreat.killmailIds.size >= 3 ? "critical" : "high",
+      timeWindow: `${threatEvents[0].killmailTime.toISOString()} — ${threatEvents.at(-1)!.killmailTime.toISOString()}`,
+      actionSteps: [
+        `由目标指挥在战前简报中标记 ${leadingThreat.shipName ?? "该类舰船"}，并说明其已关联 ${leadingThreat.killmailIds.size} 次本方损失。`,
+        "在总览和广播标签中预设该舰型；同类舰船在 60 秒内参与第 2 次本方损失时，立即升级为高威胁目标。",
+        "FC 必须在升级后 10 秒内选择集火、电子战压制或拉开距离，并在战后记录选择及结果。",
+      ],
+      successMetric:
+        "下一次遭遇同类舰船时，第二次本方损失发生前完成威胁标记；升级后 10 秒内有明确处置记录。",
+      verifyWith: ["侦察报告", "目标广播记录", "电子战或伤害日志"],
     });
   }
 
@@ -407,11 +444,21 @@ function buildRuleSuggestions(
       observation: `本方损失 ${report.friendlyLosses} 艘，敌方损失 ${report.hostileLosses} 艘。`,
       evidence: `报告记录摧毁 ${Math.round(report.totalDestroyed).toLocaleString()} ISK，损失 ${Math.round(report.totalLost).toLocaleString()} ISK。`,
       recommendation:
-        "按时间线核对主目标广播和击杀间隔，确认是否存在火力分散或目标切换过频。",
+        "用本次时间线计算每个敌方击杀之间的间隔，并为下一次行动设置目标切换和放弃目标的统一门槛。",
       confidence: 0.7,
       relatedKillmailIds: report.killmails
         .slice(0, 8)
         .map((killmail) => killmail.killmailId),
+      priority: "high",
+      timeWindow: `${report.startedAt.toISOString()} — ${report.endedAt.toISOString()}`,
+      actionSteps: [
+        "由目标指挥按时间线列出每次敌方损失前的主目标广播、参与人数和击杀间隔。",
+        "找出最长的两个无敌方击杀区间，结合广播记录确认是目标过硬、火力分散还是频繁换目标；无记录时标记为待验证，不作事实判断。",
+        "下次行动约定目标在 20 秒内无明显进展时由目标指挥明确宣布继续压制或切换，避免成员自行分散火力。",
+      ],
+      successMetric:
+        "下次同规模交战中，所有目标切换均有广播记录；连续 60 秒无敌方损失的区间较本次减少。",
+      verifyWith: ["目标广播记录", "伤害日志", "FC 或目标指挥语音"],
     });
   }
 
@@ -422,11 +469,21 @@ function buildRuleSuggestions(
       observation: "当前公开击杀数据未显示单一明显失误模式。",
       evidence: `共匹配 ${report.killmailCount} 条击杀记录，建议结合指挥语音确认上下文。`,
       recommendation:
-        "优先复查首个重要损失、最大价值击杀以及交战最密集的时间段。",
+        "按固定顺序复查首个本方损失、最高价值事件和最密集交战窗口，形成下次行动前可检查的三条规则。",
       confidence: 0.58,
       relatedKillmailIds: report.killmails
         .slice(0, 5)
         .map((killmail) => killmail.killmailId),
+      priority: "medium",
+      timeWindow: `${report.startedAt.toISOString()} — ${report.endedAt.toISOString()}`,
+      actionSteps: [
+        "复核首个本方损失前后各 60 秒，记录当时已确认的敌方舰型和目标广播。",
+        "复核最高价值击杀，记录参与人数、最后一击与从首条相关记录到击杀的耗时。",
+        "选择击杀记录最密集的 60 秒，让 FC 为该窗口写出一条应保留做法和一条下次要改变的触发规则。",
+      ],
+      successMetric:
+        "复盘结束时形成至少 3 条带触发条件、责任岗位和验证方式的战前规则。",
+      verifyWith: ["击杀邮件时间线", "目标广播记录", "FC 补充说明"],
     });
   }
 
@@ -475,6 +532,14 @@ function buildRuleAnalysis(report: ReportDetail): BattleReplayAnalysis {
     );
   const lossPeaks = detectLossPeaks(chronological);
   const phases = buildBattlePhases(report, lossPeaks);
+  const worstFriendlyPeak = [...lossPeaks].sort(
+    (left, right) =>
+      right.friendlyLosses - left.friendlyLosses ||
+      right.totalValue - left.totalValue,
+  )[0];
+  const highestValueEvent = [...chronological].sort(
+    (left, right) => right.totalValue - left.totalValue,
+  )[0];
   const total = report.totalDestroyed + report.totalLost;
   const efficiency =
     total > 0 ? Math.round((report.totalDestroyed / total) * 1000) / 10 : 0;
@@ -482,9 +547,9 @@ function buildRuleAnalysis(report: ReportDetail): BattleReplayAnalysis {
   return {
     version: 1,
     source: "rules",
-    model: "evidence-rules-v1",
+    model: "evidence-rules-v2",
     generatedAt: new Date().toISOString(),
-    summary: `本次行动匹配 ${report.killmailCount} 条击杀记录，本方损失 ${report.friendlyLosses} 艘，敌方损失 ${report.hostileLosses} 艘，战斗效率约 ${efficiency}%。系统已按舰船职责、损失价值、首个损失和火力集中度标记重点事件。`,
+    summary: `本次行动匹配 ${report.killmailCount} 条击杀记录，本方损失 ${report.friendlyLosses} 艘、敌方损失 ${report.hostileLosses} 艘，ISK 战斗效率约 ${efficiency}%。${worstFriendlyPeak ? `最需复核的损失窗口为 ${worstFriendlyPeak.startedAt} 至 ${worstFriendlyPeak.endedAt}，60 秒内本方损失 ${worstFriendlyPeak.friendlyLosses} 艘。` : "未检测到至少两条击杀记录构成的 60 秒战损高峰。"}${highestValueEvent ? `最高价值事件是 ${highestValueEvent.victimShipName ?? "未知舰船"} 损失，约 ${Math.round(highestValueEvent.totalValue).toLocaleString()} ISK（击杀邮件 ${highestValueEvent.killmailId}）。` : ""}`,
     keyShips,
     keyKills,
     lossPeaks,
@@ -719,6 +784,11 @@ async function requestOpenAiAnalysis(
             "recommendation",
             "confidence",
             "relatedKillmailIds",
+            "priority",
+            "timeWindow",
+            "actionSteps",
+            "successMetric",
+            "verifyWith",
           ],
           properties: {
             category: {
@@ -739,6 +809,24 @@ async function requestOpenAiAnalysis(
             recommendation: { type: "string" },
             confidence: { type: "number" },
             relatedKillmailIds: { type: "array", items: { type: "integer" } },
+            priority: {
+              type: "string",
+              enum: ["critical", "high", "medium"],
+            },
+            timeWindow: { type: "string" },
+            actionSteps: {
+              type: "array",
+              minItems: 3,
+              maxItems: 5,
+              items: { type: "string" },
+            },
+            successMetric: { type: "string" },
+            verifyWith: {
+              type: "array",
+              minItems: 1,
+              maxItems: 4,
+              items: { type: "string" },
+            },
           },
         },
       },
@@ -768,7 +856,7 @@ async function requestOpenAiAnalysis(
           },
         },
         instructions:
-          "你是 EVE Online 舰队战斗复盘助手。只使用提供的击杀邮件证据，用简体中文输出。识别关键舰船、关键击杀、60 秒战损高峰，并结合 attackerEvidence 与 enemyComposition 分析敌方舰船构成、参与击杀次数、伤害和最后一击集中度，提供可执行建议。keyShips 与 keyKills 必须标注该 killmail 中被击毁的舰船；敌方攻击舰船应写入建议的观察与证据。击杀邮件不记录远程维修量：未攻击且未被击毁的后勤舰不得描述为已确认存在。不能从数据证明的指挥、站位、语音、维修或移动情况必须表述为待复查或推测，禁止指责个人。所有引用的 killmailId 必须来自输入。",
+          "你是 EVE Online 舰队战术复盘分析员。只使用提供的击杀邮件证据，用简体中文输出。summary 必须在 4 句内写出战损效率、最重要的损失窗口、最显著的敌方威胁和首要改进目标。识别关键舰船、关键击杀、60 秒战损高峰，并结合 attackerEvidence 与 enemyComposition 分析敌方舰船构成、参与击杀次数、伤害和最后一击集中度。每条 suggestion 必须对应至少一个输入 killmailId；observation 只写已确认现象，evidence 必须包含具体 UTC 时间、舰船或攻击者和数值，不能只写“数据表明”。recommendation 不得只写“加强、优化、注意、复查”；actionSteps 必须有 3 至 5 个可执行步骤，逐步写明负责岗位、触发条件或完成时限；successMetric 必须可量化；verifyWith 必须列出击杀邮件之外仍需核对的记录。priority 只按战损影响选择 critical、high 或 medium。keyShips 与 keyKills 必须标注该 killmail 中被击毁的舰船；敌方攻击舰船应写入建议的观察与证据。击杀邮件不记录远程维修量：未攻击且未被击毁的后勤舰不得描述为已确认存在。不能从数据证明的指挥、站位、语音、维修或移动情况必须表述为待复查或推测，禁止指责个人。所有引用的 killmailId 必须来自输入。",
         input: JSON.stringify({
           battle: {
             name: report.fleetName,
@@ -780,9 +868,17 @@ async function requestOpenAiAnalysis(
             hostileLosses: report.hostileLosses,
             totalDestroyed: Math.round(report.totalDestroyed),
             totalLost: Math.round(report.totalLost),
+            durationMinutes: Math.max(
+              1,
+              Math.round(
+                (report.endedAt.getTime() - report.startedAt.getTime()) /
+                  60_000,
+              ),
+            ),
           },
           events,
           enemyComposition,
+          confirmedLossPeaks: detectLossPeaks(report.killmails),
         }),
       }),
     });
@@ -860,12 +956,14 @@ function mergeModelAnalysis(
                 (sum, killmail) => sum + killmail.totalValue,
                 0,
               ),
+              evidenceLevel: "confirmed" as const,
+              evidence: `该窗口由击杀邮件 ${killmails.map((killmail) => killmail.killmailId).join("、")} 确认。`,
             },
           ];
         })
         .slice(0, 5)
     : [];
-  const suggestions = Array.isArray(modelAnalysis.suggestions)
+  const modelSuggestions = Array.isArray(modelAnalysis.suggestions)
     ? modelAnalysis.suggestions
         .map((suggestion) => ({
           category: suggestion.category,
@@ -877,9 +975,50 @@ function mergeModelAnalysis(
           relatedKillmailIds: [...new Set(suggestion.relatedKillmailIds)]
             .filter((id) => validIds.has(id))
             .slice(0, 20),
+          priority: ["critical", "high", "medium"].includes(
+            suggestion.priority ?? "",
+          )
+            ? suggestion.priority
+            : ("medium" as const),
+          timeWindow:
+            typeof suggestion.timeWindow === "string"
+              ? suggestion.timeWindow.slice(0, 300)
+              : "未提供具体时间窗口",
+          actionSteps: Array.isArray(suggestion.actionSteps)
+            ? suggestion.actionSteps
+                .filter((step) => typeof step === "string" && step.trim())
+                .map((step) => step.slice(0, 700))
+                .slice(0, 5)
+            : [],
+          successMetric:
+            typeof suggestion.successMetric === "string"
+              ? suggestion.successMetric.slice(0, 700)
+              : "由 FC 在复盘后补充量化验收标准。",
+          verifyWith: Array.isArray(suggestion.verifyWith)
+            ? suggestion.verifyWith
+                .filter((item) => typeof item === "string" && item.trim())
+                .map((item) => item.slice(0, 200))
+                .slice(0, 4)
+            : [],
         }))
-        .slice(0, 8)
+        .filter((suggestion) =>
+          suggestion.relatedKillmailIds.length > 0
+          && suggestion.actionSteps.length >= 3
+          && suggestion.actionSteps.some((step) => /\d|秒|分钟|小时|FC|指挥|后勤|目标/.test(step))
+          && /\d|%/.test(suggestion.evidence)
+          && /\d|%/.test(suggestion.successMetric)
+        )
+        .slice(0, 6)
     : [];
+  const seenSuggestions = new Set<string>();
+  const suggestions = [...modelSuggestions, ...fallback.suggestions]
+    .filter((suggestion) => {
+      const key = `${suggestion.category}:${suggestion.title}`;
+      if (seenSuggestions.has(key)) return false;
+      seenSuggestions.add(key);
+      return true;
+    })
+    .slice(0, 6);
 
   return {
     version: 1,
@@ -893,7 +1032,7 @@ function mergeModelAnalysis(
     keyShips: mapEvents(modelAnalysis.keyShips, fallback.keyShips),
     keyKills: mapEvents(modelAnalysis.keyKills, fallback.keyKills),
     lossPeaks: lossPeaks.length > 0 ? lossPeaks : fallback.lossPeaks,
-    suggestions: suggestions.length > 0 ? suggestions : fallback.suggestions,
+    suggestions,
     phases: fallback.phases,
     dataQuality: fallback.dataQuality,
   };

@@ -184,12 +184,7 @@ export type BattleReplayLossPeak = {
 
 export type BattleReplayPhase = {
   id: string;
-  kind:
-    | "contact"
-    | "opening"
-    | "escalation"
-    | "turning_point"
-    | "extraction";
+  kind: "contact" | "opening" | "escalation" | "turning_point" | "extraction";
   startedAt: string;
   endedAt: string;
   title: string;
@@ -221,6 +216,11 @@ export type BattleReplaySuggestion = {
   recommendation: string;
   confidence: number;
   relatedKillmailIds: number[];
+  priority?: "critical" | "high" | "medium";
+  timeWindow?: string;
+  actionSteps?: string[];
+  successMetric?: string;
+  verifyWith?: string[];
 };
 
 export type BattleReplayAnalysis = {

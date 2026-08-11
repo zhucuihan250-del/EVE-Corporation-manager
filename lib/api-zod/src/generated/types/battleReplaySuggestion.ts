@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { BattleReplaySuggestionCategory } from "./battleReplaySuggestionCategory";
+import type { BattleReplaySuggestionPriority } from "./battleReplaySuggestionPriority";
 
 export interface BattleReplaySuggestion {
   category: BattleReplaySuggestionCategory;
@@ -15,4 +16,9 @@ export interface BattleReplaySuggestion {
   recommendation: string;
   confidence: number;
   relatedKillmailIds: number[];
+  priority?: BattleReplaySuggestionPriority;
+  timeWindow?: string;
+  actionSteps?: string[];
+  successMetric?: string;
+  verifyWith?: string[];
 }

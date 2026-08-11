@@ -1,12 +1,14 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import {
   charactersTable,
+  corporationMembershipsTable,
   corporationSkillPlansTable,
   db,
   identityGroupApplicationsTable,
   identityGroupMembershipsTable,
   identityGroupSkillPlansTable,
   identityGroupsTable,
+  usersTable,
   type CorporationSkillPlan,
   type RequiredSkill,
 } from "@workspace/db";
@@ -135,6 +137,55 @@ router.get("/identity-groups", async (req: Request, res: Response): Promise<void
     isMember: memberGroupIds.has(group.id),
     latestApplication: latestByGroup.get(group.id) ?? null,
   })));
+});
+
+router.get("/identity-groups/:id/members", async (req: Request, res: Response): Promise<void> => {
+  if (!canManage(req)) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  const tenant = req.tenant!;
+  const groupId = Number(req.params.id);
+  if (!Number.isInteger(groupId)) {
+    res.status(400).json({ error: "Invalid identity group" });
+    return;
+  }
+  const [group] = await db.select({ id: identityGroupsTable.id }).from(identityGroupsTable).where(and(
+    eq(identityGroupsTable.id, groupId),
+    eq(identityGroupsTable.corporationId, tenant.corporation.id),
+  ));
+  if (!group) {
+    res.status(404).json({ error: "Identity group not found" });
+    return;
+  }
+  const members = await db
+    .select({
+      id: identityGroupMembershipsTable.id,
+      groupId: identityGroupMembershipsTable.groupId,
+      userId: identityGroupMembershipsTable.userId,
+      characterId: identityGroupMembershipsTable.characterId,
+      characterName: charactersTable.eveCharacterName,
+      mainCharacterName: usersTable.eveCharacterName,
+      role: corporationMembershipsTable.role,
+      joinedAt: identityGroupMembershipsTable.createdAt,
+    })
+    .from(identityGroupMembershipsTable)
+    .innerJoin(usersTable, eq(usersTable.id, identityGroupMembershipsTable.userId))
+    .innerJoin(corporationMembershipsTable, and(
+      eq(corporationMembershipsTable.corporationId, tenant.corporation.id),
+      eq(corporationMembershipsTable.userId, identityGroupMembershipsTable.userId),
+    ))
+    .leftJoin(charactersTable, and(
+      eq(charactersTable.id, identityGroupMembershipsTable.characterId),
+      eq(charactersTable.corporationId, tenant.corporation.id),
+      isNull(charactersTable.deletedAt),
+    ))
+    .where(and(
+      eq(identityGroupMembershipsTable.corporationId, tenant.corporation.id),
+      eq(identityGroupMembershipsTable.groupId, groupId),
+    ))
+    .orderBy(charactersTable.eveCharacterName, usersTable.eveCharacterName);
+  res.json(members);
 });
 
 router.post("/identity-groups", async (req: Request, res: Response): Promise<void> => {

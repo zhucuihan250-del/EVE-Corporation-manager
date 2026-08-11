@@ -362,6 +362,16 @@ const zh = {
       observation: "观察",
       evidence: "证据",
       recommendation: "建议",
+      timeWindow: "重点时间窗",
+      actionSteps: "执行步骤",
+      successMetric: "验收指标",
+      verifyWith: "仍需核对",
+      relatedKillmails: "关联击杀邮件",
+      priority: {
+        critical: "紧急",
+        high: "高优先级",
+        medium: "中优先级",
+      },
       dataBoundaries: "数据边界",
       noAnalysis:
         "尚未运行战斗分析。开始分析后，系统会标记关键舰船、关键击杀和战损高峰。",

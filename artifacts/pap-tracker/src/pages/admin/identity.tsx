@@ -5,6 +5,7 @@ import {
   useCreateIdentitySkillPlan,
   useImportIdentitySkillPlan,
   useListIdentityApplications,
+  useListIdentityGroupMembers,
   useListIdentityGroups,
   useListIdentitySkillPlans,
   useReviewIdentityApplication,
@@ -72,6 +73,10 @@ export function AdminIdentity() {
   const groups = useListIdentityGroups({ includeInactive: true });
   const plans = useListIdentitySkillPlans();
   const applications = useListIdentityApplications();
+  const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
+  const groupMembers = useListIdentityGroupMembers(selectedGroupId ?? 0, {
+    query: { enabled: selectedGroupId !== null, queryKey: ["/api/identity-groups", selectedGroupId, "members"] },
+  });
   const createGroup = useCreateIdentityGroup();
   const updateGroup = useUpdateIdentityGroup();
   const importPlan = useImportIdentitySkillPlan();
@@ -82,6 +87,7 @@ export function AdminIdentity() {
   const [planDraft, setPlanDraft] = useState<PlanDraft>(emptyPlan);
   const [reviewNotes, setReviewNotes] = useState<Record<number, string>>({});
   const [showHistory, setShowHistory] = useState(false);
+  const selectedGroup = (groups.data ?? []).find((group) => group.id === selectedGroupId) ?? null;
 
   const statusText = useMemo(() => ({
     pending_skill_audit: tr("技能审核中", "Skill audit"),
@@ -241,7 +247,8 @@ export function AdminIdentity() {
           <label className="flex items-center gap-2 self-end pb-2 text-sm"><input type="checkbox" checked={groupDraft.isActive} onChange={(event) => setGroupDraft({ ...groupDraft, isActive: event.target.checked })} />{tr("身份组启用", "Identity group active")}</label>
           <div className="space-y-2 md:col-span-2"><Label>{tr("批准后自动授予的权限", "Permissions granted after approval")}</Label><div className="grid gap-2 rounded-md border border-border/50 p-3 md:grid-cols-2">{PERMISSIONS.map(([permission, cn, en]) => <label key={permission} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={groupDraft.permissions.includes(permission)} onChange={(event) => setGroupDraft({ ...groupDraft, permissions: event.target.checked ? [...groupDraft.permissions, permission] : groupDraft.permissions.filter((item) => item !== permission) })} />{tr(cn, en)}</label>)}</div></div>
           <div className="flex gap-2 md:col-span-2"><Button onClick={saveGroup}>{tr("保存身份组", "Save identity group")}</Button>{groupDraft.id && <Button variant="outline" onClick={() => setGroupDraft(emptyGroup())}>{tr("取消编辑", "Cancel editing")}</Button>}</div>
-          <div className="space-y-2 md:col-span-2 border-t border-border/50 pt-4"><Label>{tr("现有身份组", "Existing identity groups")}</Label><div className="grid gap-2 md:grid-cols-2">{(groups.data ?? []).map((group) => <div key={group.id} className="flex items-center justify-between rounded-md border border-border/50 p-3"><div><div className="font-medium">{group.name} {!group.isActive && <Badge variant="outline">{tr("停用", "Inactive")}</Badge>}</div><div className="text-xs text-muted-foreground">{group.skillPlans.map((plan) => plan.name).join(" · ") || tr("未套用方案", "No plans")}</div></div><Button size="sm" variant="outline" onClick={() => editGroup(group)}><Pencil className="mr-1 h-3 w-3" />{tr("编辑", "Edit")}</Button></div>)}</div></div>
+          <div className="space-y-2 md:col-span-2 border-t border-border/50 pt-4"><Label>{tr("现有身份组", "Existing identity groups")}</Label><div className="grid gap-2 md:grid-cols-2">{(groups.data ?? []).map((group) => <div key={group.id} className="flex items-center justify-between gap-3 rounded-md border border-border/50 p-3"><div><div className="font-medium">{group.name} {!group.isActive && <Badge variant="outline">{tr("停用", "Inactive")}</Badge>}</div><div className="text-xs text-muted-foreground">{group.skillPlans.map((plan) => plan.name).join(" · ") || tr("未套用方案", "No plans")}</div></div><div className="flex shrink-0 gap-2"><Button size="sm" variant={selectedGroupId === group.id ? "secondary" : "outline"} onClick={() => setSelectedGroupId(group.id)}><UsersRound className="mr-1 h-3 w-3" />{tr("成员", "Members")}</Button><Button size="sm" variant="outline" onClick={() => editGroup(group)}><Pencil className="mr-1 h-3 w-3" />{tr("编辑", "Edit")}</Button></div></div>)}</div></div>
+          {selectedGroup && <div className="space-y-3 rounded-md border border-primary/25 bg-primary/5 p-4 md:col-span-2"><div className="flex flex-wrap items-center justify-between gap-2"><div><div className="font-medium">{selectedGroup.name} · {tr("组内成员", "Group members")}</div><div className="text-xs text-muted-foreground">{tr("名单仅对本军团身份组管理员可见。", "This roster is visible only to identity managers in this corporation.")}</div></div><Badge variant="secondary">{tr(`${groupMembers.data?.length ?? 0} 人`, `${groupMembers.data?.length ?? 0} members`)}</Badge></div>{groupMembers.isLoading ? <p className="text-sm text-muted-foreground">{tr("正在读取成员…", "Loading members…")}</p> : groupMembers.isError ? <p className="text-sm text-destructive">{getErrorMessage(groupMembers.error)}</p> : (groupMembers.data?.length ?? 0) === 0 ? <p className="text-sm text-muted-foreground">{tr("该身份组暂无成员。", "This identity group has no members.")}</p> : <div className="grid gap-2 md:grid-cols-2">{groupMembers.data?.map((member) => <div key={member.id} className="rounded border border-border/50 bg-background/50 p-3"><div className="flex items-center justify-between gap-2"><span className="font-medium">{member.characterName ?? member.mainCharacterName ?? `#${member.userId}`}</span><Badge variant="outline">{member.role.toUpperCase()}</Badge></div>{member.characterName && member.mainCharacterName && member.characterName !== member.mainCharacterName && <div className="mt-1 text-xs text-muted-foreground">{tr("主角色", "Main character")}: {member.mainCharacterName}</div>}<div className="mt-1 text-xs text-muted-foreground">{tr("加入身份组", "Joined group")}: {new Date(member.joinedAt).toLocaleString()}</div></div>)}</div>}</div>}
         </CardContent>
       </Card>
 

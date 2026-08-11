@@ -591,6 +591,15 @@ export const BattleReplaySuggestionCategory = {
   other: "other",
 } as const;
 
+export type BattleReplaySuggestionPriority =
+  (typeof BattleReplaySuggestionPriority)[keyof typeof BattleReplaySuggestionPriority];
+
+export const BattleReplaySuggestionPriority = {
+  critical: "critical",
+  high: "high",
+  medium: "medium",
+} as const;
+
 export interface BattleReplaySuggestion {
   category: BattleReplaySuggestionCategory;
   title: string;
@@ -599,6 +608,11 @@ export interface BattleReplaySuggestion {
   recommendation: string;
   confidence: number;
   relatedKillmailIds: number[];
+  priority?: BattleReplaySuggestionPriority;
+  timeWindow?: string;
+  actionSteps?: string[];
+  successMetric?: string;
+  verifyWith?: string[];
 }
 
 export type BattleReplayPhaseKind =
@@ -1228,6 +1242,30 @@ export interface IdentityGroupInput {
   isActive?: boolean;
 }
 
+export type IdentityGroupMemberRole =
+  (typeof IdentityGroupMemberRole)[keyof typeof IdentityGroupMemberRole];
+
+export const IdentityGroupMemberRole = {
+  member: "member",
+  fc: "fc",
+  admin: "admin",
+  controller: "controller",
+} as const;
+
+export interface IdentityGroupMember {
+  id: number;
+  groupId: number;
+  userId: number;
+  /** @nullable */
+  characterId?: number | null;
+  /** @nullable */
+  characterName?: string | null;
+  /** @nullable */
+  mainCharacterName?: string | null;
+  role: IdentityGroupMemberRole;
+  joinedAt: string;
+}
+
 export type DiplomacyCaseCategory =
   (typeof DiplomacyCaseCategory)[keyof typeof DiplomacyCaseCategory];
 
@@ -1738,7 +1776,20 @@ export interface EconomySource {
   amount: number;
 }
 
+export type EconomyActionCategory =
+  (typeof EconomyActionCategory)[keyof typeof EconomyActionCategory];
+
+export const EconomyActionCategory = {
+  cost_control: "cost_control",
+  existing_revenue: "existing_revenue",
+  diversification: "diversification",
+  operations: "operations",
+  data_quality: "data_quality",
+} as const;
+
 export interface EconomyAction {
+  category?: EconomyActionCategory;
+  taxIndependent?: boolean;
   title: string;
   evidence: string;
   owner: string;
@@ -1774,6 +1825,17 @@ export type EconomySummaryConnection = { [key: string]: unknown } | null;
 
 export type EconomySummaryDivisionsItem = { [key: string]: unknown };
 
+export type EconomySummaryOperationalProgramsCourier = {
+  enabled: boolean;
+  completedOrders: number;
+  completedFees: number;
+  openOrders: number;
+};
+
+export type EconomySummaryOperationalPrograms = {
+  courier: EconomySummaryOperationalProgramsCourier;
+};
+
 export interface EconomySummary {
   /** @nullable */
   connection?: EconomySummaryConnection;
@@ -1790,6 +1852,7 @@ export interface EconomySummary {
   incomeSources: EconomySource[];
   expenseSources: EconomySource[];
   divisions: EconomySummaryDivisionsItem[];
+  operationalPrograms?: EconomySummaryOperationalPrograms;
   analysis?: EconomyAnalysis | null;
 }
 

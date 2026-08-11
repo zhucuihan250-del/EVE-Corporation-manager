@@ -144,8 +144,8 @@ export function BattleReplays() {
                     </div>
                     <p className="font-mono text-xs text-muted-foreground mt-2">
                       {format(new Date(report.startedAt), "yyyy-MM-dd HH:mm")} ·{" "}
-                      {systemCoverageLabel(report, t)}{" "}
-                      · FC {report.fleetCommander}
+                      {systemCoverageLabel(report, t)} · FC{" "}
+                      {report.fleetCommander}
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-5 font-mono text-xs">
@@ -331,8 +331,7 @@ export function BattleReplayWorkbench() {
           <p className="font-mono text-xs text-muted-foreground mt-2">
             {format(new Date(report.startedAt), "yyyy-MM-dd HH:mm")} –{" "}
             {format(new Date(report.endedAt), "HH:mm")} ·{" "}
-            {systemCoverageLabel(report, t)} · FC{" "}
-            {report.fleetCommander}
+            {systemCoverageLabel(report, t)} · FC {report.fleetCommander}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -489,9 +488,22 @@ export function BattleReplayWorkbench() {
                           key={`${suggestion.title}-${index}`}
                           className="border border-border/40 rounded-sm p-3"
                         >
-                          <p className="font-mono text-xs font-bold">
-                            {suggestion.title}
-                          </p>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="font-mono text-xs font-bold">
+                              {suggestion.title}
+                            </p>
+                            <Badge
+                              variant={
+                                suggestion.priority === "critical"
+                                  ? "destructive"
+                                  : "outline"
+                              }
+                            >
+                              {t(
+                                `battleReplay.priority.${suggestion.priority ?? "medium"}`,
+                              )}
+                            </Badge>
+                          </div>
                           <div className="mt-2 space-y-2 text-xs text-muted-foreground">
                             <p>
                               <span className="font-mono text-[10px] text-foreground/70">
@@ -511,6 +523,65 @@ export function BattleReplayWorkbench() {
                               </span>{" "}
                               {suggestion.recommendation}
                             </p>
+                            {suggestion.timeWindow && (
+                              <p>
+                                <span className="font-mono text-[10px] text-amber-300/90">
+                                  {t("battleReplay.timeWindow")}:
+                                </span>{" "}
+                                {suggestion.timeWindow}
+                              </p>
+                            )}
+                            {(suggestion.relatedKillmailIds?.length ?? 0) >
+                              0 && (
+                              <div>
+                                <span className="font-mono text-[10px] text-emerald-400/80">
+                                  {t("battleReplay.relatedKillmails")}:
+                                </span>
+                                <div className="mt-1 flex flex-wrap gap-1">
+                                  {suggestion.relatedKillmailIds.map((id) => (
+                                    <Badge
+                                      key={id}
+                                      variant="secondary"
+                                      className="font-mono text-[10px]"
+                                    >
+                                      KM #{id}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {(suggestion.actionSteps?.length ?? 0) > 0 && (
+                              <div>
+                                <div className="font-mono text-[10px] text-primary">
+                                  {t("battleReplay.actionSteps")}:
+                                </div>
+                                <ol className="mt-1 list-decimal space-y-1 pl-5 text-foreground/85">
+                                  {suggestion.actionSteps!.map(
+                                    (step, stepIndex) => (
+                                      <li key={`${step}-${stepIndex}`}>
+                                        {step}
+                                      </li>
+                                    ),
+                                  )}
+                                </ol>
+                              </div>
+                            )}
+                            {suggestion.successMetric && (
+                              <p>
+                                <span className="font-mono text-[10px] text-cyan-300/90">
+                                  {t("battleReplay.successMetric")}:
+                                </span>{" "}
+                                {suggestion.successMetric}
+                              </p>
+                            )}
+                            {(suggestion.verifyWith?.length ?? 0) > 0 && (
+                              <p>
+                                <span className="font-mono text-[10px] text-amber-300/90">
+                                  {t("battleReplay.verifyWith")}:
+                                </span>{" "}
+                                {suggestion.verifyWith!.join(" · ")}
+                              </p>
+                            )}
                           </div>
                           <p className="font-mono text-[10px] text-primary mt-2">
                             {t("battleReplay.confidence", {

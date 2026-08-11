@@ -9,6 +9,7 @@ import type { EconomyAnalysis } from "./economyAnalysis";
 import type { EconomySource } from "./economySource";
 import type { EconomySummaryConnection } from "./economySummaryConnection";
 import type { EconomySummaryDivisionsItem } from "./economySummaryDivisionsItem";
+import type { EconomySummaryOperationalPrograms } from "./economySummaryOperationalPrograms";
 
 export interface EconomySummary {
   /** @nullable */
@@ -26,5 +27,6 @@ export interface EconomySummary {
   incomeSources: EconomySource[];
   expenseSources: EconomySource[];
   divisions: EconomySummaryDivisionsItem[];
+  operationalPrograms?: EconomySummaryOperationalPrograms;
   analysis?: EconomyAnalysis | null;
 }

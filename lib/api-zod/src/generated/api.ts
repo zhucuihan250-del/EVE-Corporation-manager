@@ -852,6 +852,13 @@ export const GetBattleReportResponse = zod
                       recommendation: zod.string(),
                       confidence: zod.number(),
                       relatedKillmailIds: zod.array(zod.number()),
+                      priority: zod
+                        .enum(["critical", "high", "medium"])
+                        .optional(),
+                      timeWindow: zod.string().optional(),
+                      actionSteps: zod.array(zod.string()).optional(),
+                      successMetric: zod.string().optional(),
+                      verifyWith: zod.array(zod.string()).optional(),
                     }),
                   ),
                   phases: zod
@@ -1175,6 +1182,13 @@ export const GetBattleReplayResponse = zod
                       recommendation: zod.string(),
                       confidence: zod.number(),
                       relatedKillmailIds: zod.array(zod.number()),
+                      priority: zod
+                        .enum(["critical", "high", "medium"])
+                        .optional(),
+                      timeWindow: zod.string().optional(),
+                      actionSteps: zod.array(zod.string()).optional(),
+                      successMetric: zod.string().optional(),
+                      verifyWith: zod.array(zod.string()).optional(),
                     }),
                   ),
                   phases: zod
@@ -1338,6 +1352,13 @@ export const GetBattleReplayResponse = zod
                     recommendation: zod.string(),
                     confidence: zod.number(),
                     relatedKillmailIds: zod.array(zod.number()),
+                    priority: zod
+                      .enum(["critical", "high", "medium"])
+                      .optional(),
+                    timeWindow: zod.string().optional(),
+                    actionSteps: zod.array(zod.string()).optional(),
+                    successMetric: zod.string().optional(),
+                    verifyWith: zod.array(zod.string()).optional(),
                   }),
                 ),
                 phases: zod
@@ -1533,6 +1554,11 @@ export const UpdateBattleReplayResponse = zod.object({
             recommendation: zod.string(),
             confidence: zod.number(),
             relatedKillmailIds: zod.array(zod.number()),
+            priority: zod.enum(["critical", "high", "medium"]).optional(),
+            timeWindow: zod.string().optional(),
+            actionSteps: zod.array(zod.string()).optional(),
+            successMetric: zod.string().optional(),
+            verifyWith: zod.array(zod.string()).optional(),
           }),
         ),
         phases: zod
@@ -2342,6 +2368,27 @@ export const UpdateIdentityGroupResponse = zod.object({
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
+
+/**
+ * @summary List members of an identity group for identity managers
+ */
+export const ListIdentityGroupMembersParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListIdentityGroupMembersResponseItem = zod.object({
+  id: zod.number(),
+  groupId: zod.number(),
+  userId: zod.number(),
+  characterId: zod.number().nullish(),
+  characterName: zod.string().nullish(),
+  mainCharacterName: zod.string().nullish(),
+  role: zod.enum(["member", "fc", "admin", "controller"]),
+  joinedAt: zod.coerce.date(),
+});
+export const ListIdentityGroupMembersResponse = zod.array(
+  ListIdentityGroupMembersResponseItem,
+);
 
 export const ApplyIdentityGroupParams = zod.object({
   id: zod.coerce.number(),
@@ -3912,6 +3959,16 @@ export const GetEconomySummaryResponse = zod.object({
     }),
   ),
   divisions: zod.array(zod.record(zod.string(), zod.unknown())),
+  operationalPrograms: zod
+    .object({
+      courier: zod.object({
+        enabled: zod.boolean(),
+        completedOrders: zod.number(),
+        completedFees: zod.number(),
+        openOrders: zod.number(),
+      }),
+    })
+    .optional(),
   analysis: zod
     .union([
       zod.object({
@@ -3921,6 +3978,16 @@ export const GetEconomySummaryResponse = zod.object({
         summary: zod.string(),
         actions: zod.array(
           zod.object({
+            category: zod
+              .enum([
+                "cost_control",
+                "existing_revenue",
+                "diversification",
+                "operations",
+                "data_quality",
+              ])
+              .optional(),
+            taxIndependent: zod.boolean().optional(),
             title: zod.string(),
             evidence: zod.string(),
             owner: zod.string(),
@@ -3950,6 +4017,16 @@ export const AnalyzeCorporationEconomyResponse = zod.object({
   summary: zod.string(),
   actions: zod.array(
     zod.object({
+      category: zod
+        .enum([
+          "cost_control",
+          "existing_revenue",
+          "diversification",
+          "operations",
+          "data_quality",
+        ])
+        .optional(),
+      taxIndependent: zod.boolean().optional(),
       title: zod.string(),
       evidence: zod.string(),
       owner: zod.string(),

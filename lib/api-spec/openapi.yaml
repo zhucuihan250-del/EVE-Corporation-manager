@@ -1109,6 +1109,26 @@ paths:
               schema:
                 $ref: "#/components/schemas/IdentityGroup"
 
+  /identity-groups/{id}/members:
+    get:
+      operationId: listIdentityGroupMembers
+      tags: [identity]
+      summary: List members of an identity group for identity managers
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Members of the identity group in the active corporation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IdentityGroupMember"
+
   /identity-groups/{id}/applications:
     post:
       operationId: applyIdentityGroup
@@ -2812,6 +2832,21 @@ components:
           type: array
           items:
             type: integer
+        priority:
+          type: string
+          enum: [critical, high, medium]
+        timeWindow:
+          type: string
+        actionSteps:
+          type: array
+          items:
+            type: string
+        successMetric:
+          type: string
+        verifyWith:
+          type: array
+          items:
+            type: string
       required:
         [
           category,
@@ -3559,6 +3594,19 @@ components:
         isActive: { type: boolean }
       required: [name, category, description, requiredSkills]
 
+    IdentityGroupMember:
+      type: object
+      properties:
+        id: { type: integer }
+        groupId: { type: integer }
+        userId: { type: integer }
+        characterId: { type: ["integer", "null"] }
+        characterName: { type: ["string", "null"] }
+        mainCharacterName: { type: ["string", "null"] }
+        role: { type: string, enum: [member, fc, admin, controller] }
+        joinedAt: { type: string, format: date-time }
+      required: [id, groupId, userId, role, joinedAt]
+
     DiplomacyCase:
       type: object
       properties:
@@ -3948,6 +3996,10 @@ components:
     EconomyAction:
       type: object
       properties:
+        category:
+          type: string
+          enum: [cost_control, existing_revenue, diversification, operations, data_quality]
+        taxIndependent: { type: boolean }
         title: { type: string }
         evidence: { type: string }
         owner: { type: string }
@@ -4004,6 +4056,18 @@ components:
           items:
             type: object
             additionalProperties: true
+        operationalPrograms:
+          type: object
+          properties:
+            courier:
+              type: object
+              properties:
+                enabled: { type: boolean }
+                completedOrders: { type: integer }
+                completedFees: { type: number }
+                openOrders: { type: integer }
+              required: [enabled, completedOrders, completedFees, openOrders]
+          required: [courier]
         analysis:
           oneOf:
             - $ref: "#/components/schemas/EconomyAnalysis"

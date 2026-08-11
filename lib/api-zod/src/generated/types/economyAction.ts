@@ -5,8 +5,11 @@
  * EVE Online PAP Tracking System API
  * OpenAPI spec version: 0.1.0
  */
+import type { EconomyActionCategory } from "./economyActionCategory";
 
 export interface EconomyAction {
+  category?: EconomyActionCategory;
+  taxIndependent?: boolean;
   title: string;
   evidence: string;
   owner: string;

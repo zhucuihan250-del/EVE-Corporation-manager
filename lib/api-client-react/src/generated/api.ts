@@ -68,6 +68,7 @@ import type {
   IdentityApplication,
   IdentityGroup,
   IdentityGroupInput,
+  IdentityGroupMember,
   IdentitySkillPlanImportInput,
   IdentitySkillPlanImportResult,
   ListIdentityApplicationsParams,
@@ -4503,6 +4504,98 @@ export const useUpdateIdentityGroup = <
 > => {
   return useMutation(getUpdateIdentityGroupMutationOptions(options));
 };
+
+/**
+ * @summary List members of an identity group for identity managers
+ */
+export const getListIdentityGroupMembersUrl = (id: number) => {
+  return `/api/identity-groups/${id}/members`;
+};
+
+export const listIdentityGroupMembers = async (
+  id: number,
+  options?: RequestInit,
+): Promise<IdentityGroupMember[]> => {
+  return customFetch<IdentityGroupMember[]>(
+    getListIdentityGroupMembersUrl(id),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListIdentityGroupMembersQueryKey = (id: number) => {
+  return [`/api/identity-groups/${id}/members`] as const;
+};
+
+export const getListIdentityGroupMembersQueryOptions = <
+  TData = Awaited<ReturnType<typeof listIdentityGroupMembers>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listIdentityGroupMembers>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListIdentityGroupMembersQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listIdentityGroupMembers>>
+  > = ({ signal }) =>
+    listIdentityGroupMembers(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listIdentityGroupMembers>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListIdentityGroupMembersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listIdentityGroupMembers>>
+>;
+export type ListIdentityGroupMembersQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List members of an identity group for identity managers
+ */
+
+export function useListIdentityGroupMembers<
+  TData = Awaited<ReturnType<typeof listIdentityGroupMembers>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listIdentityGroupMembers>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListIdentityGroupMembersQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 export const getApplyIdentityGroupUrl = (id: number) => {
   return `/api/identity-groups/${id}/applications`;

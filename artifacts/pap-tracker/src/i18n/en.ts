@@ -382,6 +382,16 @@ const en = {
       observation: "OBSERVATION",
       evidence: "EVIDENCE",
       recommendation: "RECOMMENDATION",
+      timeWindow: "FOCUS WINDOW",
+      actionSteps: "ACTION STEPS",
+      successMetric: "SUCCESS METRIC",
+      verifyWith: "VERIFY WITH",
+      relatedKillmails: "RELATED KILLMAILS",
+      priority: {
+        critical: "CRITICAL",
+        high: "HIGH PRIORITY",
+        medium: "MEDIUM PRIORITY",
+      },
       dataBoundaries: "DATA BOUNDARIES",
       noAnalysis:
         "No battle analysis has been run. Start analysis to mark key ships, key kills, and loss peaks.",

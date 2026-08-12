@@ -40,6 +40,7 @@ import { Economy } from "@/pages/economy";
 import { ReimbursementSettings } from "@/pages/reimbursement-settings";
 import { Courier } from "@/pages/courier";
 import { AdminCourier } from "@/pages/admin/courier";
+import { Structures } from "@/pages/structures";
 import type { CorporationModules, CurrentUser } from "@workspace/api-client-react";
 
 const queryClient = new QueryClient({
@@ -65,6 +66,7 @@ function defaultLanding(user: CurrentUser): string {
   if (user.modules.reimbursement && user.permissions.includes("reimbursement.window.manage")) return "/reimbursement-settings";
   if (user.modules.diplomacy) return "/diplomacy";
   if (user.modules.courier) return "/courier";
+  if (user.modules.structures && hasRole(user.role, "admin")) return "/structures";
   return "/";
 }
 
@@ -203,6 +205,9 @@ function Router() {
       </Route>
       <Route path="/economy">
         {() => <ProtectedRoute component={Economy} module="economy" permission="economy.view" />}
+      </Route>
+      <Route path="/structures">
+        {() => <ProtectedRoute component={Structures} minRole="admin" module="structures" />}
       </Route>
       <Route path="/command/battle-replays/:id">
         {() => (

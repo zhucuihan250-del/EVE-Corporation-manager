@@ -19,6 +19,7 @@ import economyRouter from "./economy";
 import activityRouter from "./activity";
 import tacticalGroupsRouter from "./tactical-groups";
 import courierRouter from "./courier";
+import structuresRouter from "./structures";
 
 const router: IRouter = Router();
 
@@ -42,5 +43,6 @@ router.use(economyRouter);
 router.use(activityRouter);
 router.use(tacticalGroupsRouter);
 router.use(courierRouter);
+router.use(structuresRouter);
 
 export default router;

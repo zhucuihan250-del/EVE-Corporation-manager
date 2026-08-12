@@ -34,6 +34,7 @@ export const GetMeResponse = zod.object({
     reimbursement: zod.boolean(),
     diplomacy: zod.boolean(),
     courier: zod.boolean(),
+    structures: zod.boolean(),
   }),
   reimbursementOpen: zod.boolean(),
   tacticalGroups: zod.array(
@@ -4043,6 +4044,80 @@ export const AnalyzeCorporationEconomyResponse = zod.object({
       kpi: zod.string(),
       risk: zod.string(),
       confidence: zod.number(),
+    }),
+  ),
+});
+
+/**
+ * @summary Browse the active corporation's structures and fuel expiry
+ */
+export const GetCorporationStructuresResponse = zod.object({
+  connection: zod
+    .object({
+      characterId: zod.number(),
+      status: zod.enum(["connected", "error"]),
+      lastError: zod.string().nullable(),
+      lastSyncedAt: zod.coerce.date().nullable(),
+    })
+    .nullable(),
+  serverTime: zod.coerce.date(),
+  structures: zod.array(
+    zod.object({
+      structureId: zod.string(),
+      name: zod.string(),
+      typeId: zod.number(),
+      typeName: zod.string(),
+      systemId: zod.number(),
+      systemName: zod.string(),
+      state: zod.string(),
+      fuelExpiresAt: zod.coerce.date().nullable(),
+      stateTimerStart: zod.coerce.date().nullable(),
+      stateTimerEnd: zod.coerce.date().nullable(),
+      unanchorsAt: zod.coerce.date().nullable(),
+      services: zod.array(
+        zod.object({
+          name: zod.string(),
+          state: zod.enum(["online", "offline", "cleanup"]),
+        }),
+      ),
+      lastSeenAt: zod.coerce.date(),
+    }),
+  ),
+});
+
+/**
+ * @summary Refresh the active corporation's structures from EVE ESI
+ */
+export const SyncCorporationStructuresResponse = zod.object({
+  connection: zod
+    .object({
+      characterId: zod.number(),
+      status: zod.enum(["connected", "error"]),
+      lastError: zod.string().nullable(),
+      lastSyncedAt: zod.coerce.date().nullable(),
+    })
+    .nullable(),
+  serverTime: zod.coerce.date(),
+  structures: zod.array(
+    zod.object({
+      structureId: zod.string(),
+      name: zod.string(),
+      typeId: zod.number(),
+      typeName: zod.string(),
+      systemId: zod.number(),
+      systemName: zod.string(),
+      state: zod.string(),
+      fuelExpiresAt: zod.coerce.date().nullable(),
+      stateTimerStart: zod.coerce.date().nullable(),
+      stateTimerEnd: zod.coerce.date().nullable(),
+      unanchorsAt: zod.coerce.date().nullable(),
+      services: zod.array(
+        zod.object({
+          name: zod.string(),
+          state: zod.enum(["online", "offline", "cleanup"]),
+        }),
+      ),
+      lastSeenAt: zod.coerce.date(),
     }),
   ),
 });

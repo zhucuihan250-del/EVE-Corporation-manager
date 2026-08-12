@@ -50,6 +50,13 @@ export function getCorporationRosterAuthorizationUrl(callbackUrl: string, state:
   ], state);
 }
 
+export function getCorporationStructuresAuthorizationUrl(callbackUrl: string, state: string): string {
+  return buildAuthorizationUrl(callbackUrl, [
+    "publicData",
+    "esi-corporations.read_structures.v1",
+  ], state);
+}
+
 export async function exchangeCode(code: string, callbackUrl: string): Promise<{
   accessToken: string;
   refreshToken: string;

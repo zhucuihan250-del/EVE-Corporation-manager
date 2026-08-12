@@ -34,6 +34,7 @@ import type {
   Character,
   CorporationSkillPlan,
   CorporationSkillPlanInput,
+  CorporationStructuresDashboard,
   CourierAdminData,
   CourierAgent,
   CourierOrder,
@@ -7834,4 +7835,244 @@ export const useAnalyzeCorporationEconomy = <
   TContext
 > => {
   return useMutation(getAnalyzeCorporationEconomyMutationOptions(options));
+};
+
+/**
+ * @summary Browse the active corporation's structures and fuel expiry
+ */
+export const getGetCorporationStructuresUrl = () => {
+  return `/api/structures`;
+};
+
+export const getCorporationStructures = async (
+  options?: RequestInit,
+): Promise<CorporationStructuresDashboard> => {
+  return customFetch<CorporationStructuresDashboard>(
+    getGetCorporationStructuresUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetCorporationStructuresQueryKey = () => {
+  return [`/api/structures`] as const;
+};
+
+export const getGetCorporationStructuresQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCorporationStructures>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getCorporationStructures>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetCorporationStructuresQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getCorporationStructures>>
+  > = ({ signal }) => getCorporationStructures({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCorporationStructures>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetCorporationStructuresQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCorporationStructures>>
+>;
+export type GetCorporationStructuresQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Browse the active corporation's structures and fuel expiry
+ */
+
+export function useGetCorporationStructures<
+  TData = Awaited<ReturnType<typeof getCorporationStructures>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getCorporationStructures>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetCorporationStructuresQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Start independent EVE SSO authorization for corporation structures
+ */
+export const getConnectCorporationStructuresUrl = () => {
+  return `/api/structures/connect`;
+};
+
+export const connectCorporationStructures = async (
+  options?: RequestInit,
+): Promise<unknown> => {
+  return customFetch<unknown>(getConnectCorporationStructuresUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getConnectCorporationStructuresQueryKey = () => {
+  return [`/api/structures/connect`] as const;
+};
+
+export const getConnectCorporationStructuresQueryOptions = <
+  TData = Awaited<ReturnType<typeof connectCorporationStructures>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof connectCorporationStructures>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getConnectCorporationStructuresQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof connectCorporationStructures>>
+  > = ({ signal }) =>
+    connectCorporationStructures({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof connectCorporationStructures>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ConnectCorporationStructuresQueryResult = NonNullable<
+  Awaited<ReturnType<typeof connectCorporationStructures>>
+>;
+export type ConnectCorporationStructuresQueryError = ErrorType<void>;
+
+/**
+ * @summary Start independent EVE SSO authorization for corporation structures
+ */
+
+export function useConnectCorporationStructures<
+  TData = Awaited<ReturnType<typeof connectCorporationStructures>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof connectCorporationStructures>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getConnectCorporationStructuresQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Refresh the active corporation's structures from EVE ESI
+ */
+export const getSyncCorporationStructuresUrl = () => {
+  return `/api/structures/sync`;
+};
+
+export const syncCorporationStructures = async (
+  options?: RequestInit,
+): Promise<CorporationStructuresDashboard> => {
+  return customFetch<CorporationStructuresDashboard>(
+    getSyncCorporationStructuresUrl(),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getSyncCorporationStructuresMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof syncCorporationStructures>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof syncCorporationStructures>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["syncCorporationStructures"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof syncCorporationStructures>>,
+    void
+  > = () => {
+    return syncCorporationStructures(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SyncCorporationStructuresMutationResult = NonNullable<
+  Awaited<ReturnType<typeof syncCorporationStructures>>
+>;
+
+export type SyncCorporationStructuresMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Refresh the active corporation's structures from EVE ESI
+ */
+export const useSyncCorporationStructures = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof syncCorporationStructures>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof syncCorporationStructures>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getSyncCorporationStructuresMutationOptions(options));
 };

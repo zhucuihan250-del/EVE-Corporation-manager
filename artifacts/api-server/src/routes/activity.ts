@@ -196,6 +196,7 @@ router.get("/activity/new-members/connect", (req: Request, res: Response): void 
   const state = generateOauthState();
   req.session.rosterLinkCorporationId = req.tenant!.corporation.id;
   req.session.economyLinkCorporationId = undefined;
+  req.session.structuresLinkCorporationId = undefined;
   req.session.linkingUserId = undefined;
   req.session.eveOauthState = state;
   req.session.eveOauthFlow = "roster";

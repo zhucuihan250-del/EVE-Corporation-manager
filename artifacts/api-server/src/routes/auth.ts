@@ -1,6 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import {
   corporationRosterConnectionsTable,
+  corporationStructureConnectionsTable,
   corporationWalletConnectionsTable,
   corporationMembershipsTable,
   db,
@@ -239,6 +240,7 @@ router.get("/auth/eve/login", (req: Request, res: Response): void => {
   req.session.linkingUserId = undefined;
   req.session.economyLinkCorporationId = undefined;
   req.session.rosterLinkCorporationId = undefined;
+  req.session.structuresLinkCorporationId = undefined;
   req.session.save((error) => {
     if (error) {
       res.status(500).json({ error: "Unable to start EVE SSO" });
@@ -254,6 +256,7 @@ router.get("/auth/eve/link-alt", requireAuth, (req: Request, res: Response): voi
   req.session.linkingUserId = req.session.userId;
   req.session.economyLinkCorporationId = undefined;
   req.session.rosterLinkCorporationId = undefined;
+  req.session.structuresLinkCorporationId = undefined;
   const state = generateOauthState();
   req.session.eveOauthState = state;
   req.session.eveOauthFlow = "link_alt";
@@ -285,6 +288,7 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
   if (
     (oauthFlow === "economy" && !req.session.economyLinkCorporationId)
     || (oauthFlow === "roster" && !req.session.rosterLinkCorporationId)
+    || (oauthFlow === "structures" && !req.session.structuresLinkCorporationId)
     || (oauthFlow === "link_alt" && !req.session.linkingUserId)
   ) {
     res.status(400).json({ error: "Invalid EVE SSO flow" });
@@ -315,6 +319,49 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
       ? await getCorporationJoinDate(characterId, corporationId)
       : null;
     const mainCharacterTokens = { accessToken, refreshToken, tokenExpiry, corporationJoinedAt };
+
+    if (oauthFlow === "structures" && req.session.structuresLinkCorporationId) {
+      const targetCorporationId = req.session.structuresLinkCorporationId;
+      req.session.structuresLinkCorporationId = undefined;
+      const tenant = await getTenantContext(req);
+      if (
+        !tenant
+        || tenant.corporation.id !== targetCorporationId
+        || corporationId !== targetCorporationId
+        || !hasRole(tenant.membership.role, "admin")
+      ) {
+        redirectToFrontend(res, "/structures?error=structures_forbidden");
+        return;
+      }
+      await db
+        .insert(corporationStructureConnectionsTable)
+        .values({
+          corporationId: targetCorporationId,
+          characterId,
+          connectedBy: tenant.user.id,
+          accessToken,
+          refreshToken,
+          tokenExpiry,
+          status: "connected",
+          lastError: null,
+        })
+        .onConflictDoUpdate({
+          target: corporationStructureConnectionsTable.corporationId,
+          set: {
+            characterId,
+            connectedBy: tenant.user.id,
+            accessToken,
+            refreshToken,
+            tokenExpiry,
+            status: "connected",
+            lastError: null,
+            updatedAt: new Date(),
+          },
+        });
+      req.session.save(() => {});
+      redirectToFrontend(res, "/structures?authorization=connected");
+      return;
+    }
 
     if (oauthFlow === "roster" && req.session.rosterLinkCorporationId) {
       const targetCorporationId = req.session.rosterLinkCorporationId;
@@ -785,6 +832,7 @@ router.get("/auth/me", requireAuth, async (req: Request, res: Response): Promise
       reimbursement: tenant.corporation.reimbursementEnabled,
       diplomacy: tenant.corporation.diplomacyEnabled,
       courier: tenant.corporation.courierEnabled,
+      structures: tenant.corporation.structuresEnabled,
     },
     totalPap: tenant.corporation.papEnabled ? tenant.user.totalPap : 0,
     redeemablePap: tenant.corporation.papEnabled ? tenant.user.redeemablePap : 0,

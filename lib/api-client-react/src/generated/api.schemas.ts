@@ -37,6 +37,7 @@ export interface CorporationModules {
   reimbursement: boolean;
   diplomacy: boolean;
   courier: boolean;
+  structures: boolean;
 }
 
 export interface TacticalGroupSummary {
@@ -1062,6 +1063,57 @@ export interface RecentUnboundMemberAudit {
   recentMemberCount: number;
   unboundMemberCount: number;
   members: RecentUnboundMember[];
+}
+
+export type CorporationStructureConnectionStatus =
+  (typeof CorporationStructureConnectionStatus)[keyof typeof CorporationStructureConnectionStatus];
+
+export const CorporationStructureConnectionStatus = {
+  connected: "connected",
+  error: "error",
+} as const;
+
+export interface CorporationStructureConnection {
+  characterId: number;
+  status: CorporationStructureConnectionStatus;
+  lastError: string | null;
+  lastSyncedAt: string | null;
+}
+
+export type CorporationStructureServiceState =
+  (typeof CorporationStructureServiceState)[keyof typeof CorporationStructureServiceState];
+
+export const CorporationStructureServiceState = {
+  online: "online",
+  offline: "offline",
+  cleanup: "cleanup",
+} as const;
+
+export interface CorporationStructureService {
+  name: string;
+  state: CorporationStructureServiceState;
+}
+
+export interface CorporationStructure {
+  structureId: string;
+  name: string;
+  typeId: number;
+  typeName: string;
+  systemId: number;
+  systemName: string;
+  state: string;
+  fuelExpiresAt: string | null;
+  stateTimerStart: string | null;
+  stateTimerEnd: string | null;
+  unanchorsAt: string | null;
+  services: CorporationStructureService[];
+  lastSeenAt: string;
+}
+
+export interface CorporationStructuresDashboard {
+  connection: CorporationStructureConnection | null;
+  serverTime: string;
+  structures: CorporationStructure[];
 }
 
 export interface RequiredSkill {

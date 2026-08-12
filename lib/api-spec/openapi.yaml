@@ -1865,6 +1865,41 @@ paths:
               schema:
                 $ref: "#/components/schemas/EconomyAnalysis"
 
+  /structures:
+    get:
+      operationId: getCorporationStructures
+      tags: [structures]
+      summary: Browse the active corporation's structures and fuel expiry
+      responses:
+        "200":
+          description: Corporation-isolated structure dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CorporationStructuresDashboard"
+
+  /structures/connect:
+    get:
+      operationId: connectCorporationStructures
+      tags: [structures]
+      summary: Start independent EVE SSO authorization for corporation structures
+      responses:
+        "302":
+          description: Redirect to EVE SSO structure authorization
+
+  /structures/sync:
+    post:
+      operationId: syncCorporationStructures
+      tags: [structures]
+      summary: Refresh the active corporation's structures from EVE ESI
+      responses:
+        "200":
+          description: Synchronized corporation structure dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CorporationStructuresDashboard"
+
 components:
   schemas:
     HealthStatus:
@@ -3418,7 +3453,76 @@ components:
         reimbursement: { type: boolean }
         diplomacy: { type: boolean }
         courier: { type: boolean }
-      required: [pap, identity, economy, fleet, reimbursement, diplomacy, courier]
+        structures: { type: boolean }
+      required: [pap, identity, economy, fleet, reimbursement, diplomacy, courier, structures]
+
+    CorporationStructureConnection:
+      type: object
+      properties:
+        characterId: { type: integer }
+        status:
+          type: string
+          enum: [connected, error]
+        lastError: { type: string, nullable: true }
+        lastSyncedAt: { type: string, format: date-time, nullable: true }
+      required: [characterId, status, lastError, lastSyncedAt]
+
+    CorporationStructureService:
+      type: object
+      properties:
+        name: { type: string }
+        state:
+          type: string
+          enum: [online, offline, cleanup]
+      required: [name, state]
+
+    CorporationStructure:
+      type: object
+      properties:
+        structureId: { type: string }
+        name: { type: string }
+        typeId: { type: integer }
+        typeName: { type: string }
+        systemId: { type: integer }
+        systemName: { type: string }
+        state: { type: string }
+        fuelExpiresAt: { type: string, format: date-time, nullable: true }
+        stateTimerStart: { type: string, format: date-time, nullable: true }
+        stateTimerEnd: { type: string, format: date-time, nullable: true }
+        unanchorsAt: { type: string, format: date-time, nullable: true }
+        services:
+          type: array
+          items:
+            $ref: "#/components/schemas/CorporationStructureService"
+        lastSeenAt: { type: string, format: date-time }
+      required:
+        - structureId
+        - name
+        - typeId
+        - typeName
+        - systemId
+        - systemName
+        - state
+        - fuelExpiresAt
+        - stateTimerStart
+        - stateTimerEnd
+        - unanchorsAt
+        - services
+        - lastSeenAt
+
+    CorporationStructuresDashboard:
+      type: object
+      properties:
+        connection:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/CorporationStructureConnection"
+        serverTime: { type: string, format: date-time }
+        structures:
+          type: array
+          items:
+            $ref: "#/components/schemas/CorporationStructure"
+      required: [connection, serverTime, structures]
 
     RequiredSkill:
       type: object

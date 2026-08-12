@@ -53,6 +53,7 @@ export async function ensureCorporation(
           reimbursementEnabled: true,
           diplomacyEnabled: true,
           courierEnabled: false,
+          structuresEnabled: false,
         }).where(eq(corporationsTable.isPrimary, true));
         const [promoted] = await tx.update(corporationsTable).set({
           isPrimary: true,
@@ -63,6 +64,7 @@ export async function ensureCorporation(
           reimbursementEnabled: true,
           diplomacyEnabled: true,
           courierEnabled: true,
+          structuresEnabled: true,
         }).where(eq(corporationsTable.id, corporationId)).returning();
         return promoted;
       }
@@ -95,6 +97,7 @@ export async function ensureCorporation(
         reimbursementEnabled: true,
         diplomacyEnabled: true,
         courierEnabled: false,
+        structuresEnabled: false,
       }).where(eq(corporationsTable.isPrimary, true));
     }
     const [created] = await tx
@@ -110,6 +113,7 @@ export async function ensureCorporation(
         reimbursementEnabled: true,
         diplomacyEnabled: true,
         courierEnabled: isPrimary,
+        structuresEnabled: isPrimary,
       })
       .returning();
     return created;
@@ -267,7 +271,8 @@ export type CorporationModule =
   | "fleet"
   | "reimbursement"
   | "diplomacy"
-  | "courier";
+  | "courier"
+  | "structures";
 
 export function moduleEnabled(
   tenant: TenantContext,

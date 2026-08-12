@@ -23,6 +23,7 @@ export const corporationsTable = pgTable("corporations", {
   reimbursementOpen: boolean("reimbursement_open").notNull().default(true),
   diplomacyEnabled: boolean("diplomacy_enabled").notNull().default(true),
   courierEnabled: boolean("courier_enabled").notNull().default(false),
+  structuresEnabled: boolean("structures_enabled").notNull().default(false),
   activityMinimumPap: doublePrecision("activity_minimum_pap").notNull().default(2),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })

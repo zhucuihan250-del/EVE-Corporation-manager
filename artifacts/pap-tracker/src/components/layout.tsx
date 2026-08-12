@@ -8,6 +8,7 @@ import {
   History, Inbox, Languages, Landmark, LayoutDashboard, LogOut, Radio, ReceiptText,
   LockKeyhole, ShieldAlert, ShieldCheck, Swords, UserSquare2, Users, Wrench,
   Truck,
+  Building2,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent,
@@ -101,6 +102,9 @@ export function Layout({ children }: { children: ReactNode }) {
   const directorItems: NavItem[] = [];
   if (user?.permissions.includes("economy.view") && modules?.economy) {
     directorItems.push({ href: "/economy", label: tr("军团经济", "Corporation economy"), icon: Landmark });
+  }
+  if (isAdmin && modules?.structures) {
+    directorItems.push({ href: "/structures", label: tr("建筑浏览", "Structures"), icon: Building2 });
   }
 
   const tacticalGroups = user?.tacticalGroups ?? [];

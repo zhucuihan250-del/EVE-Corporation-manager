@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { apiUrl } from "@/lib/api";
 import { getErrorMessage, isUnauthorizedError } from "@/lib/api-error";
+import { defaultLanding } from "@/lib/navigation";
 
 export function Login() {
   const { t } = useTranslation();
@@ -15,7 +16,7 @@ export function Login() {
 
   useEffect(() => {
     if (!isLoading && user) {
-      setLocation(user.modules.pap ? "/dashboard" : user.modules.reimbursement ? "/reimbursements" : "/diplomacy");
+      setLocation(defaultLanding(user));
     }
   }, [user, isLoading, setLocation]);
 

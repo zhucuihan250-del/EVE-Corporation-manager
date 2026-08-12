@@ -1,6 +1,7 @@
 import type { ElementType, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { useGetMe, useLogout } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 import {
@@ -25,6 +26,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const tr = (cn: string, en: string) => zh ? cn : en;
   const { data: user } = useGetMe();
   const logoutMutation = useLogout();
+  const queryClient = useQueryClient();
   const [location, setLocation] = useLocation();
   const modules = user?.modules;
 
@@ -172,7 +174,7 @@ export function Layout({ children }: { children: ReactNode }) {
             <div className="flex flex-col gap-4">
               <div className="text-xs font-mono text-muted-foreground flex flex-col gap-1"><span className="text-foreground">{user?.eveCharacterName || user?.eveCharacterId || t("nav.unknownPilot")}</span><span>{user?.corporationName}</span>{modules?.pap && <span className="text-primary">{user?.totalPap} PAP</span>}</div>
               <Button variant="outline" className="w-full justify-start text-muted-foreground hover:text-primary hover:bg-primary/10 font-mono text-xs border-border/50" onClick={() => { const next = i18n.language === "en" ? "zh" : "en"; i18n.changeLanguage(next); localStorage.setItem("pap-lang", next); }}><Languages className="w-4 h-4 mr-2" />{i18n.language === "en" ? "中文" : "English"}</Button>
-              <Button variant="outline" className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 font-mono text-xs border-border/50" onClick={() => logoutMutation.mutate(undefined, { onSuccess: () => setLocation("/") })}><LogOut className="w-4 h-4 mr-2" />{t("nav.disconnect")}</Button>
+              <Button variant="outline" className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 font-mono text-xs border-border/50" onClick={() => logoutMutation.mutate(undefined, { onSuccess: () => { queryClient.clear(); setLocation("/"); } })}><LogOut className="w-4 h-4 mr-2" />{t("nav.disconnect")}</Button>
             </div>
           </SidebarFooter>
         </Sidebar>

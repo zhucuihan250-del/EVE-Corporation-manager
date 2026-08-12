@@ -145,13 +145,29 @@ app.use("/api", router);
 
 if (isProduction) {
   if (existsSync(frontendIndexFile)) {
-    app.use(express.static(frontendStaticDir, { index: false }));
+    app.use(express.static(frontendStaticDir, {
+      index: false,
+      setHeaders(res, filePath) {
+        if (path.basename(filePath) === "index.html") {
+          res.setHeader("Cache-Control", "no-cache");
+          return;
+        }
+
+        if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+          return;
+        }
+
+        res.setHeader("Cache-Control", "public, max-age=3600");
+      },
+    }));
     app.use((req, res, next) => {
       if (req.method !== "GET" || req.path.startsWith("/api")) {
         next();
         return;
       }
 
+      res.set("Cache-Control", "no-cache");
       res.sendFile(frontendIndexFile);
     });
   } else {

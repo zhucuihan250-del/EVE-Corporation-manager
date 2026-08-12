@@ -4,70 +4,79 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useGetMe } from "@workspace/api-client-react";
 import { Loader2 } from "lucide-react";
-import { useEffect } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  type ComponentType,
+  type LazyExoticComponent,
+} from "react";
 import {
   AppErrorBoundary,
   AppLoadError,
 } from "@/components/app-error-boundary";
 import { isUnauthorizedError } from "@/lib/api-error";
+import {
+  defaultLanding,
+  hasRole,
+  REIMBURSEMENT_REVIEW_PERMISSIONS,
+  type Role,
+} from "@/lib/navigation";
 
 import NotFound from "@/pages/not-found";
 import { Login } from "@/pages/login";
-import { Layout } from "@/components/layout";
-import { Dashboard } from "@/pages/dashboard";
-import { History } from "@/pages/history";
-import { Rewards } from "@/pages/rewards";
-import { Redemptions } from "@/pages/redemptions";
+import type { CorporationModules } from "@workspace/api-client-react";
 
-import { AdminDashboard } from "@/pages/admin";
-import { AdminUsers } from "@/pages/admin/users";
-import { AdminFleets } from "@/pages/admin/fleets";
-import { AdminRewards } from "@/pages/admin/rewards";
-import { AdminRedemptions } from "@/pages/admin/redemptions";
-import { AdminPap } from "@/pages/admin/pap";
-import { AdminAnnouncements } from "@/pages/admin/announcements";
-import { AdminActivity } from "@/pages/admin/activity";
-import { AdminIdentity } from "@/pages/admin/identity";
-import { Characters } from "@/pages/characters";
-import { Fitting } from "@/pages/fitting";
-import { BattleReportDetail, BattleReports } from "@/pages/battle-reports";
-import { BattleReplayWorkbench, BattleReplays } from "@/pages/battle-replays";
-import { IdentityGroups } from "@/pages/identity-groups";
-import { Diplomacy } from "@/pages/diplomacy";
-import { Reimbursements, TacticalReimbursements } from "@/pages/reimbursements";
-import { TacticalDashboard } from "@/pages/tactical-dashboard";
-import { Economy } from "@/pages/economy";
-import { ReimbursementSettings } from "@/pages/reimbursement-settings";
-import { Courier } from "@/pages/courier";
-import { AdminCourier } from "@/pages/admin/courier";
-import { Structures } from "@/pages/structures";
-import type { CorporationModules, CurrentUser } from "@workspace/api-client-react";
+const Layout = lazy(() => import("@/components/layout").then((module) => ({ default: module.Layout })));
+const Dashboard = lazy(() => import("@/pages/dashboard").then((module) => ({ default: module.Dashboard })));
+const History = lazy(() => import("@/pages/history").then((module) => ({ default: module.History })));
+const Rewards = lazy(() => import("@/pages/rewards").then((module) => ({ default: module.Rewards })));
+const Redemptions = lazy(() => import("@/pages/redemptions").then((module) => ({ default: module.Redemptions })));
+const Characters = lazy(() => import("@/pages/characters").then((module) => ({ default: module.Characters })));
+const Fitting = lazy(() => import("@/pages/fitting").then((module) => ({ default: module.Fitting })));
+const BattleReportDetail = lazy(() => import("@/pages/battle-reports").then((module) => ({ default: module.BattleReportDetail })));
+const BattleReports = lazy(() => import("@/pages/battle-reports").then((module) => ({ default: module.BattleReports })));
+const BattleReplayWorkbench = lazy(() => import("@/pages/battle-replays").then((module) => ({ default: module.BattleReplayWorkbench })));
+const BattleReplays = lazy(() => import("@/pages/battle-replays").then((module) => ({ default: module.BattleReplays })));
+const IdentityGroups = lazy(() => import("@/pages/identity-groups").then((module) => ({ default: module.IdentityGroups })));
+const Diplomacy = lazy(() => import("@/pages/diplomacy").then((module) => ({ default: module.Diplomacy })));
+const Courier = lazy(() => import("@/pages/courier").then((module) => ({ default: module.Courier })));
+const Reimbursements = lazy(() => import("@/pages/reimbursements").then((module) => ({ default: module.Reimbursements })));
+const TacticalReimbursements = lazy(() => import("@/pages/reimbursements").then((module) => ({ default: module.TacticalReimbursements })));
+const TacticalDashboard = lazy(() => import("@/pages/tactical-dashboard").then((module) => ({ default: module.TacticalDashboard })));
+const ReimbursementSettings = lazy(() => import("@/pages/reimbursement-settings").then((module) => ({ default: module.ReimbursementSettings })));
+const Economy = lazy(() => import("@/pages/economy").then((module) => ({ default: module.Economy })));
+const Structures = lazy(() => import("@/pages/structures").then((module) => ({ default: module.Structures })));
+const AdminDashboard = lazy(() => import("@/pages/admin").then((module) => ({ default: module.AdminDashboard })));
+const AdminUsers = lazy(() => import("@/pages/admin/users").then((module) => ({ default: module.AdminUsers })));
+const AdminFleets = lazy(() => import("@/pages/admin/fleets").then((module) => ({ default: module.AdminFleets })));
+const AdminRewards = lazy(() => import("@/pages/admin/rewards").then((module) => ({ default: module.AdminRewards })));
+const AdminRedemptions = lazy(() => import("@/pages/admin/redemptions").then((module) => ({ default: module.AdminRedemptions })));
+const AdminPap = lazy(() => import("@/pages/admin/pap").then((module) => ({ default: module.AdminPap })));
+const AdminAnnouncements = lazy(() => import("@/pages/admin/announcements").then((module) => ({ default: module.AdminAnnouncements })));
+const AdminActivity = lazy(() => import("@/pages/admin/activity").then((module) => ({ default: module.AdminActivity })));
+const AdminIdentity = lazy(() => import("@/pages/admin/identity").then((module) => ({ default: module.AdminIdentity })));
+const AdminCourier = lazy(() => import("@/pages/admin/courier").then((module) => ({ default: module.AdminCourier })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
+      staleTime: 30_000,
+      gcTime: 120_000,
       retry: false,
       refetchOnWindowFocus: false,
     },
   },
 });
 
-const ROLE_LEVELS = ["member", "fc", "admin", "controller"] as const;
-const REIMBURSEMENT_REVIEW_PERMISSIONS = ["reimbursement.manage", "reimbursement.window.manage"];
-type Role = (typeof ROLE_LEVELS)[number];
+type RouteComponent = ComponentType | LazyExoticComponent<ComponentType>;
 
-function hasRole(userRole: string, minRole: Role): boolean {
-  return ROLE_LEVELS.indexOf(userRole as Role) >= ROLE_LEVELS.indexOf(minRole);
-}
-
-function defaultLanding(user: CurrentUser): string {
-  if (user.modules.pap) return "/dashboard";
-  if (user.modules.reimbursement && user.reimbursementOpen) return "/reimbursements";
-  if (user.modules.reimbursement && user.permissions.includes("reimbursement.window.manage")) return "/reimbursement-settings";
-  if (user.modules.diplomacy) return "/diplomacy";
-  if (user.modules.courier) return "/courier";
-  if (user.modules.structures && hasRole(user.role, "admin")) return "/structures";
-  return "/";
+function RouteLoading() {
+  return (
+    <div className="min-h-screen w-full flex items-center justify-center bg-background text-primary">
+      <Loader2 className="w-7 h-7 animate-spin" />
+    </div>
+  );
 }
 
 function ProtectedRoute({
@@ -79,12 +88,12 @@ function ProtectedRoute({
   permissionAlternatives,
   requiresReimbursementOpen,
 }: {
-  component: any;
+  component: RouteComponent;
   minRole?: Role;
   module?: keyof CorporationModules;
   permission?: string;
   permissionAlternative?: string;
-  permissionAlternatives?: string[];
+  permissionAlternatives?: readonly string[];
   requiresReimbursementOpen?: boolean;
 }) {
   const { data: user, isLoading, isError, error } = useGetMe();
@@ -148,9 +157,11 @@ function ProtectedRoute({
   }
 
   return (
-    <Layout>
-      <Component />
-    </Layout>
+    <Suspense fallback={<RouteLoading />}>
+      <Layout>
+        <Component />
+      </Layout>
+    </Suspense>
   );
 }
 

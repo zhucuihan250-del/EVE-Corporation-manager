@@ -2409,6 +2409,31 @@ export const ListIdentityGroupMembersResponse = zod.array(
 );
 
 /**
+ * @summary Audit and list the corporation skill plans completed by one identity-group member
+ */
+export const GetIdentityGroupMemberSkillPlansParams = zod.object({
+  id: zod.coerce.number(),
+  memberId: zod.coerce.number(),
+});
+
+export const GetIdentityGroupMemberSkillPlansResponse = zod.object({
+  memberId: zod.number(),
+  characterId: zod.number(),
+  characterName: zod.string(),
+  checkedAt: zod.coerce.date(),
+  availablePlanCount: zod.number(),
+  completedPlans: zod.array(
+    zod.object({
+      id: zod.number(),
+      name: zod.string(),
+      description: zod.string(),
+      isActive: zod.boolean(),
+      requiredSkillCount: zod.number(),
+    }),
+  ),
+});
+
+/**
  * @summary Open or close new applications for one identity group
  */
 export const SetIdentityGroupApplicationWindowParams = zod.object({

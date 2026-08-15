@@ -1147,6 +1147,46 @@ paths:
                 items:
                   $ref: "#/components/schemas/IdentityGroupMember"
 
+  /identity-groups/{id}/members/{memberId}/skill-plans:
+    get:
+      operationId: getIdentityGroupMemberSkillPlans
+      tags: [identity]
+      summary: Audit and list the corporation skill plans completed by one identity-group member
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+        - in: path
+          name: memberId
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Skill plans currently completed by the member's bound character
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IdentityGroupMemberSkillPlans"
+        "404":
+          description: Identity-group member or character not found in the active corporation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: The member has no usable character skill authorization
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: EVE skill data is temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /identity-groups/{id}/application-window:
     patch:
       operationId: setIdentityGroupApplicationWindow
@@ -3783,6 +3823,30 @@ components:
         role: { type: string, enum: [member, fc, admin, controller] }
         joinedAt: { type: string, format: date-time }
       required: [id, groupId, userId, role, joinedAt]
+
+    IdentityGroupMemberCompletedSkillPlan:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        description: { type: string }
+        isActive: { type: boolean }
+        requiredSkillCount: { type: integer }
+      required: [id, name, description, isActive, requiredSkillCount]
+
+    IdentityGroupMemberSkillPlans:
+      type: object
+      properties:
+        memberId: { type: integer }
+        characterId: { type: integer }
+        characterName: { type: string }
+        checkedAt: { type: string, format: date-time }
+        availablePlanCount: { type: integer }
+        completedPlans:
+          type: array
+          items:
+            $ref: "#/components/schemas/IdentityGroupMemberCompletedSkillPlan"
+      required: [memberId, characterId, characterName, checkedAt, availablePlanCount, completedPlans]
 
     DiplomacyCase:
       type: object

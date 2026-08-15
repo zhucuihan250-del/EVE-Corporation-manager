@@ -70,6 +70,7 @@ import type {
   IdentityGroup,
   IdentityGroupInput,
   IdentityGroupMember,
+  IdentityGroupMemberSkillPlans,
   IdentitySkillPlanImportInput,
   IdentitySkillPlanImportResult,
   ListIdentityApplicationsParams,
@@ -4676,6 +4677,118 @@ export function useListIdentityGroupMembers<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getListIdentityGroupMembersQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Audit and list the corporation skill plans completed by one identity-group member
+ */
+export const getGetIdentityGroupMemberSkillPlansUrl = (
+  id: number,
+  memberId: number,
+) => {
+  return `/api/identity-groups/${id}/members/${memberId}/skill-plans`;
+};
+
+export const getIdentityGroupMemberSkillPlans = async (
+  id: number,
+  memberId: number,
+  options?: RequestInit,
+): Promise<IdentityGroupMemberSkillPlans> => {
+  return customFetch<IdentityGroupMemberSkillPlans>(
+    getGetIdentityGroupMemberSkillPlansUrl(id, memberId),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetIdentityGroupMemberSkillPlansQueryKey = (
+  id: number,
+  memberId: number,
+) => {
+  return [
+    `/api/identity-groups/${id}/members/${memberId}/skill-plans`,
+  ] as const;
+};
+
+export const getGetIdentityGroupMemberSkillPlansQueryOptions = <
+  TData = Awaited<ReturnType<typeof getIdentityGroupMemberSkillPlans>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  memberId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getIdentityGroupMemberSkillPlans>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetIdentityGroupMemberSkillPlansQueryKey(id, memberId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getIdentityGroupMemberSkillPlans>>
+  > = ({ signal }) =>
+    getIdentityGroupMemberSkillPlans(id, memberId, {
+      signal,
+      ...requestOptions,
+    });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(id && memberId),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getIdentityGroupMemberSkillPlans>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetIdentityGroupMemberSkillPlansQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getIdentityGroupMemberSkillPlans>>
+>;
+export type GetIdentityGroupMemberSkillPlansQueryError =
+  ErrorType<ErrorResponse>;
+
+/**
+ * @summary Audit and list the corporation skill plans completed by one identity-group member
+ */
+
+export function useGetIdentityGroupMemberSkillPlans<
+  TData = Awaited<ReturnType<typeof getIdentityGroupMemberSkillPlans>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  memberId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getIdentityGroupMemberSkillPlans>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetIdentityGroupMemberSkillPlansQueryOptions(
+    id,
+    memberId,
+    options,
+  );
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

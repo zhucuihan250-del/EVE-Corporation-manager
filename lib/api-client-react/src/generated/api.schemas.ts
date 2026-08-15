@@ -1324,6 +1324,23 @@ export interface IdentityGroupMember {
   joinedAt: string;
 }
 
+export interface IdentityGroupMemberCompletedSkillPlan {
+  id: number;
+  name: string;
+  description: string;
+  isActive: boolean;
+  requiredSkillCount: number;
+}
+
+export interface IdentityGroupMemberSkillPlans {
+  memberId: number;
+  characterId: number;
+  characterName: string;
+  checkedAt: string;
+  availablePlanCount: number;
+  completedPlans: IdentityGroupMemberCompletedSkillPlan[];
+}
+
 export type DiplomacyCaseCategory =
   (typeof DiplomacyCaseCategory)[keyof typeof DiplomacyCaseCategory];
 

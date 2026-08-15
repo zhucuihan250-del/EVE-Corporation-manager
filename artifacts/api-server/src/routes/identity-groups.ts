@@ -188,6 +188,125 @@ router.get("/identity-groups/:id/members", async (req: Request, res: Response): 
   res.json(members);
 });
 
+router.get("/identity-groups/:id/members/:memberId/skill-plans", async (req: Request, res: Response): Promise<void> => {
+  if (!canManage(req)) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  const tenant = req.tenant!;
+  const groupId = Number(req.params.id);
+  const memberId = Number(req.params.memberId);
+  if (!Number.isInteger(groupId) || !Number.isInteger(memberId)) {
+    res.status(400).json({ error: "Invalid identity group member" });
+    return;
+  }
+
+  const [member] = await db
+    .select({
+      id: identityGroupMembershipsTable.id,
+      userId: identityGroupMembershipsTable.userId,
+      characterId: charactersTable.id,
+      characterName: charactersTable.eveCharacterName,
+    })
+    .from(identityGroupMembershipsTable)
+    .innerJoin(corporationMembershipsTable, and(
+      eq(corporationMembershipsTable.corporationId, tenant.corporation.id),
+      eq(corporationMembershipsTable.userId, identityGroupMembershipsTable.userId),
+    ))
+    .leftJoin(charactersTable, and(
+      eq(charactersTable.id, identityGroupMembershipsTable.characterId),
+      eq(charactersTable.userId, identityGroupMembershipsTable.userId),
+      eq(charactersTable.corporationId, tenant.corporation.id),
+      isNull(charactersTable.deletedAt),
+    ))
+    .where(and(
+      eq(identityGroupMembershipsTable.id, memberId),
+      eq(identityGroupMembershipsTable.groupId, groupId),
+      eq(identityGroupMembershipsTable.corporationId, tenant.corporation.id),
+    ));
+  if (!member) {
+    res.status(404).json({ error: "Identity group member not found" });
+    return;
+  }
+  if (!member.characterId || !member.characterName) {
+    res.status(409).json({
+      error: "该成员用于技能审核的角色已解绑，暂时无法核验技能方案",
+      code: "CHARACTER_SKILLS_UNAVAILABLE",
+    });
+    return;
+  }
+
+  const plans = await db
+    .select()
+    .from(corporationSkillPlansTable)
+    .where(eq(corporationSkillPlansTable.corporationId, tenant.corporation.id))
+    .orderBy(desc(corporationSkillPlansTable.isActive), corporationSkillPlansTable.name);
+  const auditablePlans = plans.filter((plan) => plan.requiredSkills.length > 0);
+  if (auditablePlans.length === 0) {
+    res.json({
+      memberId: member.id,
+      characterId: member.characterId,
+      characterName: member.characterName,
+      checkedAt: new Date().toISOString(),
+      availablePlanCount: 0,
+      completedPlans: [],
+    });
+    return;
+  }
+
+  try {
+    const audit = await auditCharacterSkills({
+      userId: member.userId,
+      corporationId: tenant.corporation.id,
+      characterId: member.characterId,
+      requiredSkills: [],
+      skillPlans: auditablePlans.map((plan) => ({
+        id: plan.id,
+        name: plan.name,
+        requiredSkills: plan.requiredSkills,
+      })),
+      skillPlanMatchMode: "any",
+    });
+    const completedPlanIds = new Set(
+      (audit.plans ?? [])
+        .filter((plan) => plan.passed && plan.planId !== null)
+        .map((plan) => plan.planId),
+    );
+    res.json({
+      memberId: member.id,
+      characterId: member.characterId,
+      characterName: member.characterName,
+      checkedAt: audit.checkedAt,
+      availablePlanCount: auditablePlans.length,
+      completedPlans: auditablePlans
+        .filter((plan) => completedPlanIds.has(plan.id))
+        .map((plan) => ({
+          id: plan.id,
+          name: plan.name,
+          description: plan.description,
+          isActive: plan.isActive,
+          requiredSkillCount: plan.requiredSkills.length,
+        })),
+    });
+  } catch (error) {
+    if (error instanceof SkillAuditError) {
+      const status = error.code === "CHARACTER_NOT_FOUND"
+        ? 404
+        : error.code === "SKILL_AUTHORIZATION_REQUIRED"
+          ? 409
+          : 503;
+      const message = error.code === "SKILL_AUTHORIZATION_REQUIRED"
+        ? "该成员需要重新绑定角色并授权技能读取后才能核验"
+        : error.code === "ESI_SKILLS_UNAVAILABLE"
+          ? "EVE 技能数据暂时不可用，请稍后重试"
+          : error.message;
+      res.status(status).json({ error: message, code: error.code });
+      return;
+    }
+    throw error;
+  }
+});
+
 router.post("/identity-groups", async (req: Request, res: Response): Promise<void> => {
   if (!canManage(req)) {
     res.status(403).json({ error: "Forbidden" });

@@ -1264,6 +1264,7 @@ export interface IdentityGroup {
   permissions: string[];
   skillPlanMatchMode: IdentityGroupSkillPlanMatchMode;
   skillPlans: CorporationSkillPlan[];
+  applicationOpen: boolean;
   isActive: boolean;
   isMember: boolean;
   latestApplication?: IdentityApplication | null;
@@ -1295,6 +1296,7 @@ export interface IdentityGroupInput {
   permissions?: string[];
   skillPlanIds?: number[];
   skillPlanMatchMode?: IdentityGroupInputSkillPlanMatchMode;
+  applicationOpen?: boolean;
   isActive?: boolean;
 }
 
@@ -1978,6 +1980,15 @@ export type GetActivityReportParams = {
 
 export type ListIdentityGroupsParams = {
   includeInactive?: boolean;
+};
+
+export type SetIdentityGroupApplicationWindowBody = {
+  applicationOpen: boolean;
+};
+
+export type SetIdentityGroupApplicationWindow200 = {
+  id: number;
+  applicationOpen: boolean;
 };
 
 export type ApplyIdentityGroupBody = {

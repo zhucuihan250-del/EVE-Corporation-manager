@@ -17,5 +17,6 @@ export interface IdentityGroupInput {
   permissions?: string[];
   skillPlanIds?: number[];
   skillPlanMatchMode?: IdentityGroupInputSkillPlanMatchMode;
+  applicationOpen?: boolean;
   isActive?: boolean;
 }

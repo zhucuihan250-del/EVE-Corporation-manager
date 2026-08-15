@@ -14,7 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/api-error";
-import { CheckCircle2, ShieldCheck, XCircle } from "lucide-react";
+import { CheckCircle2, LockKeyhole, ShieldCheck, XCircle } from "lucide-react";
 
 export function IdentityGroups() {
   const { i18n } = useTranslation();
@@ -95,6 +95,11 @@ export function IdentityGroups() {
                 <div className="flex items-center gap-2 text-sm text-emerald-400"><CheckCircle2 className="h-4 w-4" />{tr("您已加入该身份组", "You are a member")}</div>
               ) : group.latestApplication && ["pending_skill_audit", "pending_review", "needs_information"].includes(group.latestApplication.status) ? (
                 <Badge variant="outline">{statusText[group.latestApplication.status]}</Badge>
+              ) : !group.applicationOpen ? (
+                <div className="rounded-md border border-muted bg-muted/20 p-4 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2 font-medium text-foreground"><LockKeyhole className="h-4 w-4" />{tr("申请已关闭", "Applications closed")}</div>
+                  <p className="mt-1">{tr("该身份组暂不接受新申请，请等待管理员重新开放。", "This identity group is not accepting new applications. Please wait for management to reopen it.")}</p>
+                </div>
               ) : (
                 <div className="space-y-3">
                   <select className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm" value={characterByGroup[group.id] ?? ""} onChange={(event) => setCharacterByGroup((current) => ({ ...current, [group.id]: event.target.value }))}>

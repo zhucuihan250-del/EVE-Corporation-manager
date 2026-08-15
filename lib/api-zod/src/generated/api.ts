@@ -2090,6 +2090,7 @@ export const ListIdentityGroupsResponseItem = zod.object({
       updatedAt: zod.coerce.date(),
     }),
   ),
+  applicationOpen: zod.boolean(),
   isActive: zod.boolean(),
   isMember: zod.boolean(),
   latestApplication: zod
@@ -2205,6 +2206,7 @@ export const CreateIdentityGroupBody = zod.object({
   permissions: zod.array(zod.string()).optional(),
   skillPlanIds: zod.array(zod.number()).optional(),
   skillPlanMatchMode: zod.enum(["all", "any"]).optional(),
+  applicationOpen: zod.boolean().optional(),
   isActive: zod.boolean().optional(),
 });
 
@@ -2231,6 +2233,7 @@ export const UpdateIdentityGroupBody = zod.object({
   permissions: zod.array(zod.string()).optional(),
   skillPlanIds: zod.array(zod.number()).optional(),
   skillPlanMatchMode: zod.enum(["all", "any"]).optional(),
+  applicationOpen: zod.boolean().optional(),
   isActive: zod.boolean().optional(),
 });
 
@@ -2283,6 +2286,7 @@ export const UpdateIdentityGroupResponse = zod.object({
       updatedAt: zod.coerce.date(),
     }),
   ),
+  applicationOpen: zod.boolean(),
   isActive: zod.boolean(),
   isMember: zod.boolean(),
   latestApplication: zod
@@ -2403,6 +2407,22 @@ export const ListIdentityGroupMembersResponseItem = zod.object({
 export const ListIdentityGroupMembersResponse = zod.array(
   ListIdentityGroupMembersResponseItem,
 );
+
+/**
+ * @summary Open or close new applications for one identity group
+ */
+export const SetIdentityGroupApplicationWindowParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const SetIdentityGroupApplicationWindowBody = zod.object({
+  applicationOpen: zod.boolean(),
+});
+
+export const SetIdentityGroupApplicationWindowResponse = zod.object({
+  id: zod.number(),
+  applicationOpen: zod.boolean(),
+});
 
 export const ApplyIdentityGroupParams = zod.object({
   id: zod.coerce.number(),

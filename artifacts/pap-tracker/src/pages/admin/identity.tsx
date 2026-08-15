@@ -11,6 +11,7 @@ import {
   useListIdentityGroups,
   useListIdentitySkillPlans,
   useReviewIdentityApplication,
+  useSetIdentityGroupApplicationWindow,
   useUpdateIdentityGroup,
   useUpdateIdentitySkillPlan,
   type CorporationSkillPlan,
@@ -36,7 +37,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/api-error";
-import { CheckCircle2, ClipboardPaste, KeyRound, Loader2, Pencil, ShieldCheck, Trash2, UsersRound, XCircle } from "lucide-react";
+import { CheckCircle2, ClipboardPaste, KeyRound, Loader2, LockKeyhole, LockOpen, Pencil, ShieldCheck, Trash2, UsersRound, XCircle } from "lucide-react";
 
 const PERMISSIONS = [
   ["fleet.manage", "FC与舰队管理", "FC and fleet management"],
@@ -59,6 +60,7 @@ type GroupDraft = {
   permissions: string[];
   skillPlanIds: number[];
   skillPlanMatchMode: "all" | "any";
+  applicationOpen: boolean;
   isActive: boolean;
 };
 
@@ -79,7 +81,7 @@ type DeleteTarget = {
   name: string;
 };
 
-const emptyGroup = (): GroupDraft => ({ id: null, name: "", category: "combat", description: "", requiredSkills: [], permissions: [], skillPlanIds: [], skillPlanMatchMode: "all", isActive: true });
+const emptyGroup = (): GroupDraft => ({ id: null, name: "", category: "combat", description: "", requiredSkills: [], permissions: [], skillPlanIds: [], skillPlanMatchMode: "all", applicationOpen: true, isActive: true });
 const emptyPlan = (): PlanDraft => ({ id: null, name: "", description: "", skills: "", parsedText: "", parsedSkills: [], unresolvedLines: [], isActive: true });
 
 export function AdminIdentity() {
@@ -98,6 +100,7 @@ export function AdminIdentity() {
   const createGroup = useCreateIdentityGroup();
   const updateGroup = useUpdateIdentityGroup();
   const deleteGroup = useDeleteIdentityGroup();
+  const setApplicationWindow = useSetIdentityGroupApplicationWindow();
   const importPlan = useImportIdentitySkillPlan();
   const createPlan = useCreateIdentitySkillPlan();
   const updatePlan = useUpdateIdentitySkillPlan();
@@ -182,6 +185,7 @@ export function AdminIdentity() {
     permissions: group.permissions,
     skillPlanIds: group.skillPlans.map((plan) => plan.id),
     skillPlanMatchMode: group.skillPlanMatchMode,
+    applicationOpen: group.applicationOpen,
     isActive: group.isActive,
   });
 
@@ -198,6 +202,7 @@ export function AdminIdentity() {
       permissions: groupDraft.permissions,
       skillPlanIds: groupDraft.skillPlanIds,
       skillPlanMatchMode: groupDraft.skillPlanMatchMode,
+      applicationOpen: groupDraft.applicationOpen,
       isActive: groupDraft.isActive,
     };
     const options = {
@@ -266,6 +271,25 @@ export function AdminIdentity() {
     else deletePlan.mutate({ id: target.id }, options);
   };
 
+  const toggleApplicationWindow = (group: IdentityGroup) => {
+    const applicationOpen = !group.applicationOpen;
+    setApplicationWindow.mutate({ id: group.id, data: { applicationOpen } }, {
+      onSuccess: async () => {
+        if (groupDraft.id === group.id) {
+          setGroupDraft((current) => ({ ...current, applicationOpen }));
+        }
+        await refreshIdentity();
+        toast({
+          title: applicationOpen ? tr("身份组申请已开放", "Identity-group applications opened") : tr("身份组申请已关闭", "Identity-group applications closed"),
+          description: applicationOpen
+            ? tr(`成员现在可以申请“${group.name}”。`, `Members can now apply to “${group.name}”.`)
+            : tr(`“${group.name}”不再接受新申请，现有成员和待审核记录不受影响。`, `“${group.name}” no longer accepts new applications. Existing members and pending reviews are unchanged.`),
+        });
+      },
+      onError: (error) => toast({ title: tr("申请开关更新失败", "Unable to update application window"), description: getErrorMessage(error), variant: "destructive" }),
+    });
+  };
+
   return (
     <div className="p-6 space-y-6 overflow-auto">
       <div><h1 className="flex items-center gap-2 text-2xl font-bold font-mono tracking-wider"><ShieldCheck className="h-6 w-6 text-primary" />{tr("身份组审核与管理", "IDENTITY REVIEW & MANAGEMENT")}</h1><p className="mt-1 text-sm text-muted-foreground">{tr("集中审核管理身份申请、配置自动授予权限，并复用军团技能方案。", "Review management applications, configure automatically granted permissions, and reuse corporation skill plans.")}</p></div>
@@ -294,9 +318,10 @@ export function AdminIdentity() {
           <div className="space-y-2 md:col-span-2"><Label>{tr("套用军团技能方案", "Apply corporation skill plans")}</Label><div className="grid gap-2 rounded-md border border-border/50 p-3 md:grid-cols-2">{(plans.data ?? []).map((plan) => <label key={plan.id} className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={groupDraft.skillPlanIds.includes(plan.id)} onChange={(event) => setGroupDraft({ ...groupDraft, skillPlanIds: event.target.checked ? [...groupDraft.skillPlanIds, plan.id] : groupDraft.skillPlanIds.filter((id) => id !== plan.id) })} /><span>{plan.name}{!plan.isActive && <Badge className="ml-2" variant="outline">{tr("停用", "Inactive")}</Badge>}<span className="block text-xs text-muted-foreground">{plan.requiredSkills.length} {tr("项技能", "skills")}</span></span></label>)}</div></div>
           <div className="space-y-2"><Label>{tr("多方案规则", "Multiple-plan rule")}</Label><select className="h-10 w-full rounded-md border border-input bg-background px-3" value={groupDraft.skillPlanMatchMode} onChange={(event) => setGroupDraft({ ...groupDraft, skillPlanMatchMode: event.target.value as GroupDraft["skillPlanMatchMode"] })}><option value="all">{tr("需要满足全部方案", "Must satisfy every plan")}</option><option value="any">{tr("满足任意一套即可", "Any one plan is enough")}</option></select></div>
           <label className="flex items-center gap-2 self-end pb-2 text-sm"><input type="checkbox" checked={groupDraft.isActive} onChange={(event) => setGroupDraft({ ...groupDraft, isActive: event.target.checked })} />{tr("身份组启用", "Identity group active")}</label>
+          <label className="flex items-center gap-2 pb-2 text-sm md:col-span-2"><input type="checkbox" checked={groupDraft.applicationOpen} onChange={(event) => setGroupDraft({ ...groupDraft, applicationOpen: event.target.checked })} />{tr("开放成员申请（关闭后不影响现有成员与待审核申请）", "Accept member applications (closing does not affect existing members or pending reviews)")}</label>
           <div className="space-y-2 md:col-span-2"><Label>{tr("批准后自动授予的权限", "Permissions granted after approval")}</Label><div className="grid gap-2 rounded-md border border-border/50 p-3 md:grid-cols-2">{PERMISSIONS.map(([permission, cn, en]) => <label key={permission} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={groupDraft.permissions.includes(permission)} onChange={(event) => setGroupDraft({ ...groupDraft, permissions: event.target.checked ? [...groupDraft.permissions, permission] : groupDraft.permissions.filter((item) => item !== permission) })} />{tr(cn, en)}</label>)}</div></div>
           <div className="flex gap-2 md:col-span-2"><Button onClick={saveGroup}>{tr("保存身份组", "Save identity group")}</Button>{groupDraft.id && <Button variant="outline" onClick={() => setGroupDraft(emptyGroup())}>{tr("取消编辑", "Cancel editing")}</Button>}</div>
-          <div className="space-y-2 md:col-span-2 border-t border-border/50 pt-4"><Label>{tr("现有身份组", "Existing identity groups")}</Label><div className="grid gap-2 md:grid-cols-2">{(groups.data ?? []).map((group) => <div key={group.id} className="flex items-center justify-between gap-3 rounded-md border border-border/50 p-3"><div><div className="font-medium">{group.name} {!group.isActive && <Badge variant="outline">{tr("停用", "Inactive")}</Badge>}</div><div className="text-xs text-muted-foreground">{group.skillPlans.map((plan) => plan.name).join(" · ") || tr("未套用方案", "No plans")}</div></div><div className="flex shrink-0 gap-2"><Button size="sm" variant={selectedGroupId === group.id ? "secondary" : "outline"} onClick={() => setSelectedGroupId(group.id)}><UsersRound className="mr-1 h-3 w-3" />{tr("成员", "Members")}</Button><Button size="sm" variant="outline" onClick={() => editGroup(group)}><Pencil className="mr-1 h-3 w-3" />{tr("编辑", "Edit")}</Button><Button size="icon" variant="destructive" aria-label={tr(`删除身份组 ${group.name}`, `Delete identity group ${group.name}`)} onClick={() => setDeleteTarget({ kind: "group", id: group.id, name: group.name })}><Trash2 className="h-3.5 w-3.5" /></Button></div></div>)}</div></div>
+          <div className="space-y-2 md:col-span-2 border-t border-border/50 pt-4"><Label>{tr("现有身份组", "Existing identity groups")}</Label><div className="grid gap-2 md:grid-cols-2">{(groups.data ?? []).map((group) => <div key={group.id} className="flex items-center justify-between gap-3 rounded-md border border-border/50 p-3"><div><div className="font-medium">{group.name} {!group.isActive && <Badge variant="outline">{tr("停用", "Inactive")}</Badge>} {!group.applicationOpen && <Badge variant="outline" className="border-amber-500/40 text-amber-300">{tr("申请关闭", "Applications closed")}</Badge>}</div><div className="text-xs text-muted-foreground">{group.skillPlans.map((plan) => plan.name).join(" · ") || tr("未套用方案", "No plans")}</div></div><div className="flex shrink-0 gap-2"><Button size="sm" variant={group.applicationOpen ? "outline" : "secondary"} disabled={setApplicationWindow.isPending} onClick={() => toggleApplicationWindow(group)}>{group.applicationOpen ? <LockKeyhole className="mr-1 h-3 w-3" /> : <LockOpen className="mr-1 h-3 w-3" />}{group.applicationOpen ? tr("关闭申请", "Close") : tr("开放申请", "Open")}</Button><Button size="sm" variant={selectedGroupId === group.id ? "secondary" : "outline"} onClick={() => setSelectedGroupId(group.id)}><UsersRound className="mr-1 h-3 w-3" />{tr("成员", "Members")}</Button><Button size="sm" variant="outline" onClick={() => editGroup(group)}><Pencil className="mr-1 h-3 w-3" />{tr("编辑", "Edit")}</Button><Button size="icon" variant="destructive" aria-label={tr(`删除身份组 ${group.name}`, `Delete identity group ${group.name}`)} onClick={() => setDeleteTarget({ kind: "group", id: group.id, name: group.name })}><Trash2 className="h-3.5 w-3.5" /></Button></div></div>)}</div></div>
           {selectedGroup && <div className="space-y-3 rounded-md border border-primary/25 bg-primary/5 p-4 md:col-span-2"><div className="flex flex-wrap items-center justify-between gap-2"><div><div className="font-medium">{selectedGroup.name} · {tr("组内成员", "Group members")}</div><div className="text-xs text-muted-foreground">{tr("名单仅对本军团身份组管理员可见。", "This roster is visible only to identity managers in this corporation.")}</div></div><Badge variant="secondary">{tr(`${groupMembers.data?.length ?? 0} 人`, `${groupMembers.data?.length ?? 0} members`)}</Badge></div>{groupMembers.isLoading ? <p className="text-sm text-muted-foreground">{tr("正在读取成员…", "Loading members…")}</p> : groupMembers.isError ? <p className="text-sm text-destructive">{getErrorMessage(groupMembers.error)}</p> : (groupMembers.data?.length ?? 0) === 0 ? <p className="text-sm text-muted-foreground">{tr("该身份组暂无成员。", "This identity group has no members.")}</p> : <div className="grid gap-2 md:grid-cols-2">{groupMembers.data?.map((member) => <div key={member.id} className="rounded border border-border/50 bg-background/50 p-3"><div className="flex items-center justify-between gap-2"><span className="font-medium">{member.characterName ?? member.mainCharacterName ?? `#${member.userId}`}</span><Badge variant="outline">{member.role.toUpperCase()}</Badge></div>{member.characterName && member.mainCharacterName && member.characterName !== member.mainCharacterName && <div className="mt-1 text-xs text-muted-foreground">{tr("主角色", "Main character")}: {member.mainCharacterName}</div>}<div className="mt-1 text-xs text-muted-foreground">{tr("加入身份组", "Joined group")}: {new Date(member.joinedAt).toLocaleString()}</div></div>)}</div>}</div>}
         </CardContent>
       </Card>

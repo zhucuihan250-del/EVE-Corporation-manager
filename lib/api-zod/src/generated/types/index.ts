@@ -168,6 +168,8 @@ export * from "./searchFittingCatalogCategory";
 export * from "./searchFittingCatalogLanguage";
 export * from "./searchFittingCatalogParams";
 export * from "./searchFittingCatalogSlot";
+export * from "./setIdentityGroupApplicationWindow200";
+export * from "./setIdentityGroupApplicationWindowBody";
 export * from "./skillAuditItem";
 export * from "./skillAuditResult";
 export * from "./skillAuditResultMatchMode";

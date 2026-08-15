@@ -1147,6 +1147,37 @@ paths:
                 items:
                   $ref: "#/components/schemas/IdentityGroupMember"
 
+  /identity-groups/{id}/application-window:
+    patch:
+      operationId: setIdentityGroupApplicationWindow
+      tags: [identity]
+      summary: Open or close new applications for one identity group
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                applicationOpen: { type: boolean }
+              required: [applicationOpen]
+      responses:
+        "200":
+          description: Application window updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: integer }
+                  applicationOpen: { type: boolean }
+                required: [id, applicationOpen]
+
   /identity-groups/{id}/applications:
     post:
       operationId: applyIdentityGroup
@@ -3708,6 +3739,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CorporationSkillPlan"
+        applicationOpen: { type: boolean }
         isActive: { type: boolean }
         isMember: { type: boolean }
         latestApplication:
@@ -3716,7 +3748,7 @@ components:
             - type: "null"
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
-      required: [id, corporationId, name, category, description, requiredSkills, permissions, skillPlanMatchMode, skillPlans, isActive, isMember, createdAt, updatedAt]
+      required: [id, corporationId, name, category, description, requiredSkills, permissions, skillPlanMatchMode, skillPlans, applicationOpen, isActive, isMember, createdAt, updatedAt]
 
     IdentityGroupInput:
       type: object
@@ -3735,6 +3767,7 @@ components:
           type: array
           items: { type: integer }
         skillPlanMatchMode: { type: string, enum: [all, any] }
+        applicationOpen: { type: boolean }
         isActive: { type: boolean }
       required: [name, category, description, requiredSkills]
 

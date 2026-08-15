@@ -86,6 +86,8 @@ import type {
   Reward,
   ScanFleetResponse,
   SearchFittingCatalogParams,
+  SetIdentityGroupApplicationWindow200,
+  SetIdentityGroupApplicationWindowBody,
   SuccessResponse,
   SyncCorporationWallet200,
   TacticalGroupDashboard,
@@ -4681,6 +4683,99 @@ export function useListIdentityGroupMembers<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Open or close new applications for one identity group
+ */
+export const getSetIdentityGroupApplicationWindowUrl = (id: number) => {
+  return `/api/identity-groups/${id}/application-window`;
+};
+
+export const setIdentityGroupApplicationWindow = async (
+  id: number,
+  setIdentityGroupApplicationWindowBody: SetIdentityGroupApplicationWindowBody,
+  options?: RequestInit,
+): Promise<SetIdentityGroupApplicationWindow200> => {
+  return customFetch<SetIdentityGroupApplicationWindow200>(
+    getSetIdentityGroupApplicationWindowUrl(id),
+    {
+      ...options,
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(setIdentityGroupApplicationWindowBody),
+    },
+  );
+};
+
+export const getSetIdentityGroupApplicationWindowMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setIdentityGroupApplicationWindow>>,
+    TError,
+    { id: number; data: BodyType<SetIdentityGroupApplicationWindowBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setIdentityGroupApplicationWindow>>,
+  TError,
+  { id: number; data: BodyType<SetIdentityGroupApplicationWindowBody> },
+  TContext
+> => {
+  const mutationKey = ["setIdentityGroupApplicationWindow"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setIdentityGroupApplicationWindow>>,
+    { id: number; data: BodyType<SetIdentityGroupApplicationWindowBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return setIdentityGroupApplicationWindow(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetIdentityGroupApplicationWindowMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setIdentityGroupApplicationWindow>>
+>;
+export type SetIdentityGroupApplicationWindowMutationBody =
+  BodyType<SetIdentityGroupApplicationWindowBody>;
+export type SetIdentityGroupApplicationWindowMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Open or close new applications for one identity group
+ */
+export const useSetIdentityGroupApplicationWindow = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setIdentityGroupApplicationWindow>>,
+    TError,
+    { id: number; data: BodyType<SetIdentityGroupApplicationWindowBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof setIdentityGroupApplicationWindow>>,
+  TError,
+  { id: number; data: BodyType<SetIdentityGroupApplicationWindowBody> },
+  TContext
+> => {
+  return useMutation(
+    getSetIdentityGroupApplicationWindowMutationOptions(options),
+  );
+};
 
 export const getApplyIdentityGroupUrl = (id: number) => {
   return `/api/identity-groups/${id}/applications`;

@@ -21,6 +21,7 @@ export interface IdentityGroup {
   permissions: string[];
   skillPlanMatchMode: IdentityGroupSkillPlanMatchMode;
   skillPlans: CorporationSkillPlan[];
+  applicationOpen: boolean;
   isActive: boolean;
   isMember: boolean;
   latestApplication?: IdentityApplication | null;

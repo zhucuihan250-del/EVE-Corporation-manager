@@ -224,6 +224,7 @@ router.post("/identity-groups", async (req: Request, res: Response): Promise<voi
       requiredSkills,
       permissions,
       skillPlanMatchMode,
+      applicationOpen: req.body.applicationOpen !== false,
       isActive: req.body.isActive !== false,
     }).returning();
     if (skillPlanIds.length) {
@@ -281,6 +282,7 @@ router.patch("/identity-groups/:id", async (req: Request, res: Response): Promis
   if (requiredSkills !== undefined) updates.requiredSkills = requiredSkills;
   if (permissions !== undefined) updates.permissions = permissions;
   if (skillPlanMatchMode !== undefined) updates.skillPlanMatchMode = skillPlanMatchMode;
+  if (typeof req.body.applicationOpen === "boolean") updates.applicationOpen = req.body.applicationOpen;
   if (typeof req.body.isActive === "boolean") updates.isActive = req.body.isActive;
   const group = await db.transaction(async (tx) => {
     let updated = existing;
@@ -307,6 +309,34 @@ router.patch("/identity-groups/:id", async (req: Request, res: Response): Promis
   });
   const responsePlans = skillPlans ?? (await getSkillPlansByGroup(tenant.corporation.id, [id])).get(id) ?? [];
   res.json({ ...group, skillPlans: responsePlans, isMember: false, latestApplication: null });
+});
+
+router.patch("/identity-groups/:id/application-window", async (req: Request, res: Response): Promise<void> => {
+  if (!canManage(req)) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || typeof req.body.applicationOpen !== "boolean") {
+    res.status(400).json({ error: "Invalid identity group application window" });
+    return;
+  }
+  const [group] = await db
+    .update(identityGroupsTable)
+    .set({ applicationOpen: req.body.applicationOpen })
+    .where(and(
+      eq(identityGroupsTable.id, id),
+      eq(identityGroupsTable.corporationId, req.tenant!.corporation.id),
+    ))
+    .returning({
+      id: identityGroupsTable.id,
+      applicationOpen: identityGroupsTable.applicationOpen,
+    });
+  if (!group) {
+    res.status(404).json({ error: "Identity group not found" });
+    return;
+  }
+  res.json(group);
 });
 
 router.delete("/identity-groups/:id", async (req: Request, res: Response): Promise<void> => {
@@ -556,6 +586,13 @@ router.post("/identity-groups/:id/applications", async (req: Request, res: Respo
     res.status(404).json({ error: "Identity group or character not found" });
     return;
   }
+  if (!group.applicationOpen) {
+    res.status(409).json({
+      error: "该身份组当前已关闭新申请",
+      code: "IDENTITY_GROUP_APPLICATIONS_CLOSED",
+    });
+    return;
+  }
   if (existingMembership.length > 0) {
     res.status(409).json({ error: "Already a member of this identity group" });
     return;
@@ -580,6 +617,17 @@ router.post("/identity-groups/:id/applications", async (req: Request, res: Respo
       ? skillAudit.plans.filter((plan) => !plan.passed).map((plan) => plan.name)
       : skillAudit.skills.filter((skill) => !skill.passed).map((skill) => `${skill.name} ${skill.trainedLevel}/${skill.level}`);
     const application = await db.transaction(async (tx) => {
+      const [openGroup] = await tx
+        .select({ id: identityGroupsTable.id })
+        .from(identityGroupsTable)
+        .where(and(
+          eq(identityGroupsTable.id, groupId),
+          eq(identityGroupsTable.corporationId, tenant.corporation.id),
+          eq(identityGroupsTable.isActive, true),
+          eq(identityGroupsTable.applicationOpen, true),
+        ))
+        .for("share");
+      if (!openGroup) return null;
       const [created] = await tx.insert(identityGroupApplicationsTable).values({
         corporationId: tenant.corporation.id,
         groupId,
@@ -602,6 +650,13 @@ router.post("/identity-groups/:id/applications", async (req: Request, res: Respo
       }
       return created;
     });
+    if (!application) {
+      res.status(409).json({
+        error: "该身份组当前已关闭新申请",
+        code: "IDENTITY_GROUP_APPLICATIONS_CLOSED",
+      });
+      return;
+    }
     res.status(201).json(application);
   } catch (error) {
     if (error instanceof SkillAuditError) {

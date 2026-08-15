@@ -87,6 +87,7 @@ export const identityGroupsTable = pgTable(
     skillPlanMatchMode: text("skill_plan_match_mode", { enum: ["all", "any"] })
       .notNull()
       .default("all"),
+    applicationOpen: boolean("application_open").notNull().default(true),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })

@@ -4507,6 +4507,90 @@ export const useUpdateIdentityGroup = <
 };
 
 /**
+ * @summary Delete an unused identity group in the active corporation
+ */
+export const getDeleteIdentityGroupUrl = (id: number) => {
+  return `/api/identity-groups/${id}`;
+};
+
+export const deleteIdentityGroup = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteIdentityGroupUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteIdentityGroupMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteIdentityGroup>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteIdentityGroup>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteIdentityGroup"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteIdentityGroup>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteIdentityGroup(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteIdentityGroupMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteIdentityGroup>>
+>;
+
+export type DeleteIdentityGroupMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Delete an unused identity group in the active corporation
+ */
+export const useDeleteIdentityGroup = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteIdentityGroup>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteIdentityGroup>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteIdentityGroupMutationOptions(options));
+};
+
+/**
  * @summary List members of an identity group for identity managers
  */
 export const getListIdentityGroupMembersUrl = (id: number) => {
@@ -5114,6 +5198,90 @@ export const useUpdateIdentitySkillPlan = <
   TContext
 > => {
   return useMutation(getUpdateIdentitySkillPlanMutationOptions(options));
+};
+
+/**
+ * @summary Delete an unused corporation skill plan
+ */
+export const getDeleteIdentitySkillPlanUrl = (id: number) => {
+  return `/api/identity-skill-plans/${id}`;
+};
+
+export const deleteIdentitySkillPlan = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteIdentitySkillPlanUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteIdentitySkillPlanMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteIdentitySkillPlan>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteIdentitySkillPlan>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteIdentitySkillPlan"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteIdentitySkillPlan>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteIdentitySkillPlan(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteIdentitySkillPlanMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteIdentitySkillPlan>>
+>;
+
+export type DeleteIdentitySkillPlanMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Delete an unused corporation skill plan
+ */
+export const useDeleteIdentitySkillPlan = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteIdentitySkillPlan>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteIdentitySkillPlan>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteIdentitySkillPlanMutationOptions(options));
 };
 
 export const getReviewIdentityApplicationUrl = (id: number) => {

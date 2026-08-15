@@ -1108,6 +1108,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/IdentityGroup"
+    delete:
+      operationId: deleteIdentityGroup
+      tags: [identity]
+      summary: Delete an unused identity group in the active corporation
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Identity group deleted
+        "409":
+          description: Group has members or application history and must be deactivated instead
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /identity-groups/{id}/members:
     get:
@@ -1249,6 +1267,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CorporationSkillPlan"
+    delete:
+      operationId: deleteIdentitySkillPlan
+      tags: [identity]
+      summary: Delete an unused corporation skill plan
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Skill plan deleted
+        "409":
+          description: Skill plan is still attached to one or more identity groups
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /identity-applications/{id}:
     patch:

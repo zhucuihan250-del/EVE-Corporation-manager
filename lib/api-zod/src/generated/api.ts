@@ -2377,6 +2377,13 @@ export const UpdateIdentityGroupResponse = zod.object({
 });
 
 /**
+ * @summary Delete an unused identity group in the active corporation
+ */
+export const DeleteIdentityGroupParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
  * @summary List members of an identity group for identity managers
  */
 export const ListIdentityGroupMembersParams = zod.object({
@@ -2621,6 +2628,13 @@ export const UpdateIdentitySkillPlanResponse = zod.object({
   isActive: zod.boolean(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Delete an unused corporation skill plan
+ */
+export const DeleteIdentitySkillPlanParams = zod.object({
+  id: zod.coerce.number(),
 });
 
 export const ReviewIdentityApplicationParams = zod.object({

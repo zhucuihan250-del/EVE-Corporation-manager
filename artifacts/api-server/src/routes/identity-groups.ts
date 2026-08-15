@@ -12,7 +12,7 @@ import {
   type CorporationSkillPlan,
   type RequiredSkill,
 } from "@workspace/db";
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { hasRole, requireAuth } from "../middlewares/auth";
 import { auditCharacterSkills, SkillAuditError } from "../lib/identity-skills";
 import { importSkillPlanText, SkillPlanImportError } from "../lib/skill-plan-import";
@@ -309,6 +309,74 @@ router.patch("/identity-groups/:id", async (req: Request, res: Response): Promis
   res.json({ ...group, skillPlans: responsePlans, isMember: false, latestApplication: null });
 });
 
+router.delete("/identity-groups/:id", async (req: Request, res: Response): Promise<void> => {
+  if (!canManage(req)) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  const corporationId = req.tenant!.corporation.id;
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: "Invalid identity group" });
+    return;
+  }
+
+  const result = await db.transaction(async (tx) => {
+    const [group] = await tx
+      .select({ id: identityGroupsTable.id })
+      .from(identityGroupsTable)
+      .where(and(
+        eq(identityGroupsTable.id, id),
+        eq(identityGroupsTable.corporationId, corporationId),
+      ))
+      .for("update");
+    if (!group) return { kind: "not_found" as const };
+
+    const [[members], [applications]] = await Promise.all([
+      tx
+        .select({ count: sql<number>`COUNT(*)::int` })
+        .from(identityGroupMembershipsTable)
+        .where(and(
+          eq(identityGroupMembershipsTable.corporationId, corporationId),
+          eq(identityGroupMembershipsTable.groupId, id),
+        )),
+      tx
+        .select({ count: sql<number>`COUNT(*)::int` })
+        .from(identityGroupApplicationsTable)
+        .where(and(
+          eq(identityGroupApplicationsTable.corporationId, corporationId),
+          eq(identityGroupApplicationsTable.groupId, id),
+        )),
+    ]);
+    const memberCount = Number(members?.count ?? 0);
+    const applicationCount = Number(applications?.count ?? 0);
+    if (memberCount > 0 || applicationCount > 0) {
+      return { kind: "in_use" as const, memberCount, applicationCount };
+    }
+
+    await tx.delete(identityGroupsTable).where(and(
+      eq(identityGroupsTable.id, id),
+      eq(identityGroupsTable.corporationId, corporationId),
+    ));
+    return { kind: "deleted" as const };
+  });
+
+  if (result.kind === "not_found") {
+    res.status(404).json({ error: "Identity group not found" });
+    return;
+  }
+  if (result.kind === "in_use") {
+    res.status(409).json({
+      error: `该身份组仍有 ${result.memberCount} 名成员和 ${result.applicationCount} 条申请记录。为保留权限与审核历史，请停用身份组，不可直接删除。`,
+      code: "IDENTITY_GROUP_IN_USE",
+      memberCount: result.memberCount,
+      applicationCount: result.applicationCount,
+    });
+    return;
+  }
+  res.status(204).send();
+});
+
 router.get("/identity-skill-plans", async (req: Request, res: Response): Promise<void> => {
   if (!canManage(req)) {
     res.status(403).json({ error: "Forbidden" });
@@ -388,6 +456,67 @@ router.patch("/identity-skill-plans/:id", async (req: Request, res: Response): P
     return;
   }
   res.json(plan);
+});
+
+router.delete("/identity-skill-plans/:id", async (req: Request, res: Response): Promise<void> => {
+  if (!canManage(req)) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  const corporationId = req.tenant!.corporation.id;
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: "Invalid skill plan" });
+    return;
+  }
+
+  const result = await db.transaction(async (tx) => {
+    const [plan] = await tx
+      .select({ id: corporationSkillPlansTable.id })
+      .from(corporationSkillPlansTable)
+      .where(and(
+        eq(corporationSkillPlansTable.id, id),
+        eq(corporationSkillPlansTable.corporationId, corporationId),
+      ))
+      .for("update");
+    if (!plan) return { kind: "not_found" as const };
+
+    const linkedGroups = await tx
+      .select({ name: identityGroupsTable.name })
+      .from(identityGroupSkillPlansTable)
+      .innerJoin(identityGroupsTable, and(
+        eq(identityGroupsTable.id, identityGroupSkillPlansTable.groupId),
+        eq(identityGroupsTable.corporationId, corporationId),
+      ))
+      .where(and(
+        eq(identityGroupSkillPlansTable.corporationId, corporationId),
+        eq(identityGroupSkillPlansTable.skillPlanId, id),
+      ))
+      .orderBy(identityGroupsTable.name);
+    if (linkedGroups.length > 0) {
+      return { kind: "in_use" as const, groupNames: linkedGroups.map((group) => group.name) };
+    }
+
+    await tx.delete(corporationSkillPlansTable).where(and(
+      eq(corporationSkillPlansTable.id, id),
+      eq(corporationSkillPlansTable.corporationId, corporationId),
+    ));
+    return { kind: "deleted" as const };
+  });
+
+  if (result.kind === "not_found") {
+    res.status(404).json({ error: "Skill plan not found" });
+    return;
+  }
+  if (result.kind === "in_use") {
+    res.status(409).json({
+      error: `该技能方案仍被身份组使用：${result.groupNames.join("、")}。请先编辑这些身份组并取消关联。`,
+      code: "IDENTITY_SKILL_PLAN_IN_USE",
+      groupNames: result.groupNames,
+    });
+    return;
+  }
+  res.status(204).send();
 });
 
 router.post("/identity-groups/:id/applications", async (req: Request, res: Response): Promise<void> => {

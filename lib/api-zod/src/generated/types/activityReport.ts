@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ActivityMember } from "./activityMember";
+import type { ActivityMonthlySettlement } from "./activityMonthlySettlement";
 
 export interface ActivityReport {
   month: string;
@@ -14,8 +15,10 @@ export interface ActivityReport {
   evaluatedAt: Date;
   eligibilityDays: number;
   minimumPap: number;
+  configuredMinimumPap: number;
   totalEligible: number;
   meetingRequirement: number;
   belowRequirement: number;
+  settlement: ActivityMonthlySettlement;
   members: ActivityMember[];
 }

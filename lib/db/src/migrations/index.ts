@@ -17,6 +17,7 @@ import { reimbursementReferencePricingMigration } from "./0015-reimbursement-ref
 import { redemptionApplicantSnapshotMigration } from "./0016-redemption-applicant-snapshot";
 import { corporationStructuresMigration } from "./0017-corporation-structures";
 import { identityGroupApplicationWindowMigration } from "./0018-identity-group-application-window";
+import { activityMonthlyPapDeductionMigration } from "./0019-activity-monthly-pap-deduction";
 
 type Migration = {
   id: string;
@@ -42,6 +43,7 @@ const migrations: Migration[] = [
   redemptionApplicantSnapshotMigration,
   corporationStructuresMigration,
   identityGroupApplicationWindowMigration,
+  activityMonthlyPapDeductionMigration,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {

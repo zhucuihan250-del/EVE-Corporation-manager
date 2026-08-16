@@ -17,4 +17,6 @@ export interface ActivityMember {
   papRecords: number;
   remainingPap: number;
   metRequirement: boolean;
+  /** @nullable */
+  settledDeductionPap: number | null;
 }

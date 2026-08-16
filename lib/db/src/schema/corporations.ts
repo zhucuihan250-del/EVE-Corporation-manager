@@ -25,6 +25,9 @@ export const corporationsTable = pgTable("corporations", {
   courierEnabled: boolean("courier_enabled").notNull().default(false),
   structuresEnabled: boolean("structures_enabled").notNull().default(false),
   activityMinimumPap: doublePrecision("activity_minimum_pap").notNull().default(2),
+  activityDeductionStartedAt: timestamp("activity_deduction_started_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()

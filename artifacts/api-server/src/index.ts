@@ -2,6 +2,10 @@ import app from "./app";
 import { pool, runMigrations } from "@workspace/db";
 import { logger } from "./lib/logger";
 import { CHARACTER_RETENTION_SWEEP_INTERVAL_MS, purgeExpiredDeletedCharacters } from "./lib/character-retention";
+import {
+  ACTIVITY_SETTLEMENT_SWEEP_INTERVAL_MS,
+  settleDueActivityMonths,
+} from "./lib/activity-monthly-settlement";
 
 const rawPort = process.env["PORT"];
 
@@ -41,6 +45,22 @@ async function prepareDatabase() {
   }
 }
 
+let activitySettlementSweepRunning = false;
+async function runActivitySettlementSweep() {
+  if (activitySettlementSweepRunning) return;
+  activitySettlementSweepRunning = true;
+  try {
+    const result = await settleDueActivityMonths();
+    if (result.settlementsCreated > 0) {
+      logger.info(result, "Monthly activity PAP settlements completed");
+    }
+  } catch (err) {
+    logger.error({ err }, "Failed to settle monthly activity PAP deductions");
+  } finally {
+    activitySettlementSweepRunning = false;
+  }
+}
+
 prepareDatabase()
   .then(() => {
     app.listen(port, "0.0.0.0", (err) => {
@@ -62,6 +82,12 @@ prepareDatabase()
           });
       }, CHARACTER_RETENTION_SWEEP_INTERVAL_MS);
       retentionSweep.unref();
+
+      void runActivitySettlementSweep();
+      const activitySettlementSweep = setInterval(() => {
+        void runActivitySettlementSweep();
+      }, ACTIVITY_SETTLEMENT_SWEEP_INTERVAL_MS);
+      activitySettlementSweep.unref();
     });
   })
   .catch((err) => {

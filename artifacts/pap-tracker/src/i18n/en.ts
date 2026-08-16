@@ -61,6 +61,7 @@ const en = {
       details: "DETAILS",
       character: "CHARACTER",
       amount: "AMOUNT",
+      activityDeduction: "ACTIVITY DEDUCTION",
     },
     rewards: {
       title: "Requisition Center",
@@ -525,6 +526,7 @@ const en = {
       type: "TYPE",
       context: "CONTEXT",
       delta: "DELTA",
+      activityDeduction: "ACTIVITY DEDUCTION",
     },
     announcements: {
       title: "Fleet Notices",

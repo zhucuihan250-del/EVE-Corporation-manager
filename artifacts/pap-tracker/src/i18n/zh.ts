@@ -61,6 +61,7 @@ const zh = {
       details: "详情",
       character: "角色",
       amount: "数量",
+      activityDeduction: "月度活跃扣除",
     },
     rewards: {
       title: "兑换中心",
@@ -503,6 +504,7 @@ const zh = {
       type: "类型",
       context: "上下文",
       delta: "变动",
+      activityDeduction: "月度活跃扣除",
     },
     announcements: {
       title: "舰队预告",

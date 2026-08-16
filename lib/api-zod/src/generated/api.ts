@@ -1636,7 +1636,7 @@ export const ListPapRecordsResponseItem = zod.object({
   characterId: zod.number().nullish(),
   fleetId: zod.number().nullish(),
   amount: zod.number(),
-  type: zod.enum(["fleet", "manual", "adjustment"]),
+  type: zod.enum(["fleet", "manual", "adjustment", "activity_deduction"]),
   reason: zod.string().nullish(),
   fleetName: zod.string().nullish(),
   characterName: zod.string().nullish(),
@@ -1654,7 +1654,7 @@ export const ListAllPapRecordsResponseItem = zod.object({
   characterId: zod.number().nullish(),
   fleetId: zod.number().nullish(),
   amount: zod.number(),
-  type: zod.enum(["fleet", "manual", "adjustment"]),
+  type: zod.enum(["fleet", "manual", "adjustment", "activity_deduction"]),
   reason: zod.string().nullish(),
   fleetName: zod.string().nullish(),
   characterName: zod.string().nullish(),
@@ -1695,9 +1695,16 @@ export const GetActivityReportResponse = zod.object({
   evaluatedAt: zod.coerce.date(),
   eligibilityDays: zod.number(),
   minimumPap: zod.number(),
+  configuredMinimumPap: zod.number(),
   totalEligible: zod.number(),
   meetingRequirement: zod.number(),
   belowRequirement: zod.number(),
+  settlement: zod.object({
+    status: zod.enum(["not_applicable", "scheduled", "pending", "settled"]),
+    settledAt: zod.coerce.date().nullable(),
+    eligibleMemberCount: zod.number().nullable(),
+    totalDeductedPap: zod.number().nullable(),
+  }),
   members: zod.array(
     zod.object({
       userId: zod.number(),
@@ -1709,6 +1716,7 @@ export const GetActivityReportResponse = zod.object({
       papRecords: zod.number(),
       remainingPap: zod.number(),
       metRequirement: zod.boolean(),
+      settledDeductionPap: zod.number().nullable(),
     }),
   ),
 });

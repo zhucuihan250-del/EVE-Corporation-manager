@@ -52,8 +52,8 @@ export function History() {
                       {format(new Date(record.createdAt), "yyyy-MM-dd HH:mm")}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={record.type === 'fleet' ? 'default' : 'secondary'} className="font-mono text-[10px] rounded-sm">
-                        {record.type.toUpperCase()}
+                      <Badge variant={record.type === 'fleet' ? 'default' : record.type === 'activity_deduction' ? 'destructive' : 'secondary'} className="font-mono text-[10px] rounded-sm">
+                        {record.type === 'activity_deduction' ? t("history.activityDeduction") : record.type.toUpperCase()}
                       </Badge>
                     </TableCell>
                     <TableCell className="font-mono text-sm text-muted-foreground">
@@ -62,8 +62,8 @@ export function History() {
                     <TableCell className="font-mono text-xs text-muted-foreground/70">
                       {record.characterName ?? "—"}
                     </TableCell>
-                    <TableCell className="font-mono font-bold text-right text-primary">
-                      +{record.amount}
+                    <TableCell className={`font-mono font-bold text-right ${record.amount >= 0 ? "text-primary" : "text-destructive"}`}>
+                      {record.amount > 0 ? "+" : ""}{record.amount}
                     </TableCell>
                   </TableRow>
                 ))}

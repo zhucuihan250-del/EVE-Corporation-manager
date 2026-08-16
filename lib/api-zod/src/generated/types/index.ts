@@ -8,6 +8,8 @@
 
 export * from "./activityMember";
 export * from "./activityMemberRole";
+export * from "./activityMonthlySettlement";
+export * from "./activityMonthlySettlementStatus";
 export * from "./activityReport";
 export * from "./activitySettings";
 export * from "./activitySettingsInput";

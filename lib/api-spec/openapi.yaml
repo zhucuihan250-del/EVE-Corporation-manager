@@ -3240,7 +3240,7 @@ components:
           type: number
         type:
           type: string
-          enum: [fleet, manual, adjustment]
+          enum: [fleet, manual, adjustment, activity_deduction]
         reason:
           type: ["string", "null"]
         fleetName:
@@ -3481,7 +3481,17 @@ components:
         papRecords: { type: integer }
         remainingPap: { type: number }
         metRequirement: { type: boolean }
-      required: [userId, characterName, role, corporationJoinedAt, daysInCorporation, pap, papRecords, remainingPap, metRequirement]
+        settledDeductionPap: { type: ["number", "null"] }
+      required: [userId, characterName, role, corporationJoinedAt, daysInCorporation, pap, papRecords, remainingPap, metRequirement, settledDeductionPap]
+
+    ActivityMonthlySettlement:
+      type: object
+      properties:
+        status: { type: string, enum: [not_applicable, scheduled, pending, settled] }
+        settledAt: { type: ["string", "null"], format: date-time }
+        eligibleMemberCount: { type: ["integer", "null"] }
+        totalDeductedPap: { type: ["number", "null"] }
+      required: [status, settledAt, eligibleMemberCount, totalDeductedPap]
 
     ActivityReport:
       type: object
@@ -3492,14 +3502,17 @@ components:
         evaluatedAt: { type: string, format: date-time }
         eligibilityDays: { type: integer }
         minimumPap: { type: number }
+        configuredMinimumPap: { type: number }
         totalEligible: { type: integer }
         meetingRequirement: { type: integer }
         belowRequirement: { type: integer }
+        settlement:
+          $ref: "#/components/schemas/ActivityMonthlySettlement"
         members:
           type: array
           items:
             $ref: "#/components/schemas/ActivityMember"
-      required: [month, periodStart, periodEnd, evaluatedAt, eligibilityDays, minimumPap, totalEligible, meetingRequirement, belowRequirement, members]
+      required: [month, periodStart, periodEnd, evaluatedAt, eligibilityDays, minimumPap, configuredMinimumPap, totalEligible, meetingRequirement, belowRequirement, settlement, members]
 
     ActivitySettings:
       type: object

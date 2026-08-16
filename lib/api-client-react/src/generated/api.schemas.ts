@@ -813,6 +813,7 @@ export const PapRecordType = {
   fleet: "fleet",
   manual: "manual",
   adjustment: "adjustment",
+  activity_deduction: "activity_deduction",
 } as const;
 
 export interface PapRecord {
@@ -1005,6 +1006,28 @@ export interface ActivityMember {
   papRecords: number;
   remainingPap: number;
   metRequirement: boolean;
+  /** @nullable */
+  settledDeductionPap: number | null;
+}
+
+export type ActivityMonthlySettlementStatus =
+  (typeof ActivityMonthlySettlementStatus)[keyof typeof ActivityMonthlySettlementStatus];
+
+export const ActivityMonthlySettlementStatus = {
+  not_applicable: "not_applicable",
+  scheduled: "scheduled",
+  pending: "pending",
+  settled: "settled",
+} as const;
+
+export interface ActivityMonthlySettlement {
+  status: ActivityMonthlySettlementStatus;
+  /** @nullable */
+  settledAt: string | null;
+  /** @nullable */
+  eligibleMemberCount: number | null;
+  /** @nullable */
+  totalDeductedPap: number | null;
 }
 
 export interface ActivityReport {
@@ -1014,9 +1037,11 @@ export interface ActivityReport {
   evaluatedAt: string;
   eligibilityDays: number;
   minimumPap: number;
+  configuredMinimumPap: number;
   totalEligible: number;
   meetingRequirement: number;
   belowRequirement: number;
+  settlement: ActivityMonthlySettlement;
   members: ActivityMember[];
 }
 

@@ -15,7 +15,7 @@ export const papRecordsTable = pgTable("pap_records", {
   characterId: integer("character_id").references(() => charactersTable.id, { onDelete: "set null" }),
   fleetId: integer("fleet_id").references(() => fleetsTable.id, { onDelete: "set null" }),
   amount: real("amount").notNull(),
-  type: text("type", { enum: ["fleet", "manual", "adjustment"] }).notNull(),
+  type: text("type", { enum: ["fleet", "manual", "adjustment", "activity_deduction"] }).notNull(),
   reason: text("reason"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

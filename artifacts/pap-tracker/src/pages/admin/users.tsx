@@ -226,8 +226,7 @@ export function AdminUsers() {
                 <TableRow className="border-border/30 hover:bg-transparent">
                   <TableHead className="font-mono text-xs text-muted-foreground">{t("personnel.pilotName")}</TableHead>
                   <TableHead className="font-mono text-xs text-muted-foreground">{t("personnel.role")}</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground text-right">{t("personnel.totalPap")}</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground text-right">{t("personnel.redeemable")}</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground text-right">{t("personnel.papBalance")}</TableHead>
                   <TableHead className="font-mono text-xs text-muted-foreground text-right">{t("personnel.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
@@ -240,11 +239,8 @@ export function AdminUsers() {
                     <TableCell>
                       <RoleBadge role={user.role} />
                     </TableCell>
-                    <TableCell className="font-mono font-bold text-right text-muted-foreground">
-                      {user.totalPap}
-                    </TableCell>
                     <TableCell className="font-mono font-bold text-right text-emerald-400">
-                      {user.redeemablePap}
+                      {user.pap}
                     </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>

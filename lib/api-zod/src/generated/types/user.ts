@@ -18,7 +18,17 @@ export interface User {
   /** @nullable */
   corporationName?: string | null;
   role: UserRole;
+  /** Current PAP balance available for use. */
+  pap: number;
+  /**
+   * Compatibility alias of pap.
+   * @deprecated
+   */
   totalPap: number;
+  /**
+   * Compatibility alias of pap.
+   * @deprecated
+   */
   redeemablePap: number;
   createdAt: Date;
 }

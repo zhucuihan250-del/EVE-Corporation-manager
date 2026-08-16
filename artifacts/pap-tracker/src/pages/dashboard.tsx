@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useGetDashboardSummary, useGetRecentFleets, useListAnnouncements, useListFleets } from "@workspace/api-client-react";
-import { Target, Activity, Award, Trophy, Swords, Radio, CalendarClock, Shield, TrendingUp } from "lucide-react";
+import { Target, Activity, Award, Swords, Radio, CalendarClock, Shield, TrendingUp } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -85,29 +85,19 @@ export function Dashboard() {
       </div>
 
       {isSummaryLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[0,1,2,3].map(i => <Skeleton key={i} className="h-32 rounded-sm border border-border/50 bg-card/50" />)}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[0,1,2].map(i => <Skeleton key={i} className="h-32 rounded-sm border border-border/50 bg-card/50" />)}
         </div>
       ) : summary ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="bg-card/40 backdrop-blur border-primary/20 rounded-sm">
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-xs font-mono font-medium text-muted-foreground tracking-wider uppercase">{t("dashboard.totalPap")}</CardTitle>
+              <CardTitle className="text-xs font-mono font-medium text-muted-foreground tracking-wider uppercase">{t("dashboard.papBalance")}</CardTitle>
               <Award className="w-4 h-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold font-mono text-foreground">{summary.totalPap}</div>
-              <p className="text-xs text-muted-foreground mt-1 font-mono">{t("dashboard.lifetimeAccumulated")}</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-card/40 backdrop-blur border-border/50 rounded-sm">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-xs font-mono font-medium text-muted-foreground tracking-wider uppercase">{t("dashboard.redeemable")}</CardTitle>
-              <Trophy className="w-4 h-4 text-emerald-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold font-mono text-foreground">{summary.redeemablePap}</div>
-              <p className="text-xs text-muted-foreground mt-1 font-mono">{t("dashboard.availableToSpend")}</p>
+              <div className="text-3xl font-bold font-mono text-foreground">{summary.pap}</div>
+              <p className="text-xs text-muted-foreground mt-1 font-mono">{t("dashboard.availableBalance")}</p>
             </CardContent>
           </Card>
           <Card className="bg-card/40 backdrop-blur border-border/50 rounded-sm">

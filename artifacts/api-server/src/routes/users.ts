@@ -9,6 +9,7 @@ import {
   AdjustUserPapBody,
 } from "@workspace/api-zod";
 import { requireModule, requireTenant } from "../lib/tenant";
+import { canonicalPapBalance, normalizePap, setPapBalance } from "../lib/pap-balance";
 
 const router: IRouter = Router();
 router.use("/users", requireAuth, requireTenant, requireModule("pap"));
@@ -53,7 +54,8 @@ router.get("/users", requireAuth, async (req: Request, res: Response): Promise<v
     corporationId: req.tenant!.corporation.id,
     corporationName: req.tenant!.corporation.name,
     role: membershipRole,
-    totalPap: u.totalPap,
+    pap: u.redeemablePap,
+    totalPap: u.redeemablePap,
     redeemablePap: u.redeemablePap,
     createdAt: u.createdAt,
   })));
@@ -87,7 +89,8 @@ router.get("/users/:id", requireAuth, async (req: Request, res: Response): Promi
     corporationId: req.tenant!.corporation.id,
     corporationName: req.tenant!.corporation.name,
     role: row.role,
-    totalPap: row.user.totalPap,
+    pap: row.user.redeemablePap,
+    totalPap: row.user.redeemablePap,
     redeemablePap: row.user.redeemablePap,
     createdAt: row.user.createdAt,
   });
@@ -139,7 +142,8 @@ router.patch("/users/:id/role", requireAuth, async (req: Request, res: Response)
     corporationId: req.tenant!.corporation.id,
     corporationName: req.tenant!.corporation.name,
     role: membership.role,
-    totalPap: user.totalPap,
+    pap: user.redeemablePap,
+    totalPap: user.redeemablePap,
     redeemablePap: user.redeemablePap,
     createdAt: user.createdAt,
   });
@@ -177,20 +181,29 @@ router.patch("/users/:id/pap", requireAuth, async (req: Request, res: Response):
     return;
   }
 
-  const newTotal = targetUser.totalPap + body.data.amount;
-  const newRedeemable = Math.max(0, targetUser.redeemablePap + body.data.amount);
+  await db.transaction(async (tx) => {
+    const [lockedUser] = await tx
+      .select({ id: usersTable.id, redeemablePap: usersTable.redeemablePap })
+      .from(usersTable)
+      .where(eq(usersTable.id, targetUser.id))
+      .for("update");
+    if (!lockedUser) throw new Error(`PAP adjustment target ${targetUser.id} no longer exists`);
 
-  await db.update(usersTable).set({
-    totalPap: newTotal,
-    redeemablePap: newRedeemable,
-  }).where(eq(usersTable.id, params.data.id));
+    const before = canonicalPapBalance(lockedUser.redeemablePap);
+    const after = canonicalPapBalance(before + body.data.amount);
+    const appliedAmount = normalizePap(after - before);
 
-  await db.insert(papRecordsTable).values({
-    corporationId: req.tenant!.corporation.id,
-    userId: params.data.id,
-    amount: body.data.amount,
-    type: "adjustment",
-    reason: body.data.reason,
+    await tx.update(usersTable)
+      .set(setPapBalance(after))
+      .where(eq(usersTable.id, lockedUser.id));
+
+    await tx.insert(papRecordsTable).values({
+      corporationId: req.tenant!.corporation.id,
+      userId: lockedUser.id,
+      amount: appliedAmount,
+      type: "adjustment",
+      reason: body.data.reason,
+    });
   });
 
   res.json({ success: true, message: "PAP adjusted" });

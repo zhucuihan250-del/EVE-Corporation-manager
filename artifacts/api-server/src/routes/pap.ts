@@ -4,6 +4,7 @@ import { and, eq, desc, sql } from "drizzle-orm";
 import { requireAuth, hasRole } from "../middlewares/auth";
 import { CreateManualPapBody } from "@workspace/api-zod";
 import { requireModule, requireTenant } from "../lib/tenant";
+import { canonicalPapBalance, normalizePap, setPapBalance } from "../lib/pap-balance";
 
 const router: IRouter = Router();
 router.use("/pap", requireAuth, requireTenant, requireModule("pap"));
@@ -140,21 +141,34 @@ router.post("/pap/manual", requireAuth, async (req: Request, res: Response): Pro
     return;
   }
 
-  const [papRecord] = await db
-    .insert(papRecordsTable)
-    .values({
-      corporationId: req.tenant!.corporation.id,
-      userId: body.data.userId,
-      amount: body.data.amount,
-      type: "manual",
-      reason: body.data.reason,
-    })
-    .returning();
+  const papRecord = await db.transaction(async (tx) => {
+    const [lockedUser] = await tx
+      .select({ id: usersTable.id, redeemablePap: usersTable.redeemablePap })
+      .from(usersTable)
+      .where(eq(usersTable.id, body.data.userId))
+      .for("update");
+    if (!lockedUser) throw new Error(`Manual PAP target ${body.data.userId} no longer exists`);
 
-  await db.update(usersTable).set({
-    totalPap: sql`total_pap + ${body.data.amount}`,
-    redeemablePap: sql`redeemable_pap + ${body.data.amount}`,
-  }).where(eq(usersTable.id, body.data.userId));
+    const before = canonicalPapBalance(lockedUser.redeemablePap);
+    const after = canonicalPapBalance(before + body.data.amount);
+    const appliedAmount = normalizePap(after - before);
+
+    await tx.update(usersTable)
+      .set(setPapBalance(after))
+      .where(eq(usersTable.id, lockedUser.id));
+
+    const [record] = await tx
+      .insert(papRecordsTable)
+      .values({
+        corporationId: req.tenant!.corporation.id,
+        userId: lockedUser.id,
+        amount: appliedAmount,
+        type: "manual",
+        reason: body.data.reason,
+      })
+      .returning();
+    return record;
+  });
 
   res.status(201).json({
     ...papRecord,

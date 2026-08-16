@@ -6,6 +6,7 @@ import { requireModule, requireTenant } from "../lib/tenant";
 import { CreateRedemptionBody } from "@workspace/api-zod";
 import { papRecordsTable } from "@workspace/db";
 import { addCalendarMonths, ensureCorporationJoinedAt } from "../lib/corporation-membership";
+import { canonicalPapBalance, setPapBalance } from "../lib/pap-balance";
 
 const router: IRouter = Router();
 router.use("/redemptions", requireAuth, requireTenant, requireModule("pap"));
@@ -199,16 +200,17 @@ router.post("/redemptions", requireAuth, async (req: Request, res: Response): Pr
         }
       }
 
-      if (currentUser.redeemablePap < currentReward.papCost) {
+      const currentPap = canonicalPapBalance(currentUser.redeemablePap);
+      if (currentPap < currentReward.papCost) {
         throw new RedemptionRequestError(
           400,
-          `Insufficient PAP balance. Need ${currentReward.papCost}, have ${currentUser.redeemablePap}`,
+          `Insufficient PAP balance. Need ${currentReward.papCost}, have ${currentPap}`,
         );
       }
 
-      await tx.update(usersTable).set({
-        redeemablePap: sql`redeemable_pap - ${currentReward.papCost}`,
-      }).where(eq(usersTable.id, currentUser.id));
+      await tx.update(usersTable)
+        .set(setPapBalance(currentPap - currentReward.papCost))
+        .where(eq(usersTable.id, currentUser.id));
 
       await tx.insert(papRecordsTable).values({
         corporationId: req.tenant!.corporation.id,

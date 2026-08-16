@@ -8,6 +8,7 @@ import {
   usersTable,
 } from "@workspace/db";
 import { and, eq, isNotNull, lte, sql } from "drizzle-orm";
+import { canonicalPapBalance, normalizePap, setPapBalance } from "./pap-balance";
 
 export const ACTIVITY_ELIGIBILITY_DAYS = 60;
 export const ACTIVITY_SETTLEMENT_SWEEP_INTERVAL_MS = 15 * 60 * 1_000;
@@ -25,10 +26,6 @@ export type ActivitySettlementSweepResult = {
   membersSettled: number;
   totalPapDeducted: number;
 };
-
-function normalizePap(value: number): number {
-  return Math.round((value + Number.EPSILON) * 1_000_000) / 1_000_000;
-}
 
 function monthPeriod(year: number, zeroBasedMonth: number): MonthPeriod {
   const start = new Date(Date.UTC(year, zeroBasedMonth, 1));
@@ -102,7 +99,6 @@ async function settleCorporationMonth(
       ))
       .orderBy(usersTable.id);
 
-    const totalPapDeducted = normalizePap(minimumPap * members.length);
     const [settlement] = await tx
       .insert(activityMonthlySettlementsTable)
       .values({
@@ -112,15 +108,15 @@ async function settleCorporationMonth(
         periodEnd: period.end,
         minimumPap,
         eligibleMemberCount: members.length,
-        totalDeductedPap: totalPapDeducted,
+        totalDeductedPap: 0,
       })
       .returning({ id: activityMonthlySettlementsTable.id });
 
+    let totalPapDeducted = 0;
     for (const member of members) {
       const [user] = await tx
         .select({
           id: usersTable.id,
-          totalPap: usersTable.totalPap,
           redeemablePap: usersTable.redeemablePap,
         })
         .from(usersTable)
@@ -133,26 +129,25 @@ async function settleCorporationMonth(
         throw new Error(`Eligible activity member ${member.userId} changed corporation during settlement`);
       }
 
-      const totalPapBefore = Number(user.totalPap);
-      const redeemablePapBefore = Number(user.redeemablePap);
-      const totalPapAfter = normalizePap(totalPapBefore - minimumPap);
-      const redeemablePapAfter = normalizePap(Math.max(0, redeemablePapBefore - minimumPap));
+      const redeemablePapBefore = canonicalPapBalance(user.redeemablePap);
+      const deductedPap = normalizePap(Math.min(redeemablePapBefore, minimumPap));
+      const redeemablePapAfter = canonicalPapBalance(redeemablePapBefore - deductedPap);
       await tx
         .update(usersTable)
-        .set({ totalPap: totalPapAfter, redeemablePap: redeemablePapAfter })
+        .set(setPapBalance(redeemablePapAfter))
         .where(and(
           eq(usersTable.id, user.id),
           eq(usersTable.corporationId, corporationId),
         ));
 
       let papRecordId: number | null = null;
-      if (minimumPap > 0) {
+      if (deductedPap > 0) {
         const [papRecord] = await tx
           .insert(papRecordsTable)
           .values({
             corporationId,
             userId: user.id,
-            amount: -minimumPap,
+            amount: -deductedPap,
             type: "activity_deduction",
             reason: `Monthly activity minimum deduction · ${period.month}`,
             createdAt: period.end,
@@ -166,13 +161,19 @@ async function settleCorporationMonth(
         settlementId: settlement.id,
         userId: user.id,
         papRecordId,
-        amount: minimumPap,
-        totalPapBefore,
-        totalPapAfter,
+        amount: deductedPap,
+        totalPapBefore: redeemablePapBefore,
+        totalPapAfter: redeemablePapAfter,
         redeemablePapBefore,
         redeemablePapAfter,
       });
+      totalPapDeducted = normalizePap(totalPapDeducted + deductedPap);
     }
+
+    await tx
+      .update(activityMonthlySettlementsTable)
+      .set({ totalDeductedPap: totalPapDeducted })
+      .where(eq(activityMonthlySettlementsTable.id, settlement.id));
 
     return { membersSettled: members.length, totalPapDeducted };
   });

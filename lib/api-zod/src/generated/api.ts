@@ -45,8 +45,9 @@ export const GetMeResponse = zod.object({
       joinedAt: zod.coerce.date().nullable(),
     }),
   ),
-  totalPap: zod.number(),
-  redeemablePap: zod.number(),
+  pap: zod.number().describe("Current PAP balance available for use."),
+  totalPap: zod.number().describe("Compatibility alias of pap."),
+  redeemablePap: zod.number().describe("Compatibility alias of pap."),
   createdAt: zod.coerce.date(),
 });
 
@@ -68,8 +69,9 @@ export const ListUsersResponseItem = zod.object({
   corporationId: zod.number().nullish(),
   corporationName: zod.string().nullish(),
   role: zod.enum(["member", "fc", "admin", "controller"]),
-  totalPap: zod.number(),
-  redeemablePap: zod.number(),
+  pap: zod.number().describe("Current PAP balance available for use."),
+  totalPap: zod.number().describe("Compatibility alias of pap."),
+  redeemablePap: zod.number().describe("Compatibility alias of pap."),
   createdAt: zod.coerce.date(),
 });
 export const ListUsersResponse = zod.array(ListUsersResponseItem);
@@ -88,8 +90,9 @@ export const GetUserResponse = zod.object({
   corporationId: zod.number().nullish(),
   corporationName: zod.string().nullish(),
   role: zod.enum(["member", "fc", "admin", "controller"]),
-  totalPap: zod.number(),
-  redeemablePap: zod.number(),
+  pap: zod.number().describe("Current PAP balance available for use."),
+  totalPap: zod.number().describe("Compatibility alias of pap."),
+  redeemablePap: zod.number().describe("Compatibility alias of pap."),
   createdAt: zod.coerce.date(),
 });
 
@@ -123,8 +126,9 @@ export const UpdateUserRoleResponse = zod.object({
   corporationId: zod.number().nullish(),
   corporationName: zod.string().nullish(),
   role: zod.enum(["member", "fc", "admin", "controller"]),
-  totalPap: zod.number(),
-  redeemablePap: zod.number(),
+  pap: zod.number().describe("Current PAP balance available for use."),
+  totalPap: zod.number().describe("Compatibility alias of pap."),
+  redeemablePap: zod.number().describe("Compatibility alias of pap."),
   createdAt: zod.coerce.date(),
 });
 
@@ -1933,8 +1937,9 @@ export const UpdateRedemptionResponse = zod.object({
  * @summary Get summary stats for current user dashboard
  */
 export const GetDashboardSummaryResponse = zod.object({
-  totalPap: zod.number(),
-  redeemablePap: zod.number(),
+  pap: zod.number().describe("Current PAP balance available for use."),
+  totalPap: zod.number().describe("Compatibility alias of pap."),
+  redeemablePap: zod.number().describe("Compatibility alias of pap."),
   fleetCount: zod.number(),
   redemptionCount: zod.number(),
   recentPapEarned: zod.number(),

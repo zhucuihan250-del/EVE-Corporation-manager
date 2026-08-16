@@ -98,7 +98,8 @@ router.get("/dashboard/summary", requireAuth, async (req: Request, res: Response
     );
 
   res.json({
-    totalPap: user.totalPap,
+    pap: user.redeemablePap,
+    totalPap: user.redeemablePap,
     redeemablePap: user.redeemablePap,
     fleetCount: fleetCountResult.count,
     redemptionCount: redemptionCountResult.count,

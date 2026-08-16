@@ -2066,10 +2066,17 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TacticalGroupSummary"
+        pap:
+          type: number
+          description: Current PAP balance available for use.
         totalPap:
           type: number
+          deprecated: true
+          description: Compatibility alias of pap.
         redeemablePap:
           type: number
+          deprecated: true
+          description: Compatibility alias of pap.
         createdAt:
           type: string
           format: date-time
@@ -2081,6 +2088,7 @@ components:
         - modules
         - reimbursementOpen
         - tacticalGroups
+        - pap
         - totalPap
         - redeemablePap
         - createdAt
@@ -2101,16 +2109,24 @@ components:
         role:
           type: string
           enum: [member, fc, admin, controller]
+        pap:
+          type: number
+          description: Current PAP balance available for use.
         totalPap:
           type: number
+          deprecated: true
+          description: Compatibility alias of pap.
         redeemablePap:
           type: number
+          deprecated: true
+          description: Compatibility alias of pap.
         createdAt:
           type: string
           format: date-time
       required:
         - id
         - role
+        - pap
         - totalPap
         - redeemablePap
         - createdAt
@@ -3413,10 +3429,17 @@ components:
     DashboardSummary:
       type: object
       properties:
+        pap:
+          type: number
+          description: Current PAP balance available for use.
         totalPap:
           type: number
+          deprecated: true
+          description: Compatibility alias of pap.
         redeemablePap:
           type: number
+          deprecated: true
+          description: Compatibility alias of pap.
         fleetCount:
           type: integer
         redemptionCount:
@@ -3424,6 +3447,7 @@ components:
         recentPapEarned:
           type: number
       required:
+        - pap
         - totalPap
         - redeemablePap
         - fleetCount

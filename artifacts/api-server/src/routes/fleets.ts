@@ -5,6 +5,7 @@ import { refreshAccessToken } from "../lib/eve-sso";
 import { requireAuth, hasRole } from "../middlewares/auth";
 import { ensureBattleReportForFleet, queueBattleReportGeneration } from "../lib/battle-reports";
 import { ensureCorporationMembership, hasPermission, requireModule, requireTenant } from "../lib/tenant";
+import { incrementPapBalance } from "../lib/pap-balance";
 import {
   CreateFleetBody,
   GetFleetParams,
@@ -609,22 +610,21 @@ router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response)
       skipped++;
       continue;
     }
-    await db.insert(papRecordsTable).values({
-      corporationId: req.tenant!.corporation.id,
-      userId: character.userId,
-      characterId: character.id,
-      fleetId: fleet.id,
-      amount: fleet.papValue,
-      type: "fleet",
-      reason: `Fleet: ${fleet.name}`,
+    await db.transaction(async (tx) => {
+      await tx.insert(papRecordsTable).values({
+        corporationId: req.tenant!.corporation.id,
+        userId: character.userId!,
+        characterId: character.id,
+        fleetId: fleet.id,
+        amount: fleet.papValue,
+        type: "fleet",
+        reason: `Fleet: ${fleet.name}`,
+      });
+      await tx
+        .update(usersTable)
+        .set(incrementPapBalance(fleet.papValue))
+        .where(eq(usersTable.id, character.userId!));
     });
-    await db
-      .update(usersTable)
-      .set({
-        totalPap: sql`total_pap + ${fleet.papValue}`,
-        redeemablePap: sql`redeemable_pap + ${fleet.papValue}`,
-      })
-      .where(eq(usersTable.id, character.userId));
     awarded++;
   }
 
@@ -700,28 +700,25 @@ router.post("/fleets/:id/participants", requireAuth, async (req: Request, res: R
     return;
   }
 
-  // Award PAP
-  const [papRecord] = await db
-    .insert(papRecordsTable)
-    .values({
-      corporationId: req.tenant!.corporation.id,
-      userId: character.userId,
-      characterId: character.id,
-      fleetId: fleet.id,
-      amount: fleet.papValue,
-      type: "fleet",
-      reason: `Fleet: ${fleet.name}`,
-    })
-    .returning();
-
-  // Update user totals
-  await db
-    .update(usersTable)
-    .set({
-      totalPap: sql`total_pap + ${fleet.papValue}`,
-      redeemablePap: sql`redeemable_pap + ${fleet.papValue}`,
-    })
-    .where(eq(usersTable.id, character.userId));
+  const papRecord = await db.transaction(async (tx) => {
+    const [record] = await tx
+      .insert(papRecordsTable)
+      .values({
+        corporationId: req.tenant!.corporation.id,
+        userId: character.userId!,
+        characterId: character.id,
+        fleetId: fleet.id,
+        amount: fleet.papValue,
+        type: "fleet",
+        reason: `Fleet: ${fleet.name}`,
+      })
+      .returning();
+    await tx
+      .update(usersTable)
+      .set(incrementPapBalance(fleet.papValue))
+      .where(eq(usersTable.id, character.userId!));
+    return record;
+  });
 
   res.status(201).json({
     ...papRecord,

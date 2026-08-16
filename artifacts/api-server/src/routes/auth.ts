@@ -22,6 +22,7 @@ import {
   getTenantContext,
 } from "../lib/tenant";
 import { timingSafeEqual } from "node:crypto";
+import { incrementPapBalance } from "../lib/pap-balance";
 
 const router: IRouter = Router();
 
@@ -45,12 +46,11 @@ async function mergeOrphanUser(
   }
   // Move all PAP records to main user
   await db.execute(sql`UPDATE pap_records SET user_id = ${mainUserId} WHERE user_id = ${orphan.id}`);
-  // Add orphan's accumulated PAP totals to main user
-  if (orphan.totalPap > 0 || orphan.redeemablePap > 0) {
-    await db.update(usersTable).set({
-      totalPap: sql`total_pap + ${orphan.totalPap}`,
-      redeemablePap: sql`redeemable_pap + ${orphan.redeemablePap}`,
-    }).where(eq(usersTable.id, mainUserId));
+  // The spendable balance is canonical; totalPap is only a mirrored legacy field.
+  if (orphan.redeemablePap > 0) {
+    await db.update(usersTable)
+      .set(incrementPapBalance(orphan.redeemablePap))
+      .where(eq(usersTable.id, mainUserId));
   }
   // Reassign all of orphan's character records to main user (all as alts)
   await db.update(charactersTable).set({
@@ -61,7 +61,7 @@ async function mergeOrphanUser(
   }).where(and(eq(charactersTable.userId, orphan.id), isNull(charactersTable.deletedAt)));
   // Delete orphan user row
   await db.delete(usersTable).where(eq(usersTable.id, orphan.id));
-  log.info({ orphanId: orphan.id, mainUserId, orphanPap: orphan.totalPap }, "Orphan user merged into main account");
+  log.info({ orphanId: orphan.id, mainUserId, orphanPap: orphan.redeemablePap }, "Orphan user merged into main account");
 }
 
 async function findActiveCharacterByEveId(characterId: number) {
@@ -834,7 +834,8 @@ router.get("/auth/me", requireAuth, async (req: Request, res: Response): Promise
       courier: tenant.corporation.courierEnabled,
       structures: tenant.corporation.structuresEnabled,
     },
-    totalPap: tenant.corporation.papEnabled ? tenant.user.totalPap : 0,
+    pap: tenant.corporation.papEnabled ? tenant.user.redeemablePap : 0,
+    totalPap: tenant.corporation.papEnabled ? tenant.user.redeemablePap : 0,
     redeemablePap: tenant.corporation.papEnabled ? tenant.user.redeemablePap : 0,
     createdAt: tenant.user.createdAt,
   });

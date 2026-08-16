@@ -18,6 +18,7 @@ import { redemptionApplicantSnapshotMigration } from "./0016-redemption-applican
 import { corporationStructuresMigration } from "./0017-corporation-structures";
 import { identityGroupApplicationWindowMigration } from "./0018-identity-group-application-window";
 import { activityMonthlyPapDeductionMigration } from "./0019-activity-monthly-pap-deduction";
+import { unifiedPapBalanceMigration } from "./0020-unified-pap-balance";
 
 type Migration = {
   id: string;
@@ -44,6 +45,7 @@ const migrations: Migration[] = [
   corporationStructuresMigration,
   identityGroupApplicationWindowMigration,
   activityMonthlyPapDeductionMigration,
+  unifiedPapBalanceMigration,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {

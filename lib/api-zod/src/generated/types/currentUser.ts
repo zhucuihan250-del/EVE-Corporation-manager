@@ -25,7 +25,17 @@ export interface CurrentUser {
   modules: CorporationModules;
   reimbursementOpen: boolean;
   tacticalGroups: TacticalGroupSummary[];
+  /** Current PAP balance available for use. */
+  pap: number;
+  /**
+   * Compatibility alias of pap.
+   * @deprecated
+   */
   totalPap: number;
+  /**
+   * Compatibility alias of pap.
+   * @deprecated
+   */
   redeemablePap: number;
   createdAt: Date;
 }

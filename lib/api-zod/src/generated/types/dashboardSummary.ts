@@ -7,7 +7,17 @@
  */
 
 export interface DashboardSummary {
+  /** Current PAP balance available for use. */
+  pap: number;
+  /**
+   * Compatibility alias of pap.
+   * @deprecated
+   */
   totalPap: number;
+  /**
+   * Compatibility alias of pap.
+   * @deprecated
+   */
   redeemablePap: number;
   fleetCount: number;
   redemptionCount: number;

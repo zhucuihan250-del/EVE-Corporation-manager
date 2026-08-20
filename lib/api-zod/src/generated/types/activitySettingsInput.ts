@@ -5,11 +5,8 @@
  * EVE Online PAP Tracking System API
  * OpenAPI spec version: 0.1.0
  */
+import type { ActivitySettingsInputMinimumPap } from "./activitySettingsInputMinimumPap";
 
 export interface ActivitySettingsInput {
-  /**
-   * @minimum 0
-   * @maximum 1000
-   */
-  minimumPap: number;
+  minimumPap: ActivitySettingsInputMinimumPap;
 }

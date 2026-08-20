@@ -10,8 +10,10 @@ import {
 import { and, eq, isNotNull, lte, sql } from "drizzle-orm";
 import { availablePap, canonicalPapBalance, normalizePap, setPapBalance } from "./pap-balance";
 import { writePapLedger } from "./pap-ledger";
+import { ACTIVITY_MONTHLY_PAP_DEDUCTION, calculateActivityPapDeduction } from "./activity-rules";
 
 export const ACTIVITY_ELIGIBILITY_DAYS = 60;
+export { ACTIVITY_MONTHLY_PAP_DEDUCTION } from "./activity-rules";
 export const ACTIVITY_SETTLEMENT_SWEEP_INTERVAL_MS = 15 * 60 * 1_000;
 
 const DAY_MS = 24 * 60 * 60 * 1_000;
@@ -70,7 +72,6 @@ async function settleCorporationMonth(
 
     const [corporation] = await tx
       .select({
-        minimumPap: corporationsTable.activityMinimumPap,
         deductionStartedAt: corporationsTable.activityDeductionStartedAt,
       })
       .from(corporationsTable)
@@ -83,7 +84,7 @@ async function settleCorporationMonth(
       return null;
     }
 
-    const minimumPap = normalizePap(Number(corporation.minimumPap));
+    const minimumPap = ACTIVITY_MONTHLY_PAP_DEDUCTION;
     const evaluatedAt = new Date(period.end.getTime() - 1);
     const eligibilityCutoff = new Date(evaluatedAt.getTime() - ACTIVITY_ELIGIBILITY_DAYS * DAY_MS);
     const members = await tx
@@ -133,7 +134,7 @@ async function settleCorporationMonth(
       }
 
       const redeemablePapBefore = canonicalPapBalance(user.redeemablePap);
-      const deductedPap = normalizePap(Math.min(availablePap(redeemablePapBefore, user.lockedPap), minimumPap));
+      const { deductedPap } = calculateActivityPapDeduction(availablePap(redeemablePapBefore, user.lockedPap));
       const redeemablePapAfter = canonicalPapBalance(redeemablePapBefore - deductedPap);
       await tx
         .update(usersTable)

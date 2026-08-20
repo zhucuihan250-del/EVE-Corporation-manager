@@ -15,4 +15,8 @@ export interface ActivityMonthlySettlement {
   eligibleMemberCount: number | null;
   /** @nullable */
   totalDeductedPap: number | null;
+  /** @nullable */
+  successfulDeductionCount: number | null;
+  /** @nullable */
+  insufficientPapCount: number | null;
 }

@@ -7,12 +7,14 @@
  */
 
 export * from "./activityMember";
+export * from "./activityMemberDeductionStatus";
 export * from "./activityMemberRole";
 export * from "./activityMonthlySettlement";
 export * from "./activityMonthlySettlementStatus";
 export * from "./activityReport";
 export * from "./activitySettings";
 export * from "./activitySettingsInput";
+export * from "./activitySettingsInputMinimumPap";
 export * from "./addParticipantBody";
 export * from "./adjustPapBody";
 export * from "./adminSummary";

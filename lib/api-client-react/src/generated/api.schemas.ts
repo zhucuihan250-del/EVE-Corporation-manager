@@ -1257,6 +1257,16 @@ export const ActivityMemberRole = {
   controller: "controller",
 } as const;
 
+export type ActivityMemberDeductionStatus =
+  (typeof ActivityMemberDeductionStatus)[keyof typeof ActivityMemberDeductionStatus];
+
+export const ActivityMemberDeductionStatus = {
+  not_applicable: "not_applicable",
+  scheduled: "scheduled",
+  deducted: "deducted",
+  insufficient: "insufficient",
+} as const;
+
 export interface ActivityMember {
   userId: number;
   characterName: string;
@@ -1269,6 +1279,11 @@ export interface ActivityMember {
   metRequirement: boolean;
   /** @nullable */
   settledDeductionPap: number | null;
+  currentAvailablePap: number;
+  requiredDeductionPap: number;
+  deductionShortfallPap: number;
+  hasInsufficientPapAlert: boolean;
+  deductionStatus: ActivityMemberDeductionStatus;
 }
 
 export type ActivityMonthlySettlementStatus =
@@ -1289,6 +1304,10 @@ export interface ActivityMonthlySettlement {
   eligibleMemberCount: number | null;
   /** @nullable */
   totalDeductedPap: number | null;
+  /** @nullable */
+  successfulDeductionCount: number | null;
+  /** @nullable */
+  insufficientPapCount: number | null;
 }
 
 export interface ActivityReport {
@@ -1311,12 +1330,15 @@ export interface ActivitySettings {
   eligibilityDays: number;
 }
 
+export type ActivitySettingsInputMinimumPap =
+  (typeof ActivitySettingsInputMinimumPap)[keyof typeof ActivitySettingsInputMinimumPap];
+
+export const ActivitySettingsInputMinimumPap = {
+  NUMBER_2: 2,
+} as const;
+
 export interface ActivitySettingsInput {
-  /**
-   * @minimum 0
-   * @maximum 1000
-   */
-  minimumPap: number;
+  minimumPap: ActivitySettingsInputMinimumPap;
 }
 
 export type CorporationRosterConnectionStatus =

@@ -5,16 +5,17 @@ import {
   corporationMembershipsTable,
   corporationsTable,
   db,
-  papRecordsTable,
   usersTable,
 } from "@workspace/db";
-import { and, eq, gte, isNotNull, lt, ne, sql } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import { hasRole, requireAuth } from "../middlewares/auth";
 import { ensureCorporationJoinedAt } from "../lib/corporation-membership";
 import { generateOauthState, getCorporationRosterAuthorizationUrl } from "../lib/eve-sso";
 import { getCorporationRosterConnection, getRecentUnboundMemberAudit } from "../lib/corporation-roster";
 import { hasPermission, requireModule, requireTenant } from "../lib/tenant";
 import { ACTIVITY_ELIGIBILITY_DAYS } from "../lib/activity-monthly-settlement";
+import { ACTIVITY_MONTHLY_PAP_DEDUCTION, calculateActivityPapDeduction } from "../lib/activity-rules";
+import { availablePap } from "../lib/pap-balance";
 
 const router: IRouter = Router();
 const DAY_MS = 24 * 60 * 60 * 1_000;
@@ -109,20 +110,6 @@ router.get("/activity", async (req: Request, res: Response): Promise<void> => {
       isNotNull(usersTable.eveCharacterName),
     ));
   const members = await resolveJoinDates(rawMembers);
-  const papRows = await db
-    .select({
-      userId: papRecordsTable.userId,
-      pap: sql<number>`COALESCE(SUM(${papRecordsTable.amount}), 0)::float8`,
-      papRecords: sql<number>`COUNT(*)::int`,
-    })
-    .from(papRecordsTable)
-    .where(and(
-      eq(papRecordsTable.corporationId, tenant.corporation.id),
-      ne(papRecordsTable.type, "activity_deduction"),
-      gte(papRecordsTable.createdAt, period.start),
-      lt(papRecordsTable.createdAt, period.end),
-    ))
-    .groupBy(papRecordsTable.userId);
   const deductionRows = settlement
     ? await db
       .select({
@@ -135,32 +122,53 @@ router.get("/activity", async (req: Request, res: Response): Promise<void> => {
         eq(activityMonthlyDeductionsTable.settlementId, settlement.id),
       ))
     : [];
-  const papByUser = new Map(papRows.map((row) => [row.userId, row]));
   const deductionByUser = new Map(deductionRows.map((row) => [row.userId, Number(row.amount)]));
-  const minimumPap = Number(settlement?.minimumPap ?? tenant.corporation.activityMinimumPap);
+  const minimumPap = ACTIVITY_MONTHLY_PAP_DEDUCTION;
+  const settlementStatus = settlement
+    ? "settled"
+    : period.end.getTime() <= tenant.corporation.activityDeductionStartedAt.getTime()
+      ? "not_applicable"
+      : period.end.getTime() > Date.now()
+        ? "scheduled"
+        : "pending";
   const eligibleMembers = members.flatMap((member) => {
     const joinedAt = member.user.corporationJoinedAt;
     if (!joinedAt) return [];
     const daysInCorporation = Math.max(0, Math.floor((period.evaluatedAt.getTime() - joinedAt.getTime()) / DAY_MS));
     if (daysInCorporation < ACTIVITY_ELIGIBILITY_DAYS) return [];
-    const totals = papByUser.get(member.user.id);
-    const pap = Number(totals?.pap ?? 0);
-    const metRequirement = pap >= minimumPap;
+    const currentAvailablePap = availablePap(member.user.redeemablePap, member.user.lockedPap);
+    const settledDeductionPap = settlement ? (deductionByUser.get(member.user.id) ?? 0) : null;
+    const outcome = calculateActivityPapDeduction(
+      settledDeductionPap === null ? currentAvailablePap : settledDeductionPap,
+    );
+    const hasInsufficientPapAlert = settlementStatus !== "not_applicable" && outcome.hasInsufficientPap;
+    const deductionShortfallPap = hasInsufficientPapAlert ? outcome.shortfallPap : 0;
+    const deductionStatus = settlementStatus === "not_applicable"
+      ? "not_applicable"
+      : settledDeductionPap !== null
+        ? hasInsufficientPapAlert ? "insufficient" : "deducted"
+        : hasInsufficientPapAlert ? "insufficient" : "scheduled";
+    const metRequirement = !hasInsufficientPapAlert;
     return [{
       userId: member.user.id,
       characterName: member.user.eveCharacterName!,
       role: member.role,
       corporationJoinedAt: joinedAt,
       daysInCorporation,
-      pap,
-      papRecords: Number(totals?.papRecords ?? 0),
-      remainingPap: Math.max(0, minimumPap - pap),
+      pap: currentAvailablePap,
+      papRecords: 0,
+      remainingPap: deductionShortfallPap,
       metRequirement,
-      settledDeductionPap: settlement ? (deductionByUser.get(member.user.id) ?? 0) : null,
+      settledDeductionPap,
+      currentAvailablePap,
+      requiredDeductionPap: minimumPap,
+      deductionShortfallPap,
+      hasInsufficientPapAlert,
+      deductionStatus,
     }];
   }).sort((left, right) => {
     if (left.metRequirement !== right.metRequirement) return left.metRequirement ? 1 : -1;
-    if (left.pap !== right.pap) return left.pap - right.pap;
+    if (left.deductionShortfallPap !== right.deductionShortfallPap) return right.deductionShortfallPap - left.deductionShortfallPap;
     return left.characterName.localeCompare(right.characterName);
   });
   const meetingRequirement = eligibleMembers.filter((member) => member.metRequirement).length;
@@ -172,21 +180,17 @@ router.get("/activity", async (req: Request, res: Response): Promise<void> => {
     evaluatedAt: period.evaluatedAt,
     eligibilityDays: ACTIVITY_ELIGIBILITY_DAYS,
     minimumPap,
-    configuredMinimumPap: Number(tenant.corporation.activityMinimumPap),
+    configuredMinimumPap: minimumPap,
     totalEligible: eligibleMembers.length,
     meetingRequirement,
     belowRequirement: eligibleMembers.length - meetingRequirement,
     settlement: {
-      status: settlement
-        ? "settled"
-        : period.end.getTime() <= tenant.corporation.activityDeductionStartedAt.getTime()
-          ? "not_applicable"
-          : period.end.getTime() > Date.now()
-            ? "scheduled"
-            : "pending",
+      status: settlementStatus,
       settledAt: settlement?.createdAt ?? null,
       eligibleMemberCount: settlement?.eligibleMemberCount ?? null,
       totalDeductedPap: settlement?.totalDeductedPap ?? null,
+      successfulDeductionCount: settlement ? meetingRequirement : null,
+      insufficientPapCount: settlement ? eligibleMembers.length - meetingRequirement : null,
     },
     members: eligibleMembers,
   });
@@ -197,13 +201,13 @@ router.patch("/activity/settings", async (req: Request, res: Response): Promise<
     res.status(403).json({ error: "Forbidden" });
     return;
   }
-  const minimumPap = Number(req.body.minimumPap);
-  if (!Number.isFinite(minimumPap) || minimumPap < 0 || minimumPap > 1_000) {
-    res.status(400).json({ error: "minimumPap must be between 0 and 1000" });
+  const requestedMinimumPap = Number(req.body.minimumPap);
+  if (requestedMinimumPap !== ACTIVITY_MONTHLY_PAP_DEDUCTION) {
+    res.status(400).json({ error: "The monthly activity deduction is fixed at 2 PAP" });
     return;
   }
   const [corporation] = await db.update(corporationsTable).set({
-    activityMinimumPap: minimumPap,
+    activityMinimumPap: ACTIVITY_MONTHLY_PAP_DEDUCTION,
   }).where(eq(corporationsTable.id, req.tenant!.corporation.id)).returning();
   res.json({ minimumPap: corporation.activityMinimumPap, eligibilityDays: ACTIVITY_ELIGIBILITY_DAYS });
 });

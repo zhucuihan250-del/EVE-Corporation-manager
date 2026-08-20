@@ -2653,7 +2653,7 @@ export const useCreateManualPap = <
 };
 
 /**
- * @summary List monthly PAP activity for eligible corporation members
+ * @summary List fixed monthly PAP deduction results and insufficient-balance alerts
  */
 export const getGetActivityReportUrl = (params?: GetActivityReportParams) => {
   const normalizedParams = new URLSearchParams();
@@ -2723,7 +2723,7 @@ export type GetActivityReportQueryResult = NonNullable<
 export type GetActivityReportQueryError = ErrorType<void>;
 
 /**
- * @summary List monthly PAP activity for eligible corporation members
+ * @summary List fixed monthly PAP deduction results and insufficient-balance alerts
  */
 
 export function useGetActivityReport<
@@ -2750,7 +2750,7 @@ export function useGetActivityReport<
 }
 
 /**
- * @summary Update the corporation monthly PAP requirement
+ * @summary Confirm the fixed corporation monthly PAP deduction
  */
 export const getUpdateActivitySettingsUrl = () => {
   return `/api/activity/settings`;
@@ -2814,7 +2814,7 @@ export type UpdateActivitySettingsMutationBody =
 export type UpdateActivitySettingsMutationError = ErrorType<unknown>;
 
 /**
- * @summary Update the corporation monthly PAP requirement
+ * @summary Confirm the fixed corporation monthly PAP deduction
  */
 export const useUpdateActivitySettings = <
   TError = ErrorType<unknown>,

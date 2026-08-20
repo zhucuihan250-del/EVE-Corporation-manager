@@ -1717,7 +1717,7 @@ export const CreateManualPapBody = zod.object({
 });
 
 /**
- * @summary List monthly PAP activity for eligible corporation members
+ * @summary List fixed monthly PAP deduction results and insufficient-balance alerts
  */
 export const getActivityReportQueryMonthRegExp = new RegExp(
   "^\\d{4}-(0[1-9]|1[0-2])$",
@@ -1746,6 +1746,8 @@ export const GetActivityReportResponse = zod.object({
     settledAt: zod.coerce.date().nullable(),
     eligibleMemberCount: zod.number().nullable(),
     totalDeductedPap: zod.number().nullable(),
+    successfulDeductionCount: zod.number().nullable(),
+    insufficientPapCount: zod.number().nullable(),
   }),
   members: zod.array(
     zod.object({
@@ -1759,21 +1761,25 @@ export const GetActivityReportResponse = zod.object({
       remainingPap: zod.number(),
       metRequirement: zod.boolean(),
       settledDeductionPap: zod.number().nullable(),
+      currentAvailablePap: zod.number(),
+      requiredDeductionPap: zod.number(),
+      deductionShortfallPap: zod.number(),
+      hasInsufficientPapAlert: zod.boolean(),
+      deductionStatus: zod.enum([
+        "not_applicable",
+        "scheduled",
+        "deducted",
+        "insufficient",
+      ]),
     }),
   ),
 });
 
 /**
- * @summary Update the corporation monthly PAP requirement
+ * @summary Confirm the fixed corporation monthly PAP deduction
  */
-export const updateActivitySettingsBodyMinimumPapMin = 0;
-export const updateActivitySettingsBodyMinimumPapMax = 1000;
-
 export const UpdateActivitySettingsBody = zod.object({
-  minimumPap: zod
-    .number()
-    .min(updateActivitySettingsBodyMinimumPapMin)
-    .max(updateActivitySettingsBodyMinimumPapMax),
+  minimumPap: zod.literal(2),
 });
 
 export const UpdateActivitySettingsResponse = zod.object({

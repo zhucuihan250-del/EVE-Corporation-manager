@@ -5,6 +5,7 @@
  * EVE Online PAP Tracking System API
  * OpenAPI spec version: 0.1.0
  */
+import type { ActivityMemberDeductionStatus } from "./activityMemberDeductionStatus";
 import type { ActivityMemberRole } from "./activityMemberRole";
 
 export interface ActivityMember {
@@ -19,4 +20,9 @@ export interface ActivityMember {
   metRequirement: boolean;
   /** @nullable */
   settledDeductionPap: number | null;
+  currentAvailablePap: number;
+  requiredDeductionPap: number;
+  deductionShortfallPap: number;
+  hasInsufficientPapAlert: boolean;
+  deductionStatus: ActivityMemberDeductionStatus;
 }

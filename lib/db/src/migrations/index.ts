@@ -20,6 +20,7 @@ import { identityGroupApplicationWindowMigration } from "./0018-identity-group-a
 import { activityMonthlyPapDeductionMigration } from "./0019-activity-monthly-pap-deduction";
 import { unifiedPapBalanceMigration } from "./0020-unified-pap-balance";
 import { papMarketMigration } from "./0021-pap-market";
+import { fixedActivityPapDeductionMigration } from "./0022-fixed-activity-pap-deduction";
 
 type Migration = {
   id: string;
@@ -48,6 +49,7 @@ const migrations: Migration[] = [
   activityMonthlyPapDeductionMigration,
   unifiedPapBalanceMigration,
   papMarketMigration,
+  fixedActivityPapDeductionMigration,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {

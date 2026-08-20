@@ -698,7 +698,7 @@ paths:
     get:
       operationId: getActivityReport
       tags: [activity]
-      summary: List monthly PAP activity for eligible corporation members
+      summary: List fixed monthly PAP deduction results and insufficient-balance alerts
       parameters:
         - in: query
           name: month
@@ -720,7 +720,7 @@ paths:
     patch:
       operationId: updateActivitySettings
       tags: [activity]
-      summary: Update the corporation monthly PAP requirement
+      summary: Confirm the fixed corporation monthly PAP deduction
       requestBody:
         required: true
         content:
@@ -3785,7 +3785,12 @@ components:
         remainingPap: { type: number }
         metRequirement: { type: boolean }
         settledDeductionPap: { type: ["number", "null"] }
-      required: [userId, characterName, role, corporationJoinedAt, daysInCorporation, pap, papRecords, remainingPap, metRequirement, settledDeductionPap]
+        currentAvailablePap: { type: number }
+        requiredDeductionPap: { type: number }
+        deductionShortfallPap: { type: number }
+        hasInsufficientPapAlert: { type: boolean }
+        deductionStatus: { type: string, enum: [not_applicable, scheduled, deducted, insufficient] }
+      required: [userId, characterName, role, corporationJoinedAt, daysInCorporation, pap, papRecords, remainingPap, metRequirement, settledDeductionPap, currentAvailablePap, requiredDeductionPap, deductionShortfallPap, hasInsufficientPapAlert, deductionStatus]
 
     ActivityMonthlySettlement:
       type: object
@@ -3794,7 +3799,9 @@ components:
         settledAt: { type: ["string", "null"], format: date-time }
         eligibleMemberCount: { type: ["integer", "null"] }
         totalDeductedPap: { type: ["number", "null"] }
-      required: [status, settledAt, eligibleMemberCount, totalDeductedPap]
+        successfulDeductionCount: { type: ["integer", "null"] }
+        insufficientPapCount: { type: ["integer", "null"] }
+      required: [status, settledAt, eligibleMemberCount, totalDeductedPap, successfulDeductionCount, insufficientPapCount]
 
     ActivityReport:
       type: object
@@ -3827,7 +3834,7 @@ components:
     ActivitySettingsInput:
       type: object
       properties:
-        minimumPap: { type: number, minimum: 0, maximum: 1000 }
+        minimumPap: { type: number, enum: [2] }
       required: [minimumPap]
 
     CorporationRosterConnection:

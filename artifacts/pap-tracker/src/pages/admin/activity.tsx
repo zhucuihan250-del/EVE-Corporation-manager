@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { useGetActivityReport, useGetRecentUnboundMembers, useUpdateActivitySettings } from "@workspace/api-client-react";
+import { useMemo, useState } from "react";
+import { useGetActivityReport, useGetRecentUnboundMembers } from "@workspace/api-client-react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,10 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/api-error";
 import { apiUrl } from "@/lib/api";
-import { Activity, CalendarClock, CheckCircle2, Clock3, Link2, RefreshCw, Save, ShieldCheck, TriangleAlert, Users, UserX } from "lucide-react";
+import { Activity, CalendarClock, CheckCircle2, Link2, RefreshCw, ShieldCheck, TriangleAlert, Users, UserX } from "lucide-react";
 
 function currentMonth(): string {
   const now = new Date();
@@ -22,43 +20,20 @@ export function AdminActivity() {
   const { i18n } = useTranslation();
   const zh = i18n.language.startsWith("zh");
   const tr = (cn: string, en: string) => zh ? cn : en;
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
   const [month, setMonth] = useState(currentMonth());
   const [filter, setFilter] = useState<"all" | "below" | "met">("all");
-  const [minimumPap, setMinimumPap] = useState("2");
   const report = useGetActivityReport({ month });
   const rosterAudit = useGetRecentUnboundMembers();
-  const updateSettings = useUpdateActivitySettings();
-
-  useEffect(() => {
-    if (report.data) setMinimumPap(String(report.data.configuredMinimumPap));
-  }, [report.data?.configuredMinimumPap]);
 
   const visibleMembers = useMemo(() => (report.data?.members ?? []).filter((member) => (
     filter === "all" || (filter === "met" ? member.metRequirement : !member.metRequirement)
   )), [filter, report.data?.members]);
 
-  const saveSettings = () => {
-    const value = Number(minimumPap);
-    if (!Number.isFinite(value) || value < 0 || value > 1_000) {
-      toast({ title: tr("PAP要求必须在0到1000之间", "PAP requirement must be between 0 and 1000"), variant: "destructive" });
-      return;
-    }
-    updateSettings.mutate({ data: { minimumPap: value } }, {
-      onSuccess: async () => {
-        await queryClient.invalidateQueries({ queryKey: ["/api/activity"] });
-        toast({ title: tr("每月PAP要求已更新", "Monthly PAP requirement updated") });
-      },
-      onError: (error) => toast({ title: tr("保存失败", "Save failed"), description: getErrorMessage(error), variant: "destructive" }),
-    });
-  };
-
   return (
     <div className="p-6 space-y-6 overflow-auto">
       <div>
         <h1 className="flex items-center gap-2 text-2xl font-bold font-mono tracking-wider"><Activity className="h-6 w-6 text-primary" />{tr("活跃度查询", "ACTIVITY TRACKING")}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{tr("自动纳入主角色已加入当前军团至少60天的玩家，按月检查PAP并在月末自动结算最低PAP。", "Automatically includes players whose main character has been in the corporation for at least 60 days, checks monthly PAP, and settles the minimum PAP at month-end.")}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{tr("主角色入团满60天后，系统每月月末自动扣除2 PAP；扣除不足的成员会在此处警报。", "After 60 days in the corporation, members are automatically charged 2 PAP at each month-end; insufficient deductions are alerted here.")}</p>
       </div>
 
       <Card className="border-primary/30">
@@ -124,14 +99,13 @@ export function AdminActivity() {
 
       <Card>
         <CardHeader>
-          <CardTitle>{tr("查询与标准", "Period and requirement")}</CardTitle>
-          <CardDescription>{tr("入团门槛固定为60天；每月最低PAP可由管理人员调整，并作为当月月末自动扣除数值。", "The eligibility threshold is fixed at 60 days; managers can adjust the monthly PAP minimum, which is automatically deducted at month-end.")}</CardDescription>
+          <CardTitle>{tr("查询月份与扣除规则", "Month and deduction rule")}</CardTitle>
+          <CardDescription>{tr("入团门槛固定为60天，每月扣除数量固定为2 PAP。", "Eligibility is fixed at 60 days and the monthly deduction is fixed at 2 PAP.")}</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-3 md:items-end">
+        <CardContent className="grid gap-4 md:grid-cols-2 md:items-end">
           <div className="space-y-2"><Label>{tr("统计月份", "Month")}</Label><Input type="month" max={currentMonth()} value={month} onChange={(event) => setMonth(event.target.value)} /></div>
-          <div className="space-y-2"><Label>{tr("每月最低PAP", "Minimum monthly PAP")}</Label><Input type="number" min="0" max="1000" step="0.5" value={minimumPap} onChange={(event) => setMinimumPap(event.target.value)} /></div>
-          <Button onClick={saveSettings} disabled={updateSettings.isPending}><Save className="mr-2 h-4 w-4" />{tr("保存标准", "Save requirement")}</Button>
-          <div className="rounded-md border border-primary/25 bg-primary/5 p-3 text-xs text-muted-foreground md:col-span-3">{tr("按 EVE 时间（UTC）结算：成员进入活跃度审查后，每个自然月结束会从其 PAP 余额扣除当月最低标准；余额不足时扣至 0，账本记录实际扣除量。扣除记录不会计入下一月活跃度，同一成员同一月份只会结算一次。", "Settled in EVE time (UTC): after a member enters activity review, the monthly minimum is deducted from the PAP balance at the end of each calendar month. If the balance is insufficient, it is reduced to zero and the ledger records the amount actually deducted. The deduction does not count toward next month's activity, and each member is settled only once per month.")}</div>
+          <div className="rounded-md border border-primary/25 bg-primary/5 p-4"><div className="text-xs text-muted-foreground">{tr("每月固定扣除", "Fixed monthly deduction")}</div><div className="mt-1 text-2xl font-bold font-mono">2 PAP</div></div>
+          <div className="rounded-md border border-primary/25 bg-primary/5 p-3 text-xs text-muted-foreground md:col-span-2">{tr("按 EVE 时间（UTC）结算。月末仅从可用 PAP 扣除，市场冻结 PAP 不会被占用。余额不足时会扣除当时可用数量，并在查询中警报缺少的 PAP；同一成员每月只结算一次。", "Settled in EVE time (UTC). Only available PAP is charged; PAP locked in the market is protected. If the balance is insufficient, the available amount is deducted and the exact PAP shortage is alerted here. Each member is settled only once per month.")}</div>
         </CardContent>
       </Card>
 
@@ -141,14 +115,14 @@ export function AdminActivity() {
         <>
           <div className="grid gap-4 md:grid-cols-3">
             <Card><CardHeader className="pb-2"><CardDescription className="flex items-center gap-2"><Users className="h-4 w-4" />{tr("纳入统计", "Eligible")}</CardDescription></CardHeader><CardContent className="text-3xl font-bold">{report.data?.totalEligible ?? "-"}</CardContent></Card>
-            <Card className="border-emerald-500/30"><CardHeader className="pb-2"><CardDescription className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-400" />{tr("已达标", "Meeting requirement")}</CardDescription></CardHeader><CardContent className="text-3xl font-bold text-emerald-400">{report.data?.meetingRequirement ?? "-"}</CardContent></Card>
-            <Card className="border-amber-500/30"><CardHeader className="pb-2"><CardDescription className="flex items-center gap-2"><TriangleAlert className="h-4 w-4 text-amber-400" />{tr("未达标", "Below requirement")}</CardDescription></CardHeader><CardContent className="text-3xl font-bold text-amber-400">{report.data?.belowRequirement ?? "-"}</CardContent></Card>
+            <Card className="border-emerald-500/30"><CardHeader className="pb-2"><CardDescription className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-400" />{tr("扣除正常", "Deduction ready")}</CardDescription></CardHeader><CardContent className="text-3xl font-bold text-emerald-400">{report.data?.meetingRequirement ?? "-"}</CardContent></Card>
+            <Card className="border-destructive/40"><CardHeader className="pb-2"><CardDescription className="flex items-center gap-2"><TriangleAlert className="h-4 w-4 text-destructive" />{tr("PAP不足警报", "Insufficient PAP alerts")}</CardDescription></CardHeader><CardContent className="text-3xl font-bold text-destructive">{report.data?.belowRequirement ?? "-"}</CardContent></Card>
           </div>
 
-          {report.data && <Card className={report.data.settlement.status === "settled" ? "border-emerald-500/30" : report.data.settlement.status === "pending" ? "border-amber-500/30" : "border-primary/20"}>
+          {report.data && <Card className={report.data.settlement.status === "settled" ? report.data.belowRequirement > 0 ? "border-destructive/40" : "border-emerald-500/30" : report.data.settlement.status === "pending" ? "border-amber-500/30" : "border-primary/20"}>
             <CardHeader className="pb-2"><CardDescription className="flex items-center gap-2"><CalendarClock className="h-4 w-4" />{tr("月末自动PAP结算", "Automatic month-end PAP settlement")}</CardDescription></CardHeader>
             <CardContent className="space-y-1 text-sm">
-              {report.data.settlement.status === "settled" ? <><div className="font-medium text-emerald-400">{tr("该月份已完成自动结算", "Automatic settlement completed for this month")}</div><div className="text-muted-foreground">{tr(`共 ${report.data.settlement.eligibleMemberCount ?? 0} 名成员，扣除 ${report.data.settlement.totalDeductedPap ?? 0} PAP`, `${report.data.settlement.eligibleMemberCount ?? 0} members, ${report.data.settlement.totalDeductedPap ?? 0} PAP deducted`)}</div>{report.data.settlement.settledAt && <div className="text-xs text-muted-foreground">{tr("结算时间", "Settled")}: {new Date(report.data.settlement.settledAt).toLocaleString()}</div>}</>
+              {report.data.settlement.status === "settled" ? <><div className={report.data.belowRequirement > 0 ? "font-medium text-destructive" : "font-medium text-emerald-400"}>{report.data.belowRequirement > 0 ? tr(`结算完成，${report.data.belowRequirement} 名成员 PAP 不足`, `Settlement completed with ${report.data.belowRequirement} insufficient PAP alert(s)`) : tr("该月份已完成扣除，无警报", "Monthly deductions completed with no alerts")}</div><div className="text-muted-foreground">{tr(`共 ${report.data.settlement.eligibleMemberCount ?? 0} 名成员，实际扣除 ${report.data.settlement.totalDeductedPap ?? 0} PAP`, `${report.data.settlement.eligibleMemberCount ?? 0} members, ${report.data.settlement.totalDeductedPap ?? 0} PAP deducted`)}</div>{report.data.settlement.settledAt && <div className="text-xs text-muted-foreground">{tr("结算时间", "Settled")}: {new Date(report.data.settlement.settledAt).toLocaleString()}</div>}</>
                 : report.data.settlement.status === "scheduled" ? <><div className="font-medium">{tr(`将在本月结束后按 ${report.data.minimumPap} PAP/人自动结算`, `Will settle automatically after month-end at ${report.data.minimumPap} PAP per member`)}</div><div className="text-muted-foreground">{tr("最终扣除名单以月末时已经入团满60天且仍在本军团的成员为准。", "The final deduction roster includes members who have reached 60 days and are still in the corporation at month-end.")}</div></>
                   : report.data.settlement.status === "pending" ? <><div className="font-medium text-amber-400">{tr("该月份已到结算时间，自动任务正在等待处理", "This month is due and awaiting automatic settlement")}</div><div className="text-muted-foreground">{tr("系统每15分钟检查一次，完成后本页面会显示扣除总数。", "The system checks every 15 minutes; this page will show the totals after completion.")}</div></>
                     : <div className="text-muted-foreground">{tr("该月份早于自动扣除功能启用时间，不会追溯扣除。", "This month predates automatic deductions and will not be charged retroactively.")}</div>}
@@ -157,21 +131,21 @@ export function AdminActivity() {
 
           <Card>
             <CardHeader className="gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div><CardTitle>{month} · {tr("成员明细", "Member details")}</CardTitle><CardDescription>{tr(`标准：入团满60天且当月至少 ${report.data?.minimumPap ?? minimumPap} PAP`, `Requirement: 60 days in corporation and at least ${report.data?.minimumPap ?? minimumPap} PAP in the month`)}</CardDescription></div>
-              <select className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={filter} onChange={(event) => setFilter(event.target.value as typeof filter)}><option value="all">{tr("全部", "All")}</option><option value="below">{tr("仅未达标", "Below only")}</option><option value="met">{tr("仅已达标", "Meeting only")}</option></select>
+              <div><CardTitle>{month} · {tr("成员扣除结果", "Member deduction results")}</CardTitle><CardDescription>{tr("不再按当月获得 PAP 判定活跃度，仅显示固定 2 PAP 扣除结果与余额不足警报。", "Monthly earned PAP is no longer used; this view shows only the fixed 2 PAP deduction result and shortage alerts.")}</CardDescription></div>
+              <select className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={filter} onChange={(event) => setFilter(event.target.value as typeof filter)}><option value="all">{tr("全部", "All")}</option><option value="below">{tr("仅警报", "Alerts only")}</option><option value="met">{tr("仅正常", "Normal only")}</option></select>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
-                <TableHeader><TableRow><TableHead>{tr("主角色", "Main character")}</TableHead><TableHead>{tr("入团时间", "Joined")}</TableHead><TableHead>{tr("入团天数", "Days")}</TableHead><TableHead>{tr("当月PAP", "Monthly PAP")}</TableHead><TableHead>{tr("状态", "Status")}</TableHead><TableHead>{tr("月末扣除", "Month-end deduction")}</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>{tr("主角色", "Main character")}</TableHead><TableHead>{tr("入团时间", "Joined")}</TableHead><TableHead>{tr("入团天数", "Days")}</TableHead><TableHead>{tr("当前可用 PAP", "Current available PAP")}</TableHead><TableHead>{tr("扣除状态", "Deduction status")}</TableHead><TableHead>{tr("月末扣除", "Month-end deduction")}</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {visibleMembers.map((member) => (
                     <TableRow key={member.userId}>
                       <TableCell className="font-medium">{member.characterName}<div className="text-xs text-muted-foreground">{member.role}</div></TableCell>
                       <TableCell>{new Date(member.corporationJoinedAt).toLocaleDateString()}</TableCell>
                       <TableCell>{member.daysInCorporation}</TableCell>
-                      <TableCell><span className="font-semibold">{member.pap}</span><span className="ml-1 text-xs text-muted-foreground">({member.papRecords} {tr("条记录", "records")})</span></TableCell>
-                      <TableCell>{member.metRequirement ? <Badge className="bg-emerald-600"><CheckCircle2 className="mr-1 h-3 w-3" />{tr("达标", "Met")}</Badge> : <Badge variant="destructive"><Clock3 className="mr-1 h-3 w-3" />{tr(`缺少 ${member.remainingPap} PAP`, `${member.remainingPap} PAP remaining`)}</Badge>}</TableCell>
-                      <TableCell>{member.settledDeductionPap === null ? <Badge variant="outline">{report.data?.settlement.status === "not_applicable" ? tr("不追溯", "Not applicable") : tr("待结算", "Scheduled")}</Badge> : member.settledDeductionPap > 0 ? <span className="font-semibold text-destructive">-{member.settledDeductionPap} PAP</span> : <span className="font-semibold">0 PAP</span>}</TableCell>
+                      <TableCell className="font-semibold font-mono">{member.currentAvailablePap} PAP</TableCell>
+                      <TableCell>{member.deductionStatus === "not_applicable" ? <Badge variant="outline">{tr("不追溯", "Not applicable")}</Badge> : member.hasInsufficientPapAlert ? <Badge variant="destructive"><TriangleAlert className="mr-1 h-3 w-3" />{tr(`PAP 不足，缺少 ${member.deductionShortfallPap}`, `${member.deductionShortfallPap} PAP short`)}</Badge> : member.deductionStatus === "deducted" ? <Badge className="bg-emerald-600"><CheckCircle2 className="mr-1 h-3 w-3" />{tr("已完整扣除", "Deducted in full")}</Badge> : <Badge variant="outline"><CheckCircle2 className="mr-1 h-3 w-3" />{tr("余额充足", "Balance ready")}</Badge>}</TableCell>
+                      <TableCell>{member.settledDeductionPap === null ? <Badge variant="outline">{report.data?.settlement.status === "not_applicable" ? tr("不追溯", "Not applicable") : tr("待结算", "Scheduled")}</Badge> : <span className={member.hasInsufficientPapAlert ? "font-semibold text-destructive" : "font-semibold text-emerald-400"}>-{member.settledDeductionPap} / {member.requiredDeductionPap} PAP</span>}</TableCell>
                     </TableRow>
                   ))}
                   {!report.isLoading && visibleMembers.length === 0 && <TableRow><TableCell colSpan={6} className="py-10 text-center text-muted-foreground">{tr("当前条件下没有成员", "No members match the current filter")}</TableCell></TableRow>}

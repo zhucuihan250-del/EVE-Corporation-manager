@@ -10,6 +10,7 @@ import {
   LockKeyhole, ShieldAlert, ShieldCheck, Swords, UserSquare2, Users, Wrench,
   Truck,
   Building2,
+  ArrowLeftRight,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent,
@@ -45,6 +46,7 @@ export function Layout({ children }: { children: ReactNode }) {
     serviceItems.push(
       { href: "/dashboard", label: t("nav.dashboard"), icon: LayoutDashboard, exact: true },
       { href: "/history", label: t("nav.history"), icon: History },
+      { href: "/pap-market", label: "PAP Market", icon: ArrowLeftRight },
     );
   }
   if (modules?.identity) serviceItems.push({ href: "/identity-groups", label: tr("身份组", "Identity groups"), icon: ShieldCheck });
@@ -98,6 +100,7 @@ export function Layout({ children }: { children: ReactNode }) {
       { href: "/admin/rewards", label: t("nav.rewards"), icon: Gift },
       { href: "/admin/redemptions", label: t("nav.requisitions"), icon: Inbox },
       { href: "/admin/pap", label: t("nav.papLedger"), icon: BookOpen },
+      { href: "/admin/pap-market", label: tr("PAP 市场管理", "PAP Market management"), icon: ArrowLeftRight },
     );
   }
 

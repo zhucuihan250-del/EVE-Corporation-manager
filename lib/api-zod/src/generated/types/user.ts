@@ -18,7 +18,7 @@ export interface User {
   /** @nullable */
   corporationName?: string | null;
   role: UserRole;
-  /** Current PAP balance available for use. */
+  /** Current PAP available for use after market locks. */
   pap: number;
   /**
    * Compatibility alias of pap.
@@ -26,9 +26,11 @@ export interface User {
    */
   totalPap: number;
   /**
-   * Compatibility alias of pap.
+   * Compatibility total PAP balance before market locks.
    * @deprecated
    */
   redeemablePap: number;
+  availablePap: number;
+  lockedPap: number;
   createdAt: Date;
 }

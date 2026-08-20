@@ -8,6 +8,10 @@ import {
   usersTable,
   charactersTable,
   papRecordsTable,
+  papLedgerTable,
+  papMarketAdminLogsTable,
+  papMarketOrdersTable,
+  papMarketTransactionsTable,
   identityGroupMembershipsTable,
   identityGroupsTable,
 } from "@workspace/db";
@@ -22,7 +26,7 @@ import {
   getTenantContext,
 } from "../lib/tenant";
 import { timingSafeEqual } from "node:crypto";
-import { incrementPapBalance } from "../lib/pap-balance";
+import { availablePap, incrementPapBalance } from "../lib/pap-balance";
 
 const router: IRouter = Router();
 
@@ -47,11 +51,22 @@ async function mergeOrphanUser(
   // Move all PAP records to main user
   await db.execute(sql`UPDATE pap_records SET user_id = ${mainUserId} WHERE user_id = ${orphan.id}`);
   // The spendable balance is canonical; totalPap is only a mirrored legacy field.
-  if (orphan.redeemablePap > 0) {
+  if (orphan.redeemablePap > 0 || orphan.lockedPap > 0) {
     await db.update(usersTable)
-      .set(incrementPapBalance(orphan.redeemablePap))
+      .set({
+        ...incrementPapBalance(orphan.redeemablePap),
+        lockedPap: sql`locked_pap + ${orphan.lockedPap}`,
+      })
       .where(eq(usersTable.id, mainUserId));
   }
+  // Keep immutable PAP Market history while moving live ownership to the main account.
+  await db.update(papMarketOrdersTable).set({ ownerId: mainUserId }).where(eq(papMarketOrdersTable.ownerId, orphan.id));
+  await db.update(papMarketTransactionsTable).set({ buyerId: mainUserId }).where(eq(papMarketTransactionsTable.buyerId, orphan.id));
+  await db.update(papMarketTransactionsTable).set({ sellerId: mainUserId }).where(eq(papMarketTransactionsTable.sellerId, orphan.id));
+  await db.update(papMarketTransactionsTable).set({ reviewedBy: mainUserId }).where(eq(papMarketTransactionsTable.reviewedBy, orphan.id));
+  await db.update(papLedgerTable).set({ userId: mainUserId }).where(eq(papLedgerTable.userId, orphan.id));
+  await db.update(papLedgerTable).set({ adminId: mainUserId }).where(eq(papLedgerTable.adminId, orphan.id));
+  await db.update(papMarketAdminLogsTable).set({ adminId: mainUserId }).where(eq(papMarketAdminLogsTable.adminId, orphan.id));
   // Reassign all of orphan's character records to main user (all as alts)
   await db.update(charactersTable).set({
     userId: mainUserId,
@@ -834,9 +849,11 @@ router.get("/auth/me", requireAuth, async (req: Request, res: Response): Promise
       courier: tenant.corporation.courierEnabled,
       structures: tenant.corporation.structuresEnabled,
     },
-    pap: tenant.corporation.papEnabled ? tenant.user.redeemablePap : 0,
+    pap: tenant.corporation.papEnabled ? availablePap(tenant.user.redeemablePap, tenant.user.lockedPap) : 0,
     totalPap: tenant.corporation.papEnabled ? tenant.user.redeemablePap : 0,
     redeemablePap: tenant.corporation.papEnabled ? tenant.user.redeemablePap : 0,
+    availablePap: tenant.corporation.papEnabled ? availablePap(tenant.user.redeemablePap, tenant.user.lockedPap) : 0,
+    lockedPap: tenant.corporation.papEnabled ? tenant.user.lockedPap : 0,
     createdAt: tenant.user.createdAt,
   });
 });

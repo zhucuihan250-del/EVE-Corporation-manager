@@ -55,8 +55,8 @@ export function AdminPap() {
                       {record.userName}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={record.type === 'fleet' ? 'default' : record.type === 'adjustment' || record.type === 'activity_deduction' ? 'destructive' : 'secondary'} className="font-mono text-[10px] rounded-sm">
-                        {record.type === 'activity_deduction' ? t("papLedger.activityDeduction") : record.type.toUpperCase()}
+                      <Badge variant={record.type === 'fleet' || record.type === 'market_buy' ? 'default' : record.type === 'adjustment' || record.type === 'activity_deduction' || record.type === 'market_sell' ? 'destructive' : 'secondary'} className="font-mono text-[10px] rounded-sm">
+                        {record.type === 'activity_deduction' ? t("papLedger.activityDeduction") : record.type === 'market_buy' ? t("papLedger.marketBuy") : record.type === 'market_sell' ? t("papLedger.marketSell") : record.type.toUpperCase()}
                       </Badge>
                     </TableCell>
                     <TableCell className="font-mono text-sm text-muted-foreground">

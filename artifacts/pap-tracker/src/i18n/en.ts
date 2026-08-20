@@ -60,6 +60,8 @@ const en = {
       character: "CHARACTER",
       amount: "AMOUNT",
       activityDeduction: "ACTIVITY DEDUCTION",
+      marketBuy: "MARKET BUY",
+      marketSell: "MARKET SELL",
     },
     rewards: {
       title: "Requisition Center",
@@ -524,6 +526,8 @@ const en = {
       context: "CONTEXT",
       delta: "DELTA",
       activityDeduction: "ACTIVITY DEDUCTION",
+      marketBuy: "MARKET BUY",
+      marketSell: "MARKET SELL",
     },
     announcements: {
       title: "Fleet Notices",

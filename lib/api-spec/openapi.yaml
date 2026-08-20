@@ -42,6 +42,8 @@ tags:
     description: Corporation courier routes, quotes, orders, and administration
   - name: economy
     description: Director-only corporation economy
+  - name: pap-market
+    description: Corporation-isolated PAP player market and administration
 
 paths:
   /healthz:
@@ -2007,6 +2009,117 @@ paths:
               schema:
                 $ref: "#/components/schemas/CorporationStructuresDashboard"
 
+  /pap-market/overview:
+    get:
+      operationId: getPapMarketOverview
+      tags: [pap-market]
+      summary: Get the active corporation's market, wallet, and current user's history
+      responses:
+        "200":
+          description: PAP Market overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PapMarketOverview"
+
+  /pap-market/orders:
+    post:
+      operationId: createPapMarketOrder
+      tags: [pap-market]
+      summary: Create a BUY or SELL order without accepting a client-supplied price
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePapMarketOrderBody"
+      responses:
+        "201":
+          description: Created order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PapMarketOrder"
+
+  /pap-market/orders/{id}/take:
+    post:
+      operationId: takePapMarketOrder
+      tags: [pap-market]
+      summary: Accept all or part of an order and create a pending admin transaction
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TakePapMarketOrderBody"
+      responses:
+        "201":
+          description: Created transaction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PapMarketTransaction"
+
+  /pap-market/orders/{id}/cancel:
+    post:
+      operationId: cancelPapMarketOrder
+      tags: [pap-market]
+      summary: Cancel the uncommitted remainder of the current user's order
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Cancelled order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PapMarketOrder"
+
+  /pap-market/admin/overview:
+    get:
+      operationId: getPapMarketAdminOverview
+      tags: [pap-market]
+      summary: Get corporation-scoped market transactions, orders, and immutable admin logs
+      responses:
+        "200":
+          description: PAP Market administration overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PapMarketAdminOverview"
+
+  /pap-market/admin/transactions/{id}:
+    patch:
+      operationId: reviewPapMarketTransaction
+      tags: [pap-market]
+      summary: Approve, reject, or dispute a pending PAP transaction
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewPapMarketTransactionBody"
+      responses:
+        "200":
+          description: Reviewed transaction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PapMarketTransaction"
+
 components:
   schemas:
     HealthStatus:
@@ -2036,6 +2149,154 @@ components:
           type: string
       required:
         - success
+
+    PapMarketWallet:
+      type: object
+      properties:
+        totalPap: { type: number }
+        availablePap: { type: number }
+        lockedPap: { type: number }
+      required: [totalPap, availablePap, lockedPap]
+
+    PapMarketOrder:
+      type: object
+      properties:
+        id: { type: integer }
+        corporationId: { type: integer }
+        ownerId: { type: integer }
+        ownerName: { type: string }
+        type: { type: string, enum: [buy, sell] }
+        originalAmount: { type: number }
+        remainingAmount: { type: number }
+        matchedAmount: { type: number }
+        lockedPapAmount: { type: number }
+        status: { type: string, enum: [open, partially_filled, filled, cancelled, expired] }
+        totalIskValue: { type: number }
+        remainingIskValue: { type: number }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        cancelledAt: { type: [string, "null"], format: date-time }
+        expiresAt: { type: [string, "null"], format: date-time }
+      required: [id, corporationId, ownerId, ownerName, type, originalAmount, remainingAmount, matchedAmount, lockedPapAmount, status, totalIskValue, remainingIskValue, createdAt, updatedAt, cancelledAt, expiresAt]
+
+    PapMarketTransaction:
+      type: object
+      properties:
+        id: { type: integer }
+        corporationId: { type: integer }
+        orderId: { type: integer }
+        orderType: { type: string, enum: [buy, sell] }
+        buyerId: { type: integer }
+        buyerName: { type: string }
+        sellerId: { type: integer }
+        sellerName: { type: string }
+        papAmount: { type: number }
+        iskValue: { type: number }
+        status: { type: string, enum: [pending_admin, completed, rejected, disputed, cancelled] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        reviewedAt: { type: [string, "null"], format: date-time }
+        reviewedBy: { type: [integer, "null"] }
+        adminNote: { type: [string, "null"] }
+      required: [id, corporationId, orderId, orderType, buyerId, buyerName, sellerId, sellerName, papAmount, iskValue, status, createdAt, updatedAt, reviewedAt, reviewedBy, adminNote]
+
+    PapMarketAdminLog:
+      type: object
+      properties:
+        id: { type: integer }
+        corporationId: { type: integer }
+        adminId: { type: integer }
+        action: { type: string, enum: [approve, reject, dispute] }
+        transactionId: { type: integer }
+        orderId: { type: integer }
+        beforeState: { type: object, additionalProperties: true }
+        afterState: { type: object, additionalProperties: true }
+        note: { type: [string, "null"] }
+        createdAt: { type: string, format: date-time }
+      required: [id, corporationId, adminId, action, transactionId, orderId, beforeState, afterState, note, createdAt]
+
+    PapLedgerEntry:
+      type: object
+      properties:
+        id: { type: integer }
+        corporationId: { type: integer }
+        userId: { type: [integer, "null"] }
+        userName: { type: string }
+        amount: { type: number }
+        lockedDelta: { type: number }
+        type: { type: string, enum: [opening_balance, pap_earned, redemption, admin_adjustment, activity_deduction, account_merge, market_order_lock, market_order_unlock, market_transaction_lock, market_transaction_unlock, market_buy, market_sell, reversal] }
+        orderId: { type: [integer, "null"] }
+        transactionId: { type: [integer, "null"] }
+        balanceAfter: { type: number }
+        lockedAfter: { type: number }
+        availableAfter: { type: number }
+        adminId: { type: [integer, "null"] }
+        reason: { type: [string, "null"] }
+        createdAt: { type: string, format: date-time }
+      required: [id, corporationId, userId, userName, amount, lockedDelta, type, orderId, transactionId, balanceAfter, lockedAfter, availableAfter, adminId, reason, createdAt]
+
+    PapMarketOverview:
+      type: object
+      properties:
+        wallet: { $ref: "#/components/schemas/PapMarketWallet" }
+        sellOrders:
+          type: array
+          items: { $ref: "#/components/schemas/PapMarketOrder" }
+        buyOrders:
+          type: array
+          items: { $ref: "#/components/schemas/PapMarketOrder" }
+        myOrders:
+          type: array
+          items: { $ref: "#/components/schemas/PapMarketOrder" }
+        myTransactions:
+          type: array
+          items: { $ref: "#/components/schemas/PapMarketTransaction" }
+        history:
+          type: array
+          items: { $ref: "#/components/schemas/PapMarketTransaction" }
+        ledger:
+          type: array
+          items: { $ref: "#/components/schemas/PapLedgerEntry" }
+      required: [wallet, sellOrders, buyOrders, myOrders, myTransactions, history, ledger]
+
+    PapMarketAdminOverview:
+      type: object
+      properties:
+        transactions:
+          type: array
+          items: { $ref: "#/components/schemas/PapMarketTransaction" }
+        orders:
+          type: array
+          items: { $ref: "#/components/schemas/PapMarketOrder" }
+        adminLogs:
+          type: array
+          items: { $ref: "#/components/schemas/PapMarketAdminLog" }
+        ledger:
+          type: array
+          items: { $ref: "#/components/schemas/PapLedgerEntry" }
+      required: [transactions, orders, adminLogs, ledger]
+
+    CreatePapMarketOrderBody:
+      type: object
+      properties:
+        type: { type: string, enum: [buy, sell] }
+        amount: { type: number, exclusiveMinimum: 0, maximum: 1000000 }
+        requestId: { type: string, minLength: 8, maxLength: 100 }
+      required: [type, amount, requestId]
+
+    TakePapMarketOrderBody:
+      type: object
+      properties:
+        amount: { type: number, exclusiveMinimum: 0, maximum: 1000000 }
+        requestId: { type: string, minLength: 8, maxLength: 100 }
+      required: [amount, requestId]
+
+    ReviewPapMarketTransactionBody:
+      type: object
+      properties:
+        action: { type: string, enum: [approve, reject, dispute] }
+        note: { type: string, maxLength: 2000 }
+      required: [action]
 
     CurrentUser:
       type: object
@@ -2068,7 +2329,7 @@ components:
             $ref: "#/components/schemas/TacticalGroupSummary"
         pap:
           type: number
-          description: Current PAP balance available for use.
+          description: Current PAP available for use after market locks.
         totalPap:
           type: number
           deprecated: true
@@ -2076,7 +2337,11 @@ components:
         redeemablePap:
           type: number
           deprecated: true
-          description: Compatibility alias of pap.
+          description: Compatibility total PAP balance before market locks.
+        availablePap:
+          type: number
+        lockedPap:
+          type: number
         createdAt:
           type: string
           format: date-time
@@ -2091,6 +2356,8 @@ components:
         - pap
         - totalPap
         - redeemablePap
+        - availablePap
+        - lockedPap
         - createdAt
 
     User:
@@ -2111,7 +2378,7 @@ components:
           enum: [member, fc, admin, controller]
         pap:
           type: number
-          description: Current PAP balance available for use.
+          description: Current PAP available for use after market locks.
         totalPap:
           type: number
           deprecated: true
@@ -2119,7 +2386,11 @@ components:
         redeemablePap:
           type: number
           deprecated: true
-          description: Compatibility alias of pap.
+          description: Compatibility total PAP balance before market locks.
+        availablePap:
+          type: number
+        lockedPap:
+          type: number
         createdAt:
           type: string
           format: date-time
@@ -2129,6 +2400,8 @@ components:
         - pap
         - totalPap
         - redeemablePap
+        - availablePap
+        - lockedPap
         - createdAt
 
     UpdateUserRoleBody:
@@ -3256,7 +3529,7 @@ components:
           type: number
         type:
           type: string
-          enum: [fleet, manual, adjustment, activity_deduction]
+          enum: [fleet, manual, adjustment, activity_deduction, market_buy, market_sell]
         reason:
           type: ["string", "null"]
         fleetName:
@@ -3431,7 +3704,7 @@ components:
       properties:
         pap:
           type: number
-          description: Current PAP balance available for use.
+          description: Current PAP available for use after market locks.
         totalPap:
           type: number
           deprecated: true
@@ -3439,7 +3712,11 @@ components:
         redeemablePap:
           type: number
           deprecated: true
-          description: Compatibility alias of pap.
+          description: Compatibility total PAP balance before market locks.
+        availablePap:
+          type: number
+        lockedPap:
+          type: number
         fleetCount:
           type: integer
         redemptionCount:
@@ -3450,6 +3727,8 @@ components:
         - pap
         - totalPap
         - redeemablePap
+        - availablePap
+        - lockedPap
         - fleetCount
         - redemptionCount
         - recentPapEarned

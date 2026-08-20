@@ -60,6 +60,8 @@ const zh = {
       character: "角色",
       amount: "数量",
       activityDeduction: "月度活跃扣除",
+      marketBuy: "市场买入",
+      marketSell: "市场卖出",
     },
     rewards: {
       title: "兑换中心",
@@ -502,6 +504,8 @@ const zh = {
       context: "上下文",
       delta: "变动",
       activityDeduction: "月度活跃扣除",
+      marketBuy: "市场买入",
+      marketSell: "市场卖出",
     },
     announcements: {
       title: "舰队预告",

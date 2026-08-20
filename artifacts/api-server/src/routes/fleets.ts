@@ -6,6 +6,7 @@ import { requireAuth, hasRole } from "../middlewares/auth";
 import { ensureBattleReportForFleet, queueBattleReportGeneration } from "../lib/battle-reports";
 import { ensureCorporationMembership, hasPermission, requireModule, requireTenant } from "../lib/tenant";
 import { incrementPapBalance } from "../lib/pap-balance";
+import { writePapLedger } from "../lib/pap-ledger";
 import {
   CreateFleetBody,
   GetFleetParams,
@@ -620,10 +621,25 @@ router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response)
         type: "fleet",
         reason: `Fleet: ${fleet.name}`,
       });
-      await tx
+      const [updatedUser] = await tx
         .update(usersTable)
         .set(incrementPapBalance(fleet.papValue))
-        .where(eq(usersTable.id, character.userId!));
+        .where(eq(usersTable.id, character.userId!))
+        .returning({
+          redeemablePap: usersTable.redeemablePap,
+          lockedPap: usersTable.lockedPap,
+        });
+      if (!updatedUser) throw new Error(`PAP award target ${character.userId} no longer exists`);
+      await writePapLedger(tx, {
+        corporationId: req.tenant!.corporation.id,
+        userId: character.userId!,
+        userName: character.eveCharacterName,
+        amount: fleet.papValue,
+        type: "pap_earned",
+        balanceAfter: updatedUser.redeemablePap,
+        lockedAfter: updatedUser.lockedPap,
+        reason: `Fleet: ${fleet.name}`,
+      });
     });
     awarded++;
   }
@@ -713,10 +729,25 @@ router.post("/fleets/:id/participants", requireAuth, async (req: Request, res: R
         reason: `Fleet: ${fleet.name}`,
       })
       .returning();
-    await tx
+    const [updatedUser] = await tx
       .update(usersTable)
       .set(incrementPapBalance(fleet.papValue))
-      .where(eq(usersTable.id, character.userId!));
+      .where(eq(usersTable.id, character.userId!))
+      .returning({
+        redeemablePap: usersTable.redeemablePap,
+        lockedPap: usersTable.lockedPap,
+      });
+    if (!updatedUser) throw new Error(`PAP award target ${character.userId} no longer exists`);
+    await writePapLedger(tx, {
+      corporationId: req.tenant!.corporation.id,
+      userId: character.userId!,
+      userName: character.eveCharacterName,
+      amount: fleet.papValue,
+      type: "pap_earned",
+      balanceAfter: updatedUser.redeemablePap,
+      lockedAfter: updatedUser.lockedPap,
+      reason: `Fleet: ${fleet.name}`,
+    });
     return record;
   });
 

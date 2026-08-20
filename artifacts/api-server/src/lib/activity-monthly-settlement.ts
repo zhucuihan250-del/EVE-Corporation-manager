@@ -8,7 +8,8 @@ import {
   usersTable,
 } from "@workspace/db";
 import { and, eq, isNotNull, lte, sql } from "drizzle-orm";
-import { canonicalPapBalance, normalizePap, setPapBalance } from "./pap-balance";
+import { availablePap, canonicalPapBalance, normalizePap, setPapBalance } from "./pap-balance";
+import { writePapLedger } from "./pap-ledger";
 
 export const ACTIVITY_ELIGIBILITY_DAYS = 60;
 export const ACTIVITY_SETTLEMENT_SWEEP_INTERVAL_MS = 15 * 60 * 1_000;
@@ -117,7 +118,9 @@ async function settleCorporationMonth(
       const [user] = await tx
         .select({
           id: usersTable.id,
+          eveCharacterName: usersTable.eveCharacterName,
           redeemablePap: usersTable.redeemablePap,
+          lockedPap: usersTable.lockedPap,
         })
         .from(usersTable)
         .where(and(
@@ -130,11 +133,11 @@ async function settleCorporationMonth(
       }
 
       const redeemablePapBefore = canonicalPapBalance(user.redeemablePap);
-      const deductedPap = normalizePap(Math.min(redeemablePapBefore, minimumPap));
+      const deductedPap = normalizePap(Math.min(availablePap(redeemablePapBefore, user.lockedPap), minimumPap));
       const redeemablePapAfter = canonicalPapBalance(redeemablePapBefore - deductedPap);
       await tx
         .update(usersTable)
-        .set(setPapBalance(redeemablePapAfter))
+        .set(setPapBalance(redeemablePapAfter, user.lockedPap))
         .where(and(
           eq(usersTable.id, user.id),
           eq(usersTable.corporationId, corporationId),
@@ -154,6 +157,17 @@ async function settleCorporationMonth(
           })
           .returning({ id: papRecordsTable.id });
         papRecordId = papRecord.id;
+        await writePapLedger(tx, {
+          corporationId,
+          userId: user.id,
+          userName: user.eveCharacterName ?? `User ${user.id}`,
+          amount: -deductedPap,
+          type: "activity_deduction",
+          balanceAfter: redeemablePapAfter,
+          lockedAfter: user.lockedPap,
+          reason: `Monthly activity minimum deduction · ${period.month}`,
+          createdAt: period.end,
+        });
       }
 
       await tx.insert(activityMonthlyDeductionsTable).values({

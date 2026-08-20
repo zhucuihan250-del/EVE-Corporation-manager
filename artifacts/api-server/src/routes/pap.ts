@@ -5,6 +5,7 @@ import { requireAuth, hasRole } from "../middlewares/auth";
 import { CreateManualPapBody } from "@workspace/api-zod";
 import { requireModule, requireTenant } from "../lib/tenant";
 import { canonicalPapBalance, normalizePap, setPapBalance } from "../lib/pap-balance";
+import { writePapLedger } from "../lib/pap-ledger";
 
 const router: IRouter = Router();
 router.use("/pap", requireAuth, requireTenant, requireModule("pap"));
@@ -143,18 +144,18 @@ router.post("/pap/manual", requireAuth, async (req: Request, res: Response): Pro
 
   const papRecord = await db.transaction(async (tx) => {
     const [lockedUser] = await tx
-      .select({ id: usersTable.id, redeemablePap: usersTable.redeemablePap })
+      .select({ id: usersTable.id, redeemablePap: usersTable.redeemablePap, lockedPap: usersTable.lockedPap })
       .from(usersTable)
       .where(eq(usersTable.id, body.data.userId))
       .for("update");
     if (!lockedUser) throw new Error(`Manual PAP target ${body.data.userId} no longer exists`);
 
     const before = canonicalPapBalance(lockedUser.redeemablePap);
-    const after = canonicalPapBalance(before + body.data.amount);
+    const after = normalizePap(Math.max(lockedUser.lockedPap, before + body.data.amount));
     const appliedAmount = normalizePap(after - before);
 
     await tx.update(usersTable)
-      .set(setPapBalance(after))
+      .set(setPapBalance(after, lockedUser.lockedPap))
       .where(eq(usersTable.id, lockedUser.id));
 
     const [record] = await tx
@@ -167,6 +168,17 @@ router.post("/pap/manual", requireAuth, async (req: Request, res: Response): Pro
         reason: body.data.reason,
       })
       .returning();
+    await writePapLedger(tx, {
+      corporationId: req.tenant!.corporation.id,
+      userId: lockedUser.id,
+      userName: targetUser.user.eveCharacterName ?? `User ${lockedUser.id}`,
+      amount: appliedAmount,
+      type: "admin_adjustment",
+      balanceAfter: after,
+      lockedAfter: lockedUser.lockedPap,
+      adminId: currentUser.id,
+      reason: body.data.reason,
+    });
     return record;
   });
 

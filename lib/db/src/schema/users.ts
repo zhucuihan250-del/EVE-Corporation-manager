@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer, real } from "drizzle-orm/pg-core";
+import { doublePrecision, pgTable, text, serial, timestamp, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -13,8 +13,9 @@ export const usersTable = pgTable("users", {
   refreshToken: text("refresh_token"),
   tokenExpiry: timestamp("token_expiry", { withTimezone: true }),
   role: text("role", { enum: ["member", "fc", "admin", "controller"] }).notNull().default("member"),
-  totalPap: real("total_pap").notNull().default(0),
-  redeemablePap: real("redeemable_pap").notNull().default(0),
+  totalPap: doublePrecision("total_pap").notNull().default(0),
+  redeemablePap: doublePrecision("redeemable_pap").notNull().default(0),
+  lockedPap: doublePrecision("locked_pap").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

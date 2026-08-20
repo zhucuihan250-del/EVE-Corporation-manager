@@ -6,7 +6,8 @@ import { requireModule, requireTenant } from "../lib/tenant";
 import { CreateRedemptionBody } from "@workspace/api-zod";
 import { papRecordsTable } from "@workspace/db";
 import { addCalendarMonths, ensureCorporationJoinedAt } from "../lib/corporation-membership";
-import { canonicalPapBalance, setPapBalance } from "../lib/pap-balance";
+import { availablePap, canonicalPapBalance, setPapBalance } from "../lib/pap-balance";
+import { writePapLedger } from "../lib/pap-ledger";
 
 const router: IRouter = Router();
 router.use("/redemptions", requireAuth, requireTenant, requireModule("pap"));
@@ -201,15 +202,16 @@ router.post("/redemptions", requireAuth, async (req: Request, res: Response): Pr
       }
 
       const currentPap = canonicalPapBalance(currentUser.redeemablePap);
-      if (currentPap < currentReward.papCost) {
+      const currentAvailablePap = availablePap(currentPap, currentUser.lockedPap);
+      if (currentAvailablePap < currentReward.papCost) {
         throw new RedemptionRequestError(
           400,
-          `Insufficient PAP balance. Need ${currentReward.papCost}, have ${currentPap}`,
+          `Insufficient PAP balance. Need ${currentReward.papCost}, have ${currentAvailablePap}`,
         );
       }
 
       await tx.update(usersTable)
-        .set(setPapBalance(currentPap - currentReward.papCost))
+        .set(setPapBalance(currentPap - currentReward.papCost, currentUser.lockedPap))
         .where(eq(usersTable.id, currentUser.id));
 
       await tx.insert(papRecordsTable).values({
@@ -217,6 +219,16 @@ router.post("/redemptions", requireAuth, async (req: Request, res: Response): Pr
         userId: currentUser.id,
         amount: -currentReward.papCost,
         type: "adjustment",
+        reason: `Redeemed: ${currentReward.name}`,
+      });
+      await writePapLedger(tx, {
+        corporationId: req.tenant!.corporation.id,
+        userId: currentUser.id,
+        userName: currentUser.eveCharacterName ?? `User ${currentUser.id}`,
+        amount: -currentReward.papCost,
+        type: "redemption",
+        balanceAfter: currentPap - currentReward.papCost,
+        lockedAfter: currentUser.lockedPap,
         reason: `Redeemed: ${currentReward.name}`,
       });
 

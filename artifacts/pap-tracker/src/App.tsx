@@ -32,6 +32,7 @@ const Dashboard = lazy(() => import("@/pages/dashboard").then((module) => ({ def
 const History = lazy(() => import("@/pages/history").then((module) => ({ default: module.History })));
 const Rewards = lazy(() => import("@/pages/rewards").then((module) => ({ default: module.Rewards })));
 const Redemptions = lazy(() => import("@/pages/redemptions").then((module) => ({ default: module.Redemptions })));
+const PapMarket = lazy(() => import("@/pages/pap-market").then((module) => ({ default: module.PapMarket })));
 const Characters = lazy(() => import("@/pages/characters").then((module) => ({ default: module.Characters })));
 const Fitting = lazy(() => import("@/pages/fitting").then((module) => ({ default: module.Fitting })));
 const BattleReportDetail = lazy(() => import("@/pages/battle-reports").then((module) => ({ default: module.BattleReportDetail })));
@@ -53,6 +54,7 @@ const AdminFleets = lazy(() => import("@/pages/admin/fleets").then((module) => (
 const AdminRewards = lazy(() => import("@/pages/admin/rewards").then((module) => ({ default: module.AdminRewards })));
 const AdminRedemptions = lazy(() => import("@/pages/admin/redemptions").then((module) => ({ default: module.AdminRedemptions })));
 const AdminPap = lazy(() => import("@/pages/admin/pap").then((module) => ({ default: module.AdminPap })));
+const AdminPapMarket = lazy(() => import("@/pages/admin/pap-market").then((module) => ({ default: module.AdminPapMarket })));
 const AdminAnnouncements = lazy(() => import("@/pages/admin/announcements").then((module) => ({ default: module.AdminAnnouncements })));
 const AdminActivity = lazy(() => import("@/pages/admin/activity").then((module) => ({ default: module.AdminActivity })));
 const AdminIdentity = lazy(() => import("@/pages/admin/identity").then((module) => ({ default: module.AdminIdentity })));
@@ -181,6 +183,9 @@ function Router() {
       <Route path="/redemptions">
         {() => <ProtectedRoute component={Redemptions} module="pap" />}
       </Route>
+      <Route path="/pap-market">
+        {() => <ProtectedRoute component={PapMarket} module="pap" />}
+      </Route>
       <Route path="/characters">
         {() => <ProtectedRoute component={Characters} module="pap" />}
       </Route>
@@ -244,6 +249,9 @@ function Router() {
       </Route>
       <Route path="/admin/pap">
         {() => <ProtectedRoute component={AdminPap} minRole="admin" module="pap" />}
+      </Route>
+      <Route path="/admin/pap-market">
+        {() => <ProtectedRoute component={AdminPapMarket} minRole="admin" module="pap" />}
       </Route>
       <Route path="/admin/activity">
         {() => <ProtectedRoute component={AdminActivity} minRole="admin" module="pap" permissionAlternative="activity.manage" />}

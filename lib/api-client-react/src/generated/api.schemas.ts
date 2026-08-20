@@ -19,6 +19,229 @@ export interface SuccessResponse {
   message?: string;
 }
 
+export interface PapMarketWallet {
+  totalPap: number;
+  availablePap: number;
+  lockedPap: number;
+}
+
+export type PapMarketOrderType =
+  (typeof PapMarketOrderType)[keyof typeof PapMarketOrderType];
+
+export const PapMarketOrderType = {
+  buy: "buy",
+  sell: "sell",
+} as const;
+
+export type PapMarketOrderStatus =
+  (typeof PapMarketOrderStatus)[keyof typeof PapMarketOrderStatus];
+
+export const PapMarketOrderStatus = {
+  open: "open",
+  partially_filled: "partially_filled",
+  filled: "filled",
+  cancelled: "cancelled",
+  expired: "expired",
+} as const;
+
+export interface PapMarketOrder {
+  id: number;
+  corporationId: number;
+  ownerId: number;
+  ownerName: string;
+  type: PapMarketOrderType;
+  originalAmount: number;
+  remainingAmount: number;
+  matchedAmount: number;
+  lockedPapAmount: number;
+  status: PapMarketOrderStatus;
+  totalIskValue: number;
+  remainingIskValue: number;
+  createdAt: string;
+  updatedAt: string;
+  /** @nullable */
+  cancelledAt: string | null;
+  /** @nullable */
+  expiresAt: string | null;
+}
+
+export type PapMarketTransactionOrderType =
+  (typeof PapMarketTransactionOrderType)[keyof typeof PapMarketTransactionOrderType];
+
+export const PapMarketTransactionOrderType = {
+  buy: "buy",
+  sell: "sell",
+} as const;
+
+export type PapMarketTransactionStatus =
+  (typeof PapMarketTransactionStatus)[keyof typeof PapMarketTransactionStatus];
+
+export const PapMarketTransactionStatus = {
+  pending_admin: "pending_admin",
+  completed: "completed",
+  rejected: "rejected",
+  disputed: "disputed",
+  cancelled: "cancelled",
+} as const;
+
+export interface PapMarketTransaction {
+  id: number;
+  corporationId: number;
+  orderId: number;
+  orderType: PapMarketTransactionOrderType;
+  buyerId: number;
+  buyerName: string;
+  sellerId: number;
+  sellerName: string;
+  papAmount: number;
+  iskValue: number;
+  status: PapMarketTransactionStatus;
+  createdAt: string;
+  updatedAt: string;
+  /** @nullable */
+  reviewedAt: string | null;
+  /** @nullable */
+  reviewedBy: number | null;
+  /** @nullable */
+  adminNote: string | null;
+}
+
+export type PapMarketAdminLogAction =
+  (typeof PapMarketAdminLogAction)[keyof typeof PapMarketAdminLogAction];
+
+export const PapMarketAdminLogAction = {
+  approve: "approve",
+  reject: "reject",
+  dispute: "dispute",
+} as const;
+
+export type PapMarketAdminLogBeforeState = { [key: string]: unknown };
+
+export type PapMarketAdminLogAfterState = { [key: string]: unknown };
+
+export interface PapMarketAdminLog {
+  id: number;
+  corporationId: number;
+  adminId: number;
+  action: PapMarketAdminLogAction;
+  transactionId: number;
+  orderId: number;
+  beforeState: PapMarketAdminLogBeforeState;
+  afterState: PapMarketAdminLogAfterState;
+  /** @nullable */
+  note: string | null;
+  createdAt: string;
+}
+
+export type PapLedgerEntryType =
+  (typeof PapLedgerEntryType)[keyof typeof PapLedgerEntryType];
+
+export const PapLedgerEntryType = {
+  opening_balance: "opening_balance",
+  pap_earned: "pap_earned",
+  redemption: "redemption",
+  admin_adjustment: "admin_adjustment",
+  activity_deduction: "activity_deduction",
+  account_merge: "account_merge",
+  market_order_lock: "market_order_lock",
+  market_order_unlock: "market_order_unlock",
+  market_transaction_lock: "market_transaction_lock",
+  market_transaction_unlock: "market_transaction_unlock",
+  market_buy: "market_buy",
+  market_sell: "market_sell",
+  reversal: "reversal",
+} as const;
+
+export interface PapLedgerEntry {
+  id: number;
+  corporationId: number;
+  /** @nullable */
+  userId: number | null;
+  userName: string;
+  amount: number;
+  lockedDelta: number;
+  type: PapLedgerEntryType;
+  /** @nullable */
+  orderId: number | null;
+  /** @nullable */
+  transactionId: number | null;
+  balanceAfter: number;
+  lockedAfter: number;
+  availableAfter: number;
+  /** @nullable */
+  adminId: number | null;
+  /** @nullable */
+  reason: string | null;
+  createdAt: string;
+}
+
+export interface PapMarketOverview {
+  wallet: PapMarketWallet;
+  sellOrders: PapMarketOrder[];
+  buyOrders: PapMarketOrder[];
+  myOrders: PapMarketOrder[];
+  myTransactions: PapMarketTransaction[];
+  history: PapMarketTransaction[];
+  ledger: PapLedgerEntry[];
+}
+
+export interface PapMarketAdminOverview {
+  transactions: PapMarketTransaction[];
+  orders: PapMarketOrder[];
+  adminLogs: PapMarketAdminLog[];
+  ledger: PapLedgerEntry[];
+}
+
+export type CreatePapMarketOrderBodyType =
+  (typeof CreatePapMarketOrderBodyType)[keyof typeof CreatePapMarketOrderBodyType];
+
+export const CreatePapMarketOrderBodyType = {
+  buy: "buy",
+  sell: "sell",
+} as const;
+
+export interface CreatePapMarketOrderBody {
+  type: CreatePapMarketOrderBodyType;
+  /**
+   * @maximum 1000000
+   * @exclusiveMinimum 0
+   */
+  amount: number;
+  /**
+   * @minLength 8
+   * @maxLength 100
+   */
+  requestId: string;
+}
+
+export interface TakePapMarketOrderBody {
+  /**
+   * @maximum 1000000
+   * @exclusiveMinimum 0
+   */
+  amount: number;
+  /**
+   * @minLength 8
+   * @maxLength 100
+   */
+  requestId: string;
+}
+
+export type ReviewPapMarketTransactionBodyAction =
+  (typeof ReviewPapMarketTransactionBodyAction)[keyof typeof ReviewPapMarketTransactionBodyAction];
+
+export const ReviewPapMarketTransactionBodyAction = {
+  approve: "approve",
+  reject: "reject",
+  dispute: "dispute",
+} as const;
+
+export interface ReviewPapMarketTransactionBody {
+  action: ReviewPapMarketTransactionBodyAction;
+  /** @maxLength 2000 */
+  note?: string;
+}
+
 export type CurrentUserRole =
   (typeof CurrentUserRole)[keyof typeof CurrentUserRole];
 
@@ -64,7 +287,7 @@ export interface CurrentUser {
   modules: CorporationModules;
   reimbursementOpen: boolean;
   tacticalGroups: TacticalGroupSummary[];
-  /** Current PAP balance available for use. */
+  /** Current PAP available for use after market locks. */
   pap: number;
   /**
    * Compatibility alias of pap.
@@ -72,10 +295,12 @@ export interface CurrentUser {
    */
   totalPap: number;
   /**
-   * Compatibility alias of pap.
+   * Compatibility total PAP balance before market locks.
    * @deprecated
    */
   redeemablePap: number;
+  availablePap: number;
+  lockedPap: number;
   createdAt: string;
 }
 
@@ -99,7 +324,7 @@ export interface User {
   /** @nullable */
   corporationName?: string | null;
   role: UserRole;
-  /** Current PAP balance available for use. */
+  /** Current PAP available for use after market locks. */
   pap: number;
   /**
    * Compatibility alias of pap.
@@ -107,10 +332,12 @@ export interface User {
    */
   totalPap: number;
   /**
-   * Compatibility alias of pap.
+   * Compatibility total PAP balance before market locks.
    * @deprecated
    */
   redeemablePap: number;
+  availablePap: number;
+  lockedPap: number;
   createdAt: string;
 }
 
@@ -834,6 +1061,8 @@ export const PapRecordType = {
   manual: "manual",
   adjustment: "adjustment",
   activity_deduction: "activity_deduction",
+  market_buy: "market_buy",
+  market_sell: "market_sell",
 } as const;
 
 export interface PapRecord {
@@ -982,7 +1211,7 @@ export interface UpdateRedemptionBody {
 }
 
 export interface DashboardSummary {
-  /** Current PAP balance available for use. */
+  /** Current PAP available for use after market locks. */
   pap: number;
   /**
    * Compatibility alias of pap.
@@ -990,10 +1219,12 @@ export interface DashboardSummary {
    */
   totalPap: number;
   /**
-   * Compatibility alias of pap.
+   * Compatibility total PAP balance before market locks.
    * @deprecated
    */
   redeemablePap: number;
+  availablePap: number;
+  lockedPap: number;
   fleetCount: number;
   redemptionCount: number;
   recentPapEarned: number;

@@ -20,6 +20,7 @@ import activityRouter from "./activity";
 import tacticalGroupsRouter from "./tactical-groups";
 import courierRouter from "./courier";
 import structuresRouter from "./structures";
+import papMarketRouter from "./pap-market";
 
 const router: IRouter = Router();
 
@@ -44,5 +45,6 @@ router.use(activityRouter);
 router.use(tacticalGroupsRouter);
 router.use(courierRouter);
 router.use(structuresRouter);
+router.use(papMarketRouter);
 
 export default router;

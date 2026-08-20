@@ -7,7 +7,7 @@
  */
 
 export interface DashboardSummary {
-  /** Current PAP balance available for use. */
+  /** Current PAP available for use after market locks. */
   pap: number;
   /**
    * Compatibility alias of pap.
@@ -15,10 +15,12 @@ export interface DashboardSummary {
    */
   totalPap: number;
   /**
-   * Compatibility alias of pap.
+   * Compatibility total PAP balance before market locks.
    * @deprecated
    */
   redeemablePap: number;
+  availablePap: number;
+  lockedPap: number;
   fleetCount: number;
   redemptionCount: number;
   recentPapEarned: number;

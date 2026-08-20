@@ -3,6 +3,7 @@ import { corporationMembershipsTable, db, usersTable, fleetsTable, papRecordsTab
 import { eq, desc, asc, count, sql, and, sum, gte } from "drizzle-orm";
 import { requireAuth, hasRole } from "../middlewares/auth";
 import { requireModule, requireTenant } from "../lib/tenant";
+import { availablePap } from "../lib/pap-balance";
 
 const router: IRouter = Router();
 router.use("/dashboard", requireAuth, requireTenant, requireModule("pap"));
@@ -98,9 +99,11 @@ router.get("/dashboard/summary", requireAuth, async (req: Request, res: Response
     );
 
   res.json({
-    pap: user.redeemablePap,
+    pap: availablePap(user.redeemablePap, user.lockedPap),
     totalPap: user.redeemablePap,
     redeemablePap: user.redeemablePap,
+    availablePap: availablePap(user.redeemablePap, user.lockedPap),
+    lockedPap: user.lockedPap,
     fleetCount: fleetCountResult.count,
     redemptionCount: redemptionCountResult.count,
     recentPapEarned: Number(recentPapResult.total ?? 0),

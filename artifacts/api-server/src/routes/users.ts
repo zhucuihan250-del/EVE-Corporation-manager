@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { corporationMembershipsTable, db, usersTable, papRecordsTable, charactersTable, redemptionsTable } from "@workspace/db";
-import { and, asc, count, eq, inArray, isNull, sql } from "drizzle-orm";
+import { corporationMembershipsTable, db, usersTable, papRecordsTable, charactersTable, redemptionsTable, papMarketOrdersTable, papMarketTransactionsTable } from "@workspace/db";
+import { and, asc, count, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { requireAuth, hasRole } from "../middlewares/auth";
 import {
   UpdateUserRoleParams,
@@ -9,7 +9,8 @@ import {
   AdjustUserPapBody,
 } from "@workspace/api-zod";
 import { requireModule, requireTenant } from "../lib/tenant";
-import { canonicalPapBalance, normalizePap, setPapBalance } from "../lib/pap-balance";
+import { availablePap, canonicalPapBalance, normalizePap, setPapBalance } from "../lib/pap-balance";
+import { writePapLedger } from "../lib/pap-ledger";
 
 const router: IRouter = Router();
 router.use("/users", requireAuth, requireTenant, requireModule("pap"));
@@ -54,9 +55,11 @@ router.get("/users", requireAuth, async (req: Request, res: Response): Promise<v
     corporationId: req.tenant!.corporation.id,
     corporationName: req.tenant!.corporation.name,
     role: membershipRole,
-    pap: u.redeemablePap,
+    pap: availablePap(u.redeemablePap, u.lockedPap),
     totalPap: u.redeemablePap,
     redeemablePap: u.redeemablePap,
+    availablePap: availablePap(u.redeemablePap, u.lockedPap),
+    lockedPap: u.lockedPap,
     createdAt: u.createdAt,
   })));
 });
@@ -89,9 +92,11 @@ router.get("/users/:id", requireAuth, async (req: Request, res: Response): Promi
     corporationId: req.tenant!.corporation.id,
     corporationName: req.tenant!.corporation.name,
     role: row.role,
-    pap: row.user.redeemablePap,
+    pap: availablePap(row.user.redeemablePap, row.user.lockedPap),
     totalPap: row.user.redeemablePap,
     redeemablePap: row.user.redeemablePap,
+    availablePap: availablePap(row.user.redeemablePap, row.user.lockedPap),
+    lockedPap: row.user.lockedPap,
     createdAt: row.user.createdAt,
   });
 });
@@ -142,9 +147,11 @@ router.patch("/users/:id/role", requireAuth, async (req: Request, res: Response)
     corporationId: req.tenant!.corporation.id,
     corporationName: req.tenant!.corporation.name,
     role: membership.role,
-    pap: user.redeemablePap,
+    pap: availablePap(user.redeemablePap, user.lockedPap),
     totalPap: user.redeemablePap,
     redeemablePap: user.redeemablePap,
+    availablePap: availablePap(user.redeemablePap, user.lockedPap),
+    lockedPap: user.lockedPap,
     createdAt: user.createdAt,
   });
 });
@@ -183,18 +190,18 @@ router.patch("/users/:id/pap", requireAuth, async (req: Request, res: Response):
 
   await db.transaction(async (tx) => {
     const [lockedUser] = await tx
-      .select({ id: usersTable.id, redeemablePap: usersTable.redeemablePap })
+      .select({ id: usersTable.id, redeemablePap: usersTable.redeemablePap, lockedPap: usersTable.lockedPap })
       .from(usersTable)
       .where(eq(usersTable.id, targetUser.id))
       .for("update");
     if (!lockedUser) throw new Error(`PAP adjustment target ${targetUser.id} no longer exists`);
 
     const before = canonicalPapBalance(lockedUser.redeemablePap);
-    const after = canonicalPapBalance(before + body.data.amount);
+    const after = normalizePap(Math.max(lockedUser.lockedPap, before + body.data.amount));
     const appliedAmount = normalizePap(after - before);
 
     await tx.update(usersTable)
-      .set(setPapBalance(after))
+      .set(setPapBalance(after, lockedUser.lockedPap))
       .where(eq(usersTable.id, lockedUser.id));
 
     await tx.insert(papRecordsTable).values({
@@ -202,6 +209,17 @@ router.patch("/users/:id/pap", requireAuth, async (req: Request, res: Response):
       userId: lockedUser.id,
       amount: appliedAmount,
       type: "adjustment",
+      reason: body.data.reason,
+    });
+    await writePapLedger(tx, {
+      corporationId: req.tenant!.corporation.id,
+      userId: lockedUser.id,
+      userName: targetUser.eveCharacterName ?? `User ${lockedUser.id}`,
+      amount: appliedAmount,
+      type: "admin_adjustment",
+      balanceAfter: after,
+      lockedAfter: lockedUser.lockedPap,
+      adminId: req.tenant!.user.id,
       reason: body.data.reason,
     });
   });
@@ -243,6 +261,20 @@ router.delete("/users/:id", requireAuth, async (req: Request, res: Response): Pr
     .where(eq(corporationMembershipsTable.userId, targetId));
   if (membershipCount > 1) {
     res.status(409).json({ error: "该账号属于多个军团，不能由单个军团删除整个账号" });
+    return;
+  }
+  const [marketOrder, marketTransaction] = await Promise.all([
+    db.select({ id: papMarketOrdersTable.id }).from(papMarketOrdersTable).where(and(
+      eq(papMarketOrdersTable.corporationId, req.tenant!.corporation.id),
+      eq(papMarketOrdersTable.ownerId, targetId),
+    )).limit(1),
+    db.select({ id: papMarketTransactionsTable.id }).from(papMarketTransactionsTable).where(and(
+      eq(papMarketTransactionsTable.corporationId, req.tenant!.corporation.id),
+      or(eq(papMarketTransactionsTable.buyerId, targetId), eq(papMarketTransactionsTable.sellerId, targetId)),
+    )).limit(1),
+  ]);
+  if (marketOrder.length > 0 || marketTransaction.length > 0) {
+    res.status(409).json({ error: "该成员存在不可删除的 PAP Market 审计记录，不能硬删除账号" });
     return;
   }
   const identity = (await corporationIdentities([targetId], req.tenant!.corporation.id)).get(targetId);

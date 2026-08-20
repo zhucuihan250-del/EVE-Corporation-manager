@@ -45,9 +45,15 @@ export const GetMeResponse = zod.object({
       joinedAt: zod.coerce.date().nullable(),
     }),
   ),
-  pap: zod.number().describe("Current PAP balance available for use."),
+  pap: zod
+    .number()
+    .describe("Current PAP available for use after market locks."),
   totalPap: zod.number().describe("Compatibility alias of pap."),
-  redeemablePap: zod.number().describe("Compatibility alias of pap."),
+  redeemablePap: zod
+    .number()
+    .describe("Compatibility total PAP balance before market locks."),
+  availablePap: zod.number(),
+  lockedPap: zod.number(),
   createdAt: zod.coerce.date(),
 });
 
@@ -69,9 +75,15 @@ export const ListUsersResponseItem = zod.object({
   corporationId: zod.number().nullish(),
   corporationName: zod.string().nullish(),
   role: zod.enum(["member", "fc", "admin", "controller"]),
-  pap: zod.number().describe("Current PAP balance available for use."),
+  pap: zod
+    .number()
+    .describe("Current PAP available for use after market locks."),
   totalPap: zod.number().describe("Compatibility alias of pap."),
-  redeemablePap: zod.number().describe("Compatibility alias of pap."),
+  redeemablePap: zod
+    .number()
+    .describe("Compatibility total PAP balance before market locks."),
+  availablePap: zod.number(),
+  lockedPap: zod.number(),
   createdAt: zod.coerce.date(),
 });
 export const ListUsersResponse = zod.array(ListUsersResponseItem);
@@ -90,9 +102,15 @@ export const GetUserResponse = zod.object({
   corporationId: zod.number().nullish(),
   corporationName: zod.string().nullish(),
   role: zod.enum(["member", "fc", "admin", "controller"]),
-  pap: zod.number().describe("Current PAP balance available for use."),
+  pap: zod
+    .number()
+    .describe("Current PAP available for use after market locks."),
   totalPap: zod.number().describe("Compatibility alias of pap."),
-  redeemablePap: zod.number().describe("Compatibility alias of pap."),
+  redeemablePap: zod
+    .number()
+    .describe("Compatibility total PAP balance before market locks."),
+  availablePap: zod.number(),
+  lockedPap: zod.number(),
   createdAt: zod.coerce.date(),
 });
 
@@ -126,9 +144,15 @@ export const UpdateUserRoleResponse = zod.object({
   corporationId: zod.number().nullish(),
   corporationName: zod.string().nullish(),
   role: zod.enum(["member", "fc", "admin", "controller"]),
-  pap: zod.number().describe("Current PAP balance available for use."),
+  pap: zod
+    .number()
+    .describe("Current PAP available for use after market locks."),
   totalPap: zod.number().describe("Compatibility alias of pap."),
-  redeemablePap: zod.number().describe("Compatibility alias of pap."),
+  redeemablePap: zod
+    .number()
+    .describe("Compatibility total PAP balance before market locks."),
+  availablePap: zod.number(),
+  lockedPap: zod.number(),
   createdAt: zod.coerce.date(),
 });
 
@@ -1640,7 +1664,14 @@ export const ListPapRecordsResponseItem = zod.object({
   characterId: zod.number().nullish(),
   fleetId: zod.number().nullish(),
   amount: zod.number(),
-  type: zod.enum(["fleet", "manual", "adjustment", "activity_deduction"]),
+  type: zod.enum([
+    "fleet",
+    "manual",
+    "adjustment",
+    "activity_deduction",
+    "market_buy",
+    "market_sell",
+  ]),
   reason: zod.string().nullish(),
   fleetName: zod.string().nullish(),
   characterName: zod.string().nullish(),
@@ -1658,7 +1689,14 @@ export const ListAllPapRecordsResponseItem = zod.object({
   characterId: zod.number().nullish(),
   fleetId: zod.number().nullish(),
   amount: zod.number(),
-  type: zod.enum(["fleet", "manual", "adjustment", "activity_deduction"]),
+  type: zod.enum([
+    "fleet",
+    "manual",
+    "adjustment",
+    "activity_deduction",
+    "market_buy",
+    "market_sell",
+  ]),
   reason: zod.string().nullish(),
   fleetName: zod.string().nullish(),
   characterName: zod.string().nullish(),
@@ -1937,9 +1975,15 @@ export const UpdateRedemptionResponse = zod.object({
  * @summary Get summary stats for current user dashboard
  */
 export const GetDashboardSummaryResponse = zod.object({
-  pap: zod.number().describe("Current PAP balance available for use."),
+  pap: zod
+    .number()
+    .describe("Current PAP available for use after market locks."),
   totalPap: zod.number().describe("Compatibility alias of pap."),
-  redeemablePap: zod.number().describe("Compatibility alias of pap."),
+  redeemablePap: zod
+    .number()
+    .describe("Compatibility total PAP balance before market locks."),
+  availablePap: zod.number(),
+  lockedPap: zod.number(),
   fleetCount: zod.number(),
   redemptionCount: zod.number(),
   recentPapEarned: zod.number(),
@@ -4192,4 +4236,399 @@ export const SyncCorporationStructuresResponse = zod.object({
       lastSeenAt: zod.coerce.date(),
     }),
   ),
+});
+
+/**
+ * @summary Get the active corporation's market, wallet, and current user's history
+ */
+export const GetPapMarketOverviewResponse = zod.object({
+  wallet: zod.object({
+    totalPap: zod.number(),
+    availablePap: zod.number(),
+    lockedPap: zod.number(),
+  }),
+  sellOrders: zod.array(
+    zod.object({
+      id: zod.number(),
+      corporationId: zod.number(),
+      ownerId: zod.number(),
+      ownerName: zod.string(),
+      type: zod.enum(["buy", "sell"]),
+      originalAmount: zod.number(),
+      remainingAmount: zod.number(),
+      matchedAmount: zod.number(),
+      lockedPapAmount: zod.number(),
+      status: zod.enum([
+        "open",
+        "partially_filled",
+        "filled",
+        "cancelled",
+        "expired",
+      ]),
+      totalIskValue: zod.number(),
+      remainingIskValue: zod.number(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+      cancelledAt: zod.coerce.date().nullable(),
+      expiresAt: zod.coerce.date().nullable(),
+    }),
+  ),
+  buyOrders: zod.array(
+    zod.object({
+      id: zod.number(),
+      corporationId: zod.number(),
+      ownerId: zod.number(),
+      ownerName: zod.string(),
+      type: zod.enum(["buy", "sell"]),
+      originalAmount: zod.number(),
+      remainingAmount: zod.number(),
+      matchedAmount: zod.number(),
+      lockedPapAmount: zod.number(),
+      status: zod.enum([
+        "open",
+        "partially_filled",
+        "filled",
+        "cancelled",
+        "expired",
+      ]),
+      totalIskValue: zod.number(),
+      remainingIskValue: zod.number(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+      cancelledAt: zod.coerce.date().nullable(),
+      expiresAt: zod.coerce.date().nullable(),
+    }),
+  ),
+  myOrders: zod.array(
+    zod.object({
+      id: zod.number(),
+      corporationId: zod.number(),
+      ownerId: zod.number(),
+      ownerName: zod.string(),
+      type: zod.enum(["buy", "sell"]),
+      originalAmount: zod.number(),
+      remainingAmount: zod.number(),
+      matchedAmount: zod.number(),
+      lockedPapAmount: zod.number(),
+      status: zod.enum([
+        "open",
+        "partially_filled",
+        "filled",
+        "cancelled",
+        "expired",
+      ]),
+      totalIskValue: zod.number(),
+      remainingIskValue: zod.number(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+      cancelledAt: zod.coerce.date().nullable(),
+      expiresAt: zod.coerce.date().nullable(),
+    }),
+  ),
+  myTransactions: zod.array(
+    zod.object({
+      id: zod.number(),
+      corporationId: zod.number(),
+      orderId: zod.number(),
+      orderType: zod.enum(["buy", "sell"]),
+      buyerId: zod.number(),
+      buyerName: zod.string(),
+      sellerId: zod.number(),
+      sellerName: zod.string(),
+      papAmount: zod.number(),
+      iskValue: zod.number(),
+      status: zod.enum([
+        "pending_admin",
+        "completed",
+        "rejected",
+        "disputed",
+        "cancelled",
+      ]),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+      reviewedAt: zod.coerce.date().nullable(),
+      reviewedBy: zod.number().nullable(),
+      adminNote: zod.string().nullable(),
+    }),
+  ),
+  history: zod.array(
+    zod.object({
+      id: zod.number(),
+      corporationId: zod.number(),
+      orderId: zod.number(),
+      orderType: zod.enum(["buy", "sell"]),
+      buyerId: zod.number(),
+      buyerName: zod.string(),
+      sellerId: zod.number(),
+      sellerName: zod.string(),
+      papAmount: zod.number(),
+      iskValue: zod.number(),
+      status: zod.enum([
+        "pending_admin",
+        "completed",
+        "rejected",
+        "disputed",
+        "cancelled",
+      ]),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+      reviewedAt: zod.coerce.date().nullable(),
+      reviewedBy: zod.number().nullable(),
+      adminNote: zod.string().nullable(),
+    }),
+  ),
+  ledger: zod.array(
+    zod.object({
+      id: zod.number(),
+      corporationId: zod.number(),
+      userId: zod.number().nullable(),
+      userName: zod.string(),
+      amount: zod.number(),
+      lockedDelta: zod.number(),
+      type: zod.enum([
+        "opening_balance",
+        "pap_earned",
+        "redemption",
+        "admin_adjustment",
+        "activity_deduction",
+        "account_merge",
+        "market_order_lock",
+        "market_order_unlock",
+        "market_transaction_lock",
+        "market_transaction_unlock",
+        "market_buy",
+        "market_sell",
+        "reversal",
+      ]),
+      orderId: zod.number().nullable(),
+      transactionId: zod.number().nullable(),
+      balanceAfter: zod.number(),
+      lockedAfter: zod.number(),
+      availableAfter: zod.number(),
+      adminId: zod.number().nullable(),
+      reason: zod.string().nullable(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+});
+
+/**
+ * @summary Create a BUY or SELL order without accepting a client-supplied price
+ */
+export const createPapMarketOrderBodyAmountExclusiveMin = 0;
+export const createPapMarketOrderBodyAmountMax = 1000000;
+
+export const createPapMarketOrderBodyRequestIdMin = 8;
+export const createPapMarketOrderBodyRequestIdMax = 100;
+
+export const CreatePapMarketOrderBody = zod.object({
+  type: zod.enum(["buy", "sell"]),
+  amount: zod
+    .number()
+    .gt(createPapMarketOrderBodyAmountExclusiveMin)
+    .max(createPapMarketOrderBodyAmountMax),
+  requestId: zod
+    .string()
+    .min(createPapMarketOrderBodyRequestIdMin)
+    .max(createPapMarketOrderBodyRequestIdMax),
+});
+
+/**
+ * @summary Accept all or part of an order and create a pending admin transaction
+ */
+export const TakePapMarketOrderParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const takePapMarketOrderBodyAmountExclusiveMin = 0;
+export const takePapMarketOrderBodyAmountMax = 1000000;
+
+export const takePapMarketOrderBodyRequestIdMin = 8;
+export const takePapMarketOrderBodyRequestIdMax = 100;
+
+export const TakePapMarketOrderBody = zod.object({
+  amount: zod
+    .number()
+    .gt(takePapMarketOrderBodyAmountExclusiveMin)
+    .max(takePapMarketOrderBodyAmountMax),
+  requestId: zod
+    .string()
+    .min(takePapMarketOrderBodyRequestIdMin)
+    .max(takePapMarketOrderBodyRequestIdMax),
+});
+
+/**
+ * @summary Cancel the uncommitted remainder of the current user's order
+ */
+export const CancelPapMarketOrderParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const CancelPapMarketOrderResponse = zod.object({
+  id: zod.number(),
+  corporationId: zod.number(),
+  ownerId: zod.number(),
+  ownerName: zod.string(),
+  type: zod.enum(["buy", "sell"]),
+  originalAmount: zod.number(),
+  remainingAmount: zod.number(),
+  matchedAmount: zod.number(),
+  lockedPapAmount: zod.number(),
+  status: zod.enum([
+    "open",
+    "partially_filled",
+    "filled",
+    "cancelled",
+    "expired",
+  ]),
+  totalIskValue: zod.number(),
+  remainingIskValue: zod.number(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+  cancelledAt: zod.coerce.date().nullable(),
+  expiresAt: zod.coerce.date().nullable(),
+});
+
+/**
+ * @summary Get corporation-scoped market transactions, orders, and immutable admin logs
+ */
+export const GetPapMarketAdminOverviewResponse = zod.object({
+  transactions: zod.array(
+    zod.object({
+      id: zod.number(),
+      corporationId: zod.number(),
+      orderId: zod.number(),
+      orderType: zod.enum(["buy", "sell"]),
+      buyerId: zod.number(),
+      buyerName: zod.string(),
+      sellerId: zod.number(),
+      sellerName: zod.string(),
+      papAmount: zod.number(),
+      iskValue: zod.number(),
+      status: zod.enum([
+        "pending_admin",
+        "completed",
+        "rejected",
+        "disputed",
+        "cancelled",
+      ]),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+      reviewedAt: zod.coerce.date().nullable(),
+      reviewedBy: zod.number().nullable(),
+      adminNote: zod.string().nullable(),
+    }),
+  ),
+  orders: zod.array(
+    zod.object({
+      id: zod.number(),
+      corporationId: zod.number(),
+      ownerId: zod.number(),
+      ownerName: zod.string(),
+      type: zod.enum(["buy", "sell"]),
+      originalAmount: zod.number(),
+      remainingAmount: zod.number(),
+      matchedAmount: zod.number(),
+      lockedPapAmount: zod.number(),
+      status: zod.enum([
+        "open",
+        "partially_filled",
+        "filled",
+        "cancelled",
+        "expired",
+      ]),
+      totalIskValue: zod.number(),
+      remainingIskValue: zod.number(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+      cancelledAt: zod.coerce.date().nullable(),
+      expiresAt: zod.coerce.date().nullable(),
+    }),
+  ),
+  adminLogs: zod.array(
+    zod.object({
+      id: zod.number(),
+      corporationId: zod.number(),
+      adminId: zod.number(),
+      action: zod.enum(["approve", "reject", "dispute"]),
+      transactionId: zod.number(),
+      orderId: zod.number(),
+      beforeState: zod.record(zod.string(), zod.unknown()),
+      afterState: zod.record(zod.string(), zod.unknown()),
+      note: zod.string().nullable(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+  ledger: zod.array(
+    zod.object({
+      id: zod.number(),
+      corporationId: zod.number(),
+      userId: zod.number().nullable(),
+      userName: zod.string(),
+      amount: zod.number(),
+      lockedDelta: zod.number(),
+      type: zod.enum([
+        "opening_balance",
+        "pap_earned",
+        "redemption",
+        "admin_adjustment",
+        "activity_deduction",
+        "account_merge",
+        "market_order_lock",
+        "market_order_unlock",
+        "market_transaction_lock",
+        "market_transaction_unlock",
+        "market_buy",
+        "market_sell",
+        "reversal",
+      ]),
+      orderId: zod.number().nullable(),
+      transactionId: zod.number().nullable(),
+      balanceAfter: zod.number(),
+      lockedAfter: zod.number(),
+      availableAfter: zod.number(),
+      adminId: zod.number().nullable(),
+      reason: zod.string().nullable(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+});
+
+/**
+ * @summary Approve, reject, or dispute a pending PAP transaction
+ */
+export const ReviewPapMarketTransactionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const reviewPapMarketTransactionBodyNoteMax = 2000;
+
+export const ReviewPapMarketTransactionBody = zod.object({
+  action: zod.enum(["approve", "reject", "dispute"]),
+  note: zod.string().max(reviewPapMarketTransactionBodyNoteMax).optional(),
+});
+
+export const ReviewPapMarketTransactionResponse = zod.object({
+  id: zod.number(),
+  corporationId: zod.number(),
+  orderId: zod.number(),
+  orderType: zod.enum(["buy", "sell"]),
+  buyerId: zod.number(),
+  buyerName: zod.string(),
+  sellerId: zod.number(),
+  sellerName: zod.string(),
+  papAmount: zod.number(),
+  iskValue: zod.number(),
+  status: zod.enum([
+    "pending_admin",
+    "completed",
+    "rejected",
+    "disputed",
+    "cancelled",
+  ]),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+  reviewedAt: zod.coerce.date().nullable(),
+  reviewedBy: zod.number().nullable(),
+  adminNote: zod.string().nullable(),
 });

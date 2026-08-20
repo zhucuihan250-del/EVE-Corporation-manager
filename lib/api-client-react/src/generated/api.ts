@@ -50,6 +50,7 @@ import type {
   CreateFleetBody,
   CreateManualPapBody,
   CreateMyCourierRouteBody,
+  CreatePapMarketOrderBody,
   CreateRedemptionBody,
   CreateReimbursementBody,
   CreateRewardBody,
@@ -76,6 +77,10 @@ import type {
   ListIdentityApplicationsParams,
   ListIdentityGroupsParams,
   ListReimbursementLossesParams,
+  PapMarketAdminOverview,
+  PapMarketOrder,
+  PapMarketOverview,
+  PapMarketTransaction,
   PapRecord,
   RecentUnboundMemberAudit,
   Redemption,
@@ -84,6 +89,7 @@ import type {
   ReimbursementLoss,
   ReimbursementWindowStatus,
   ReviewIdentityApplicationBody,
+  ReviewPapMarketTransactionBody,
   Reward,
   ScanFleetResponse,
   SearchFittingCatalogParams,
@@ -92,6 +98,7 @@ import type {
   SuccessResponse,
   SyncCorporationWallet200,
   TacticalGroupDashboard,
+  TakePapMarketOrderBody,
   TopContributor,
   UpdateBattleReplayBody,
   UpdateCourierAgentBody,
@@ -8451,4 +8458,507 @@ export const useSyncCorporationStructures = <
   TContext
 > => {
   return useMutation(getSyncCorporationStructuresMutationOptions(options));
+};
+
+/**
+ * @summary Get the active corporation's market, wallet, and current user's history
+ */
+export const getGetPapMarketOverviewUrl = () => {
+  return `/api/pap-market/overview`;
+};
+
+export const getPapMarketOverview = async (
+  options?: RequestInit,
+): Promise<PapMarketOverview> => {
+  return customFetch<PapMarketOverview>(getGetPapMarketOverviewUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPapMarketOverviewQueryKey = () => {
+  return [`/api/pap-market/overview`] as const;
+};
+
+export const getGetPapMarketOverviewQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPapMarketOverview>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPapMarketOverview>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetPapMarketOverviewQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPapMarketOverview>>
+  > = ({ signal }) => getPapMarketOverview({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPapMarketOverview>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPapMarketOverviewQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPapMarketOverview>>
+>;
+export type GetPapMarketOverviewQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get the active corporation's market, wallet, and current user's history
+ */
+
+export function useGetPapMarketOverview<
+  TData = Awaited<ReturnType<typeof getPapMarketOverview>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPapMarketOverview>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPapMarketOverviewQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a BUY or SELL order without accepting a client-supplied price
+ */
+export const getCreatePapMarketOrderUrl = () => {
+  return `/api/pap-market/orders`;
+};
+
+export const createPapMarketOrder = async (
+  createPapMarketOrderBody: CreatePapMarketOrderBody,
+  options?: RequestInit,
+): Promise<PapMarketOrder> => {
+  return customFetch<PapMarketOrder>(getCreatePapMarketOrderUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createPapMarketOrderBody),
+  });
+};
+
+export const getCreatePapMarketOrderMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createPapMarketOrder>>,
+    TError,
+    { data: BodyType<CreatePapMarketOrderBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createPapMarketOrder>>,
+  TError,
+  { data: BodyType<CreatePapMarketOrderBody> },
+  TContext
+> => {
+  const mutationKey = ["createPapMarketOrder"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createPapMarketOrder>>,
+    { data: BodyType<CreatePapMarketOrderBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createPapMarketOrder(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreatePapMarketOrderMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createPapMarketOrder>>
+>;
+export type CreatePapMarketOrderMutationBody =
+  BodyType<CreatePapMarketOrderBody>;
+export type CreatePapMarketOrderMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create a BUY or SELL order without accepting a client-supplied price
+ */
+export const useCreatePapMarketOrder = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createPapMarketOrder>>,
+    TError,
+    { data: BodyType<CreatePapMarketOrderBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createPapMarketOrder>>,
+  TError,
+  { data: BodyType<CreatePapMarketOrderBody> },
+  TContext
+> => {
+  return useMutation(getCreatePapMarketOrderMutationOptions(options));
+};
+
+/**
+ * @summary Accept all or part of an order and create a pending admin transaction
+ */
+export const getTakePapMarketOrderUrl = (id: number) => {
+  return `/api/pap-market/orders/${id}/take`;
+};
+
+export const takePapMarketOrder = async (
+  id: number,
+  takePapMarketOrderBody: TakePapMarketOrderBody,
+  options?: RequestInit,
+): Promise<PapMarketTransaction> => {
+  return customFetch<PapMarketTransaction>(getTakePapMarketOrderUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(takePapMarketOrderBody),
+  });
+};
+
+export const getTakePapMarketOrderMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof takePapMarketOrder>>,
+    TError,
+    { id: number; data: BodyType<TakePapMarketOrderBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof takePapMarketOrder>>,
+  TError,
+  { id: number; data: BodyType<TakePapMarketOrderBody> },
+  TContext
+> => {
+  const mutationKey = ["takePapMarketOrder"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof takePapMarketOrder>>,
+    { id: number; data: BodyType<TakePapMarketOrderBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return takePapMarketOrder(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type TakePapMarketOrderMutationResult = NonNullable<
+  Awaited<ReturnType<typeof takePapMarketOrder>>
+>;
+export type TakePapMarketOrderMutationBody = BodyType<TakePapMarketOrderBody>;
+export type TakePapMarketOrderMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Accept all or part of an order and create a pending admin transaction
+ */
+export const useTakePapMarketOrder = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof takePapMarketOrder>>,
+    TError,
+    { id: number; data: BodyType<TakePapMarketOrderBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof takePapMarketOrder>>,
+  TError,
+  { id: number; data: BodyType<TakePapMarketOrderBody> },
+  TContext
+> => {
+  return useMutation(getTakePapMarketOrderMutationOptions(options));
+};
+
+/**
+ * @summary Cancel the uncommitted remainder of the current user's order
+ */
+export const getCancelPapMarketOrderUrl = (id: number) => {
+  return `/api/pap-market/orders/${id}/cancel`;
+};
+
+export const cancelPapMarketOrder = async (
+  id: number,
+  options?: RequestInit,
+): Promise<PapMarketOrder> => {
+  return customFetch<PapMarketOrder>(getCancelPapMarketOrderUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getCancelPapMarketOrderMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cancelPapMarketOrder>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof cancelPapMarketOrder>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["cancelPapMarketOrder"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof cancelPapMarketOrder>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return cancelPapMarketOrder(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CancelPapMarketOrderMutationResult = NonNullable<
+  Awaited<ReturnType<typeof cancelPapMarketOrder>>
+>;
+
+export type CancelPapMarketOrderMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Cancel the uncommitted remainder of the current user's order
+ */
+export const useCancelPapMarketOrder = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cancelPapMarketOrder>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof cancelPapMarketOrder>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getCancelPapMarketOrderMutationOptions(options));
+};
+
+/**
+ * @summary Get corporation-scoped market transactions, orders, and immutable admin logs
+ */
+export const getGetPapMarketAdminOverviewUrl = () => {
+  return `/api/pap-market/admin/overview`;
+};
+
+export const getPapMarketAdminOverview = async (
+  options?: RequestInit,
+): Promise<PapMarketAdminOverview> => {
+  return customFetch<PapMarketAdminOverview>(
+    getGetPapMarketAdminOverviewUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetPapMarketAdminOverviewQueryKey = () => {
+  return [`/api/pap-market/admin/overview`] as const;
+};
+
+export const getGetPapMarketAdminOverviewQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPapMarketAdminOverview>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPapMarketAdminOverview>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetPapMarketAdminOverviewQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPapMarketAdminOverview>>
+  > = ({ signal }) => getPapMarketAdminOverview({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPapMarketAdminOverview>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPapMarketAdminOverviewQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPapMarketAdminOverview>>
+>;
+export type GetPapMarketAdminOverviewQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get corporation-scoped market transactions, orders, and immutable admin logs
+ */
+
+export function useGetPapMarketAdminOverview<
+  TData = Awaited<ReturnType<typeof getPapMarketAdminOverview>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPapMarketAdminOverview>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPapMarketAdminOverviewQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Approve, reject, or dispute a pending PAP transaction
+ */
+export const getReviewPapMarketTransactionUrl = (id: number) => {
+  return `/api/pap-market/admin/transactions/${id}`;
+};
+
+export const reviewPapMarketTransaction = async (
+  id: number,
+  reviewPapMarketTransactionBody: ReviewPapMarketTransactionBody,
+  options?: RequestInit,
+): Promise<PapMarketTransaction> => {
+  return customFetch<PapMarketTransaction>(
+    getReviewPapMarketTransactionUrl(id),
+    {
+      ...options,
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(reviewPapMarketTransactionBody),
+    },
+  );
+};
+
+export const getReviewPapMarketTransactionMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reviewPapMarketTransaction>>,
+    TError,
+    { id: number; data: BodyType<ReviewPapMarketTransactionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reviewPapMarketTransaction>>,
+  TError,
+  { id: number; data: BodyType<ReviewPapMarketTransactionBody> },
+  TContext
+> => {
+  const mutationKey = ["reviewPapMarketTransaction"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reviewPapMarketTransaction>>,
+    { id: number; data: BodyType<ReviewPapMarketTransactionBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return reviewPapMarketTransaction(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReviewPapMarketTransactionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reviewPapMarketTransaction>>
+>;
+export type ReviewPapMarketTransactionMutationBody =
+  BodyType<ReviewPapMarketTransactionBody>;
+export type ReviewPapMarketTransactionMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Approve, reject, or dispute a pending PAP transaction
+ */
+export const useReviewPapMarketTransaction = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reviewPapMarketTransaction>>,
+    TError,
+    { id: number; data: BodyType<ReviewPapMarketTransactionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof reviewPapMarketTransaction>>,
+  TError,
+  { id: number; data: BodyType<ReviewPapMarketTransactionBody> },
+  TContext
+> => {
+  return useMutation(getReviewPapMarketTransactionMutationOptions(options));
 };

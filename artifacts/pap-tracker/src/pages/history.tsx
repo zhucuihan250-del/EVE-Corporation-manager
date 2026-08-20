@@ -52,8 +52,8 @@ export function History() {
                       {format(new Date(record.createdAt), "yyyy-MM-dd HH:mm")}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={record.type === 'fleet' ? 'default' : record.type === 'activity_deduction' ? 'destructive' : 'secondary'} className="font-mono text-[10px] rounded-sm">
-                        {record.type === 'activity_deduction' ? t("history.activityDeduction") : record.type.toUpperCase()}
+                      <Badge variant={record.type === 'fleet' || record.type === 'market_buy' ? 'default' : record.type === 'activity_deduction' || record.type === 'market_sell' ? 'destructive' : 'secondary'} className="font-mono text-[10px] rounded-sm">
+                        {record.type === 'activity_deduction' ? t("history.activityDeduction") : record.type === 'market_buy' ? t("history.marketBuy") : record.type === 'market_sell' ? t("history.marketSell") : record.type.toUpperCase()}
                       </Badge>
                     </TableCell>
                     <TableCell className="font-mono text-sm text-muted-foreground">

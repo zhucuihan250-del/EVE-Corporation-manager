@@ -13,4 +13,6 @@ export const PapRecordType = {
   manual: "manual",
   adjustment: "adjustment",
   activity_deduction: "activity_deduction",
+  market_buy: "market_buy",
+  market_sell: "market_sell",
 } as const;

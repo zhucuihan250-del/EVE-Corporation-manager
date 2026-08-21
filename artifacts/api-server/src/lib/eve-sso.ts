@@ -121,18 +121,56 @@ export async function getCharacterInfo(accessToken: string): Promise<{
     CharacterName: string;
   };
 
-  // Get corporation from ESI
+  // The public character profile can remain cached for up to 24 hours after a
+  // corporation change. Affiliation is the authoritative, fresher membership
+  // lookup; keep the profile endpoint only as a resilience fallback.
   let corporationId = 0;
   try {
-    const charResp = await fetch(
-      `${ESI_BASE}/characters/${data.CharacterID}/?datasource=tranquility`,
+    const affiliationResp = await fetch(
+      `${ESI_BASE}/characters/affiliation/?datasource=tranquility`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([data.CharacterID]),
+      },
     );
-    if (charResp.ok) {
-      const charData = (await charResp.json()) as { corporation_id: number };
-      corporationId = charData.corporation_id;
+    if (affiliationResp.ok) {
+      const affiliations = (await affiliationResp.json()) as Array<{
+        character_id: number;
+        corporation_id: number;
+      }>;
+      corporationId =
+        affiliations.find(
+          (affiliation) => affiliation.character_id === data.CharacterID,
+        )?.corporation_id ?? 0;
+    } else {
+      logger.warn(
+        { status: affiliationResp.status, characterId: data.CharacterID },
+        "Failed to fetch current corporation affiliation",
+      );
     }
   } catch (err) {
-    logger.warn({ err }, "Failed to fetch corporation info");
+    logger.warn(
+      { err, characterId: data.CharacterID },
+      "Failed to fetch current corporation affiliation",
+    );
+  }
+
+  if (!corporationId) {
+    try {
+      const charResp = await fetch(
+        `${ESI_BASE}/characters/${data.CharacterID}/?datasource=tranquility`,
+      );
+      if (charResp.ok) {
+        const charData = (await charResp.json()) as { corporation_id: number };
+        corporationId = charData.corporation_id;
+      }
+    } catch (err) {
+      logger.warn(
+        { err, characterId: data.CharacterID },
+        "Failed to fetch fallback corporation info",
+      );
+    }
   }
 
   return {

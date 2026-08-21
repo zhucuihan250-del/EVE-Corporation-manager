@@ -246,6 +246,21 @@ function validOauthState(expected: string | undefined, received: unknown): recei
   return expectedBuffer.length === receivedBuffer.length && timingSafeEqual(expectedBuffer, receivedBuffer);
 }
 
+function authCallbackErrorDetails(error: unknown) {
+  const outer = error && typeof error === "object"
+    ? error as { name?: unknown; cause?: unknown }
+    : null;
+  const cause = outer?.cause && typeof outer.cause === "object"
+    ? outer.cause as { code?: unknown; constraint?: unknown }
+    : null;
+
+  return {
+    errorType: typeof outer?.name === "string" ? outer.name : typeof error,
+    errorCode: typeof cause?.code === "string" ? cause.code : undefined,
+    constraint: typeof cause?.constraint === "string" ? cause.constraint : undefined,
+  };
+}
+
 // GET /api/auth/eve/login - redirect to EVE SSO
 router.get("/auth/eve/login", (req: Request, res: Response): void => {
   const callbackUrl = getCallbackUrl(req);
@@ -635,6 +650,12 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
       return;
     }
 
+    // Character rows are scoped to a corporation and protected by a foreign
+    // key. Ensure a newly encountered EVE corporation exists before creating
+    // or restoring the login character; establishTenantSession used to do
+    // this only after the character write, which made first-time logins fail.
+    await ensureCorporation(corporationId, corporationName);
+
     // Find or create user by EVE character ID.
     // First check usersTable (main character), then charactersTable (linked alt)
     // to prevent alts from creating a separate account on direct login.
@@ -793,7 +814,7 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
       redirectToFrontend(res, "/");
     });
   } catch (err) {
-    req.log.error({ err }, "EVE SSO callback error");
+    req.log.error(authCallbackErrorDetails(err), "EVE SSO callback error");
     redirectToFrontend(res, "/?error=auth");
   }
 });

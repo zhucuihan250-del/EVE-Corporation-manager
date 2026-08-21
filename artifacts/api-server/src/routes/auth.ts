@@ -203,10 +203,43 @@ async function establishTenantSession(
   await ensureCorporationMembership(
     user.id,
     corporationId,
-    user.role as "member" | "fc" | "admin" | "controller",
+    "member",
   );
   req.session.corporationId = corporationId;
   req.session.eveCharacterId = eveCharacterId;
+}
+
+async function removeUnusedCorporationMembership(
+  userId: number,
+  previousCorporationId: number | null,
+  currentCorporationId: number,
+): Promise<void> {
+  if (!previousCorporationId || previousCorporationId === currentCorporationId) return;
+
+  const [remainingCharacter] = await db
+    .select({ id: charactersTable.id })
+    .from(charactersTable)
+    .where(and(
+      eq(charactersTable.userId, userId),
+      eq(charactersTable.corporationId, previousCorporationId),
+      isNull(charactersTable.deletedAt),
+    ))
+    .limit(1);
+  if (remainingCharacter) return;
+
+  const removedMemberships = await db
+    .delete(corporationMembershipsTable)
+    .where(and(
+      eq(corporationMembershipsTable.userId, userId),
+      eq(corporationMembershipsTable.corporationId, previousCorporationId),
+    ))
+    .returning({ id: corporationMembershipsTable.id });
+  if (removedMemberships.length > 0) {
+    logger.info(
+      { userId, previousCorporationId, currentCorporationId },
+      "Removed corporation membership no longer backed by an active character",
+    );
+  }
 }
 
 function getCallbackUrl(req: Request): string {
@@ -675,11 +708,28 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
           .from(usersTable)
           .where(eq(usersTable.id, linkedChar.userId));
         if (mainUser) {
-          if (linkedChar.isMain || !mainUser.eveCharacterId) {
-            await setCharacterAsAccountMain(mainUser.id, linkedChar, mainCharacterTokens);
+          const [updatedLinkedChar] = await db
+            .update(charactersTable)
+            .set({
+              eveCharacterName: characterName,
+              corporationId,
+              corporationName,
+              accessToken,
+              refreshToken,
+              tokenExpiry,
+            })
+            .where(eq(charactersTable.id, linkedChar.id))
+            .returning();
+          if ((linkedChar.isMain || !mainUser.eveCharacterId) && updatedLinkedChar) {
+            await setCharacterAsAccountMain(mainUser.id, updatedLinkedChar, mainCharacterTokens);
           }
           req.session.userId = mainUser.id;
           await establishTenantSession(req, mainUser, corporationId, corporationName, characterId);
+          await removeUnusedCorporationMembership(
+            mainUser.id,
+            linkedChar.corporationId,
+            corporationId,
+          );
           req.session.save((err) => {
             if (err) {
               req.log.error({ err }, "Session save error (alt-as-main login)");
@@ -693,6 +743,8 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
         }
       }
     }
+
+    let previousCorporationId: number | null = null;
 
     if (!user) {
       // Check if there are any users (first user becomes admin)
@@ -789,6 +841,7 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
           });
         }
       } else {
+        previousCorporationId = existingChar.corporationId;
         await db
           .update(charactersTable)
           .set({
@@ -804,6 +857,7 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
     }
 
     await establishTenantSession(req, user, corporationId, corporationName, characterId);
+    await removeUnusedCorporationMembership(user.id, previousCorporationId, corporationId);
     req.session.userId = user.id;
     req.session.save((err) => {
       if (err) {

@@ -1,4 +1,4 @@
-import { and, asc, eq, lt, ne, or } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lt, ne, or } from "drizzle-orm";
 import {
   battleReportKillmailsTable,
   battleReportParticipantsTable,
@@ -26,6 +26,7 @@ const MAX_CHARACTER_FALLBACK_PARTICIPANTS = 60;
 const MAX_CHARACTER_FALLBACK_PAGES = 3;
 const MAX_ROAMING_PARTICIPANTS = 40;
 const MAX_ROAMING_CHARACTER_PAGES = 2;
+const MAX_RECOVERY_JOBS = 20;
 const activeGenerationJobs = new Set<number>();
 const queuedGenerationJobs = new Set<number>();
 const generationQueue: { reportId: number; force: boolean }[] = [];
@@ -759,4 +760,48 @@ export function queueBattleReportGeneration(reportId: number, force = false): vo
   queuedGenerationJobs.add(reportId);
   generationQueue.push({ reportId, force });
   drainGenerationQueue();
+}
+
+/**
+ * Restore recent jobs that may have been interrupted by a deploy or process
+ * restart. zKillboard only supports the automatic seven-day lookup window, so
+ * older reports are deliberately left untouched for manual review.
+ */
+export async function resumeRecentBattleReportGeneration(): Promise<number> {
+  const now = Date.now();
+  const automaticWindowStart = new Date(
+    now - MAX_AUTOMATIC_LOOKBACK_SECONDS * 1_000,
+  );
+  const staleGenerationThreshold = new Date(now - 5 * 60_000);
+  const stalePartialThreshold = new Date(now - 30 * 60_000);
+  const reports = await db
+    .select({
+      id: battleReportsTable.id,
+      status: battleReportsTable.status,
+    })
+    .from(battleReportsTable)
+    .where(
+      and(
+        gte(battleReportsTable.endedAt, automaticWindowStart),
+        or(
+          eq(battleReportsTable.status, "pending"),
+          eq(battleReportsTable.status, "failed"),
+          and(
+            eq(battleReportsTable.status, "generating"),
+            lt(battleReportsTable.updatedAt, staleGenerationThreshold),
+          ),
+          and(
+            eq(battleReportsTable.status, "partial"),
+            lt(battleReportsTable.updatedAt, stalePartialThreshold),
+          ),
+        ),
+      ),
+    )
+    .orderBy(desc(battleReportsTable.endedAt))
+    .limit(MAX_RECOVERY_JOBS);
+
+  for (const report of reports) {
+    queueBattleReportGeneration(report.id, report.status === "partial");
+  }
+  return reports.length;
 }

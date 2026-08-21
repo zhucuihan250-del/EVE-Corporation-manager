@@ -6,6 +6,7 @@ import {
   ACTIVITY_SETTLEMENT_SWEEP_INTERVAL_MS,
   settleDueActivityMonths,
 } from "./lib/activity-monthly-settlement";
+import { resumeRecentBattleReportGeneration } from "./lib/battle-reports";
 
 const rawPort = process.env["PORT"];
 
@@ -42,6 +43,13 @@ async function prepareDatabase() {
   const purgedCharacters = await purgeExpiredDeletedCharacters();
   if (purgedCharacters > 0) {
     logger.info({ purgedCharacters }, "Expired deleted characters purged");
+  }
+  const resumedBattleReports = await resumeRecentBattleReportGeneration();
+  if (resumedBattleReports > 0) {
+    logger.info(
+      { resumedBattleReports },
+      "Interrupted battle report jobs queued for recovery",
+    );
   }
 }
 

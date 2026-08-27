@@ -183,16 +183,34 @@ export function ReimbursementSettings() {
                   </Button>
                 </div>
                 {claim.jitaMidValue !== null && claim.maximumInsurancePayout !== null && (
-                  <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
-                    <div><span className="block">{tr("损失 Jita 中间价", "Jita midpoint loss")}</span><span className="text-sm font-medium text-foreground">{formatIsk(claim.jitaMidValue)}</span></div>
+                  <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2 lg:grid-cols-4">
+                    <div><span className="block">{tr("损失基础估值", "Gross loss valuation")}</span><span className="text-sm font-medium text-foreground">{formatIsk(claim.jitaMidValue)}</span></div>
                     <div><span className="block">{tr("减：舰船最高保险赔付", "Less: maximum ship insurance")}</span><span className="text-sm font-medium text-foreground">− {formatIsk(claim.maximumInsurancePayout)}</span></div>
+                    <div><span className="block">{tr("减：固定 NPC 回收货物", "Less: fixed NPC buyback cargo")}</span><span className="text-sm font-medium text-foreground">− {formatIsk(claim.fixedNpcCargoValue)}</span></div>
                     <div><span className="block">{tr("参考补损额", "Reference reimbursement")}</span><span className="text-sm font-medium text-primary">= {formatIsk(claim.referenceReimbursementAmount ?? 0)}</span></div>
                   </div>
+                )}
+                {claim.fixedNpcCargoDeductions.length > 0 && (
+                  <div className="space-y-2 rounded-md border border-amber-400/30 bg-amber-400/5 p-3">
+                    <div className="text-xs font-medium text-amber-300">{tr("固定 NPC 回收货物扣除明细", "Fixed NPC buyback cargo deductions")}</div>
+                    <div className="space-y-1">
+                      {claim.fixedNpcCargoDeductions.map((item) => (
+                        <div key={item.typeId} className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-[1fr_auto_auto] sm:gap-4">
+                          <span className="text-foreground">{item.itemName} × {item.quantity}</span>
+                          <span>{tr("单价", "Unit")} {formatIsk(item.unitPrice)}</span>
+                          <span className="font-medium text-amber-300">− {formatIsk(item.totalValue)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {claim.referencePriceStatus !== "pending" && claim.fixedNpcCargoCalculatedAt === null && (
+                  <div className="flex items-start gap-2 text-xs text-amber-400"><TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />{tr("这是一条旧估价记录；点击“刷新价格”后才会应用固定 NPC 回收货物扣除。", "This is a legacy estimate; refresh prices to apply fixed NPC cargo deductions.")}</div>
                 )}
                 {(claim.referencePriceStatus === "partial" || claim.referencePriceStatus === "unavailable") && (
                   <div className="flex items-start gap-2 text-xs text-amber-400"><TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />{claim.referencePriceStatus === "unavailable" ? tr("全部损失物品都缺少可用的 Jita 4-4 订单，暂时无法估价。", "No lost items have usable Jita 4-4 orders, so pricing is currently unavailable.") : tr(`有 ${claim.referencePriceMissingTypeCount} 类损失物品缺少完整的 Jita 4-4 双边订单，当前结果为部分估价。`, `${claim.referencePriceMissingTypeCount} lost item types lack complete two-sided Jita 4-4 orders; this is a partial estimate.`)}</div>
                 )}
-                <p className="text-xs text-muted-foreground">{tr("计算口径：舰船与全部损失物品按 Jita 4-4 最高收购价和最低出售价的中间值计价，再减去该舰船最高档保险的赔付；仅供审核参考，不会自动修改批准金额。", "Method: price the hull and all lost items at the midpoint of Jita 4-4 best buy and best sell, then subtract the ship's highest insurance payout. This is advisory and never changes the approved amount automatically.")}{claim.referencePriceCalculatedAt && <> · {tr("更新于", "updated")} {new Date(claim.referencePriceCalculatedAt).toLocaleString()}</>}</p>
+                <p className="text-xs text-muted-foreground">{tr("计算口径：舰船与普通损失物品按 Jita 4-4 最高收购价和最低出售价的中间值计价；货舱或舰队机库内具有长期 NPC 收购单的货物先按全宇宙最高 NPC 收购价计入基础估值，再按相同金额全额扣除，因此不会进入参考补损额。固定价货物按摧毁与掉落数量合计；最后再扣除舰船最高档保险赔付。仅供审核参考，不会自动修改批准金额。", "Method: price the hull and ordinary lost items at the midpoint of Jita 4-4 best buy and best sell. Cargo or fleet-hangar goods with long-running NPC buy orders are added to the gross valuation at the highest universe-wide NPC buy price and then deducted in full, so they never enter the reference reimbursement. Both destroyed and dropped quantities are counted, and the ship's highest insurance payout is also deducted. This is advisory and never changes the approved amount automatically.")}{claim.referencePriceCalculatedAt && <> · {tr("更新于", "updated")} {new Date(claim.referencePriceCalculatedAt).toLocaleString()}</>}</p>
               </div>
               {claim.status !== "rejected" && claim.status !== "paid" && <div className="space-y-3 border-t border-border/50 pt-3">
                 <Textarea placeholder={tr("审核说明；拒绝申请时必填", "Review notes; required when rejecting")} value={draft.reviewerNotes} onChange={(event) => setReview((current) => ({ ...current, [claim.id]: { ...draft, reviewerNotes: event.target.value } }))} />

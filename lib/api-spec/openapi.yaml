@@ -4233,6 +4233,16 @@ components:
         open: { type: boolean }
       required: [open]
 
+    ReimbursementFixedNpcCargoDeduction:
+      type: object
+      properties:
+        typeId: { type: integer }
+        itemName: { type: string }
+        quantity: { type: integer }
+        unitPrice: { type: number }
+        totalValue: { type: number }
+      required: [typeId, itemName, quantity, unitPrice, totalValue]
+
     ReimbursementClaim:
       type: object
       properties:
@@ -4253,6 +4263,12 @@ components:
         requestedAmount: { type: number }
         jitaMidValue: { type: ["number", "null"] }
         maximumInsurancePayout: { type: ["number", "null"] }
+        fixedNpcCargoValue: { type: number }
+        fixedNpcCargoDeductions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReimbursementFixedNpcCargoDeduction"
+        fixedNpcCargoCalculatedAt: { type: ["string", "null"], format: date-time }
         referenceReimbursementAmount: { type: ["number", "null"] }
         referencePriceStatus: { type: string, enum: [pending, calculated, partial, unavailable] }
         referencePriceMissingTypeCount: { type: integer }
@@ -4266,7 +4282,7 @@ components:
         paymentReference: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
-      required: [id, corporationId, submittedBy, characterId, characterName, fleetId, identityGroupId, identityGroupName, killmailId, killmailUrl, lossOccurredAt, shipTypeId, shipName, lossValue, requestedAmount, jitaMidValue, maximumInsurancePayout, referenceReimbursementAmount, referencePriceStatus, referencePriceMissingTypeCount, referencePriceCalculatedAt, description, validation, status, createdAt, updatedAt]
+      required: [id, corporationId, submittedBy, characterId, characterName, fleetId, identityGroupId, identityGroupName, killmailId, killmailUrl, lossOccurredAt, shipTypeId, shipName, lossValue, requestedAmount, jitaMidValue, maximumInsurancePayout, fixedNpcCargoValue, fixedNpcCargoDeductions, fixedNpcCargoCalculatedAt, referenceReimbursementAmount, referencePriceStatus, referencePriceMissingTypeCount, referencePriceCalculatedAt, description, validation, status, createdAt, updatedAt]
 
     CreateReimbursementBody:
       type: object

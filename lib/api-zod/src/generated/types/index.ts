@@ -178,6 +178,7 @@ export * from "./refreshBattleReport202";
 export * from "./reimbursementClaim";
 export * from "./reimbursementClaimReferencePriceStatus";
 export * from "./reimbursementClaimStatus";
+export * from "./reimbursementFixedNpcCargoDeduction";
 export * from "./reimbursementLoss";
 export * from "./reimbursementLossClaimStatus";
 export * from "./reimbursementValidation";

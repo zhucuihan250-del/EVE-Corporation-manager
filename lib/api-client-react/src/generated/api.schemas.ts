@@ -1750,6 +1750,14 @@ export interface UpdateReimbursementWindowBody {
   open: boolean;
 }
 
+export interface ReimbursementFixedNpcCargoDeduction {
+  typeId: number;
+  itemName: string;
+  quantity: number;
+  unitPrice: number;
+  totalValue: number;
+}
+
 export type ReimbursementClaimReferencePriceStatus =
   (typeof ReimbursementClaimReferencePriceStatus)[keyof typeof ReimbursementClaimReferencePriceStatus];
 
@@ -1796,6 +1804,10 @@ export interface ReimbursementClaim {
   jitaMidValue: number | null;
   /** @nullable */
   maximumInsurancePayout: number | null;
+  fixedNpcCargoValue: number;
+  fixedNpcCargoDeductions: ReimbursementFixedNpcCargoDeduction[];
+  /** @nullable */
+  fixedNpcCargoCalculatedAt: string | null;
   /** @nullable */
   referenceReimbursementAmount: number | null;
   referencePriceStatus: ReimbursementClaimReferencePriceStatus;

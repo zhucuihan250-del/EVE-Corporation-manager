@@ -7,6 +7,7 @@
  */
 import type { ReimbursementClaimReferencePriceStatus } from "./reimbursementClaimReferencePriceStatus";
 import type { ReimbursementClaimStatus } from "./reimbursementClaimStatus";
+import type { ReimbursementFixedNpcCargoDeduction } from "./reimbursementFixedNpcCargoDeduction";
 import type { ReimbursementValidation } from "./reimbursementValidation";
 
 export interface ReimbursementClaim {
@@ -32,6 +33,10 @@ export interface ReimbursementClaim {
   jitaMidValue: number | null;
   /** @nullable */
   maximumInsurancePayout: number | null;
+  fixedNpcCargoValue: number;
+  fixedNpcCargoDeductions: ReimbursementFixedNpcCargoDeduction[];
+  /** @nullable */
+  fixedNpcCargoCalculatedAt: Date | null;
   /** @nullable */
   referenceReimbursementAmount: number | null;
   referencePriceStatus: ReimbursementClaimReferencePriceStatus;

@@ -2958,6 +2958,17 @@ export const ListReimbursementsResponseItem = zod.object({
   requestedAmount: zod.number(),
   jitaMidValue: zod.number().nullable(),
   maximumInsurancePayout: zod.number().nullable(),
+  fixedNpcCargoValue: zod.number(),
+  fixedNpcCargoDeductions: zod.array(
+    zod.object({
+      typeId: zod.number(),
+      itemName: zod.string(),
+      quantity: zod.number(),
+      unitPrice: zod.number(),
+      totalValue: zod.number(),
+    }),
+  ),
+  fixedNpcCargoCalculatedAt: zod.coerce.date().nullable(),
   referenceReimbursementAmount: zod.number().nullable(),
   referencePriceStatus: zod.enum([
     "pending",
@@ -3055,6 +3066,17 @@ export const ListReimbursementWindowClaimsResponseItem = zod.object({
   requestedAmount: zod.number(),
   jitaMidValue: zod.number().nullable(),
   maximumInsurancePayout: zod.number().nullable(),
+  fixedNpcCargoValue: zod.number(),
+  fixedNpcCargoDeductions: zod.array(
+    zod.object({
+      typeId: zod.number(),
+      itemName: zod.string(),
+      quantity: zod.number(),
+      unitPrice: zod.number(),
+      totalValue: zod.number(),
+    }),
+  ),
+  fixedNpcCargoCalculatedAt: zod.coerce.date().nullable(),
   referenceReimbursementAmount: zod.number().nullable(),
   referencePriceStatus: zod.enum([
     "pending",
@@ -3140,6 +3162,17 @@ export const UpdateReimbursementWindowClaimResponse = zod.object({
   requestedAmount: zod.number(),
   jitaMidValue: zod.number().nullable(),
   maximumInsurancePayout: zod.number().nullable(),
+  fixedNpcCargoValue: zod.number(),
+  fixedNpcCargoDeductions: zod.array(
+    zod.object({
+      typeId: zod.number(),
+      itemName: zod.string(),
+      quantity: zod.number(),
+      unitPrice: zod.number(),
+      totalValue: zod.number(),
+    }),
+  ),
+  fixedNpcCargoCalculatedAt: zod.coerce.date().nullable(),
   referenceReimbursementAmount: zod.number().nullable(),
   referencePriceStatus: zod.enum([
     "pending",
@@ -3198,6 +3231,17 @@ export const RefreshReimbursementReferencePricingResponse = zod.object({
   requestedAmount: zod.number(),
   jitaMidValue: zod.number().nullable(),
   maximumInsurancePayout: zod.number().nullable(),
+  fixedNpcCargoValue: zod.number(),
+  fixedNpcCargoDeductions: zod.array(
+    zod.object({
+      typeId: zod.number(),
+      itemName: zod.string(),
+      quantity: zod.number(),
+      unitPrice: zod.number(),
+      totalValue: zod.number(),
+    }),
+  ),
+  fixedNpcCargoCalculatedAt: zod.coerce.date().nullable(),
   referenceReimbursementAmount: zod.number().nullable(),
   referencePriceStatus: zod.enum([
     "pending",
@@ -3351,6 +3395,17 @@ export const UpdateReimbursementResponse = zod.object({
   requestedAmount: zod.number(),
   jitaMidValue: zod.number().nullable(),
   maximumInsurancePayout: zod.number().nullable(),
+  fixedNpcCargoValue: zod.number(),
+  fixedNpcCargoDeductions: zod.array(
+    zod.object({
+      typeId: zod.number(),
+      itemName: zod.string(),
+      quantity: zod.number(),
+      unitPrice: zod.number(),
+      totalValue: zod.number(),
+    }),
+  ),
+  fixedNpcCargoCalculatedAt: zod.coerce.date().nullable(),
   referenceReimbursementAmount: zod.number().nullable(),
   referencePriceStatus: zod.enum([
     "pending",
@@ -3463,6 +3518,17 @@ export const ListTacticalGroupReimbursementsResponseItem = zod.object({
   requestedAmount: zod.number(),
   jitaMidValue: zod.number().nullable(),
   maximumInsurancePayout: zod.number().nullable(),
+  fixedNpcCargoValue: zod.number(),
+  fixedNpcCargoDeductions: zod.array(
+    zod.object({
+      typeId: zod.number(),
+      itemName: zod.string(),
+      quantity: zod.number(),
+      unitPrice: zod.number(),
+      totalValue: zod.number(),
+    }),
+  ),
+  fixedNpcCargoCalculatedAt: zod.coerce.date().nullable(),
   referenceReimbursementAmount: zod.number().nullable(),
   referencePriceStatus: zod.enum([
     "pending",
@@ -3549,6 +3615,17 @@ export const UpdateTacticalGroupReimbursementResponse = zod.object({
   requestedAmount: zod.number(),
   jitaMidValue: zod.number().nullable(),
   maximumInsurancePayout: zod.number().nullable(),
+  fixedNpcCargoValue: zod.number(),
+  fixedNpcCargoDeductions: zod.array(
+    zod.object({
+      typeId: zod.number(),
+      itemName: zod.string(),
+      quantity: zod.number(),
+      unitPrice: zod.number(),
+      totalValue: zod.number(),
+    }),
+  ),
+  fixedNpcCargoCalculatedAt: zod.coerce.date().nullable(),
   referenceReimbursementAmount: zod.number().nullable(),
   referencePriceStatus: zod.enum([
     "pending",

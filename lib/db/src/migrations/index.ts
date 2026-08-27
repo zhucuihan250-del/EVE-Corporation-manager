@@ -21,6 +21,7 @@ import { activityMonthlyPapDeductionMigration } from "./0019-activity-monthly-pa
 import { unifiedPapBalanceMigration } from "./0020-unified-pap-balance";
 import { papMarketMigration } from "./0021-pap-market";
 import { fixedActivityPapDeductionMigration } from "./0022-fixed-activity-pap-deduction";
+import { reimbursementFixedNpcCargoMigration } from "./0023-reimbursement-fixed-npc-cargo";
 
 type Migration = {
   id: string;
@@ -50,6 +51,7 @@ const migrations: Migration[] = [
   unifiedPapBalanceMigration,
   papMarketMigration,
   fixedActivityPapDeductionMigration,
+  reimbursementFixedNpcCargoMigration,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {

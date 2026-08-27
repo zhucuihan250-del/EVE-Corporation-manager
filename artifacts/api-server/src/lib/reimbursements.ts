@@ -1,3 +1,5 @@
+import { getFixedNpcBuyPrice } from "./npc-buyback-catalog";
+
 const ESI_BASE = "https://esi.evetech.net/latest";
 const ZKILL_BASE = "https://zkillboard.com/api";
 const CHARACTER_LOSS_CACHE_TTL_MS = 15 * 60_000;
@@ -20,8 +22,9 @@ type ZkillEntry = {
   zkb?: { hash?: string; totalValue?: number };
 };
 
-type KillmailItem = {
+export type KillmailItem = {
   item_type_id: number;
+  flag?: number;
   quantity_destroyed?: number;
   quantity_dropped?: number;
   items?: KillmailItem[];
@@ -68,10 +71,21 @@ export type VerifiedKillmail = {
 export type ReimbursementReferencePricing = {
   jitaMidValue: number;
   maximumInsurancePayout: number;
+  fixedNpcCargoValue: number;
+  fixedNpcCargoDeductions: FixedNpcCargoDeduction[];
+  fixedNpcCargoCalculatedAt: Date;
   referenceReimbursementAmount: number;
   referencePriceStatus: "calculated" | "partial" | "unavailable";
   referencePriceMissingTypeCount: number;
   referencePriceCalculatedAt: Date;
+};
+
+export type FixedNpcCargoDeduction = {
+  typeId: number;
+  itemName: string;
+  quantity: number;
+  unitPrice: number;
+  totalValue: number;
 };
 
 export class KillmailValidationError extends Error {}
@@ -79,7 +93,7 @@ export class ReferencePricingError extends Error {}
 
 const verifiedKillmailCache = new Map<number, { expiresAt: number; value: VerifiedKillmail }>();
 const characterLossCache = new Map<number, { expiresAt: number; value: VerifiedKillmail[] }>();
-const shipNameCache = new Map<number, string>();
+const typeNameCache = new Map<number, string>();
 const jitaMidPriceCache = new Map<number, { expiresAt: number; value: JitaMidPrice }>();
 const jitaMidPriceRequests = new Map<number, Promise<JitaMidPrice>>();
 let insurancePayoutCache: { expiresAt: number; value: Map<number, number> } | null = null;
@@ -114,19 +128,19 @@ async function fetchJson<T>(url: string, source: "zkill" | "esi"): Promise<T> {
   }
 }
 
-async function getShipName(shipTypeId: number): Promise<string> {
-  const cached = shipNameCache.get(shipTypeId);
+async function getTypeName(typeId: number): Promise<string> {
+  const cached = typeNameCache.get(typeId);
   if (cached) return cached;
   try {
     const type = await fetchJson<{ name?: string }>(
-      `${ESI_BASE}/universe/types/${shipTypeId}/?datasource=tranquility&language=zh`,
+      `${ESI_BASE}/universe/types/${typeId}/?datasource=tranquility&language=zh`,
       "esi",
     );
-    const name = String(type.name ?? shipTypeId);
-    shipNameCache.set(shipTypeId, name);
+    const name = String(type.name ?? typeId);
+    typeNameCache.set(typeId, name);
     return name;
   } catch {
-    return String(shipTypeId);
+    return String(typeId);
   }
 }
 
@@ -157,7 +171,7 @@ async function verifyZkillEntry(entry: ZkillEntry): Promise<VerifiedKillmail> {
     occurredAt: new Date(killmail.killmail_time),
     victimCharacterId: killmail.victim.character_id ?? null,
     shipTypeId: killmail.victim.ship_type_id,
-    shipName: await getShipName(killmail.victim.ship_type_id),
+    shipName: await getTypeName(killmail.victim.ship_type_id),
     totalValue: Number(entry.zkb?.totalValue ?? 0),
     victimItems: killmail.victim.items ?? [],
   };
@@ -365,8 +379,52 @@ function collectLossTypeQuantities(shipTypeId: number, items: KillmailItem[]): M
   return quantities;
 }
 
+type FixedNpcCargoDeductionCandidate = Omit<FixedNpcCargoDeduction, "itemName">;
+
+const REIMBURSABLE_CARGO_FLAGS = new Set([
+  5, // Cargo
+  155, // Fleet Hangar
+]);
+
+export function collectFixedNpcCargoDeductions(items: KillmailItem[]): FixedNpcCargoDeductionCandidate[] {
+  const quantities = new Map<number, number>();
+  const visit = (item: KillmailItem, insideCargo: boolean): void => {
+    const isCargo = insideCargo || (item.flag !== undefined && REIMBURSABLE_CARGO_FLAGS.has(item.flag));
+    const quantity = Number(item.quantity_destroyed ?? 0) + Number(item.quantity_dropped ?? 0);
+    if (
+      isCargo
+      && Number.isSafeInteger(item.item_type_id)
+      && Number.isSafeInteger(quantity)
+      && quantity > 0
+      && getFixedNpcBuyPrice(item.item_type_id) !== null
+    ) {
+      quantities.set(item.item_type_id, (quantities.get(item.item_type_id) ?? 0) + quantity);
+    }
+    for (const nested of item.items ?? []) visit(nested, isCargo);
+  };
+  for (const item of items) visit(item, false);
+
+  return [...quantities.entries()].map(([typeId, quantity]) => {
+    const unitPrice = getFixedNpcBuyPrice(typeId)!;
+    return {
+      typeId,
+      quantity,
+      unitPrice,
+      totalValue: roundIsk(unitPrice * quantity),
+    };
+  });
+}
+
 function roundIsk(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+export function calculateReferenceReimbursementAmount(
+  jitaMidValue: number,
+  maximumInsurancePayout: number,
+  fixedNpcCargoValue: number,
+): number {
+  return roundIsk(Math.max(0, jitaMidValue - maximumInsurancePayout - fixedNpcCargoValue));
 }
 
 export async function calculateReimbursementReference(input: {
@@ -384,12 +442,20 @@ export async function calculateReimbursementReference(input: {
     victimItems = killmail.victim.items ?? [];
   }
   const quantities = collectLossTypeQuantities(input.shipTypeId, victimItems);
-  const typeIds = [...quantities.keys()];
+  const fixedNpcCargoCandidates = collectFixedNpcCargoDeductions(victimItems);
+  const fixedNpcCargoByType = new Map(fixedNpcCargoCandidates.map((item) => [item.typeId, item]));
+  const typeIds = [...quantities.entries()].flatMap(([typeId, quantity]) => (
+    quantity > (fixedNpcCargoByType.get(typeId)?.quantity ?? 0) ? [typeId] : []
+  ));
   const prices = new Map<number, JitaMidPrice>();
   let nextIndex = 0;
 
-  const [insurancePayouts] = await Promise.all([
+  const [insurancePayouts, fixedNpcCargoDeductions] = await Promise.all([
     getInsurancePayouts(),
+    Promise.all(fixedNpcCargoCandidates.map(async (item) => ({
+      ...item,
+      itemName: await getTypeName(item.typeId),
+    }))),
     Promise.all(Array.from(
       { length: Math.min(MARKET_PRICE_CONCURRENCY, typeIds.length) },
       async () => {
@@ -407,14 +473,25 @@ export async function calculateReimbursementReference(input: {
   let missingTypeCount = 0;
   let pricedTypeCount = 0;
   for (const [typeId, quantity] of quantities) {
-    const quote = prices.get(typeId);
-    if (!quote || quote.value === null) {
-      missingTypeCount += 1;
-      continue;
+    const fixedNpcCargo = fixedNpcCargoByType.get(typeId);
+    const fixedNpcCargoQuantity = fixedNpcCargo?.quantity ?? 0;
+    const marketQuantity = Math.max(0, quantity - fixedNpcCargoQuantity);
+    let hasPrice = fixedNpcCargoQuantity > 0;
+
+    if (fixedNpcCargo) {
+      jitaMidValue += fixedNpcCargo.unitPrice * fixedNpcCargoQuantity;
     }
-    pricedTypeCount += 1;
-    if (!quote.hasTwoSidedMarket) missingTypeCount += 1;
-    jitaMidValue += quote.value * quantity;
+    if (marketQuantity > 0) {
+      const quote = prices.get(typeId);
+      if (!quote || quote.value === null) {
+        missingTypeCount += 1;
+      } else {
+        hasPrice = true;
+        if (!quote.hasTwoSidedMarket) missingTypeCount += 1;
+        jitaMidValue += quote.value * marketQuantity;
+      }
+    }
+    if (hasPrice) pricedTypeCount += 1;
   }
   const maximumInsurancePayout = insurancePayouts.get(input.shipTypeId) ?? 0;
   const status = pricedTypeCount === 0
@@ -424,13 +501,25 @@ export async function calculateReimbursementReference(input: {
     : "partial";
   const roundedJitaMidValue = roundIsk(jitaMidValue);
   const roundedInsurancePayout = roundIsk(maximumInsurancePayout);
+  const fixedNpcCargoValue = roundIsk(fixedNpcCargoDeductions.reduce(
+    (total, deduction) => total + deduction.totalValue,
+    0,
+  ));
+  const calculatedAt = new Date();
 
   return {
     jitaMidValue: roundedJitaMidValue,
     maximumInsurancePayout: roundedInsurancePayout,
-    referenceReimbursementAmount: roundIsk(Math.max(0, roundedJitaMidValue - roundedInsurancePayout)),
+    fixedNpcCargoValue,
+    fixedNpcCargoDeductions,
+    fixedNpcCargoCalculatedAt: calculatedAt,
+    referenceReimbursementAmount: calculateReferenceReimbursementAmount(
+      roundedJitaMidValue,
+      roundedInsurancePayout,
+      fixedNpcCargoValue,
+    ),
     referencePriceStatus: status,
     referencePriceMissingTypeCount: missingTypeCount,
-    referencePriceCalculatedAt: new Date(),
+    referencePriceCalculatedAt: calculatedAt,
   };
 }

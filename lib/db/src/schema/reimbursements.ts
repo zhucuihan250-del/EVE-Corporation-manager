@@ -22,6 +22,14 @@ export type ReimbursementValidation = {
   message: string;
 };
 
+export type ReimbursementFixedNpcCargoDeduction = {
+  typeId: number;
+  itemName: string;
+  quantity: number;
+  unitPrice: number;
+  totalValue: number;
+};
+
 export const reimbursementClaimsTable = pgTable(
   "reimbursement_claims",
   {
@@ -50,6 +58,12 @@ export const reimbursementClaimsTable = pgTable(
     requestedAmount: doublePrecision("requested_amount").notNull(),
     jitaMidValue: doublePrecision("jita_mid_value"),
     maximumInsurancePayout: doublePrecision("maximum_insurance_payout"),
+    fixedNpcCargoValue: doublePrecision("fixed_npc_cargo_value").notNull().default(0),
+    fixedNpcCargoDeductions: jsonb("fixed_npc_cargo_deductions")
+      .$type<ReimbursementFixedNpcCargoDeduction[]>()
+      .notNull()
+      .default([]),
+    fixedNpcCargoCalculatedAt: timestamp("fixed_npc_cargo_calculated_at", { withTimezone: true }),
     referenceReimbursementAmount: doublePrecision("reference_reimbursement_amount"),
     referencePriceStatus: text("reference_price_status", {
       enum: ["pending", "calculated", "partial", "unavailable"],

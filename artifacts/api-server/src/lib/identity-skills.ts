@@ -1,21 +1,7 @@
 import { charactersTable, db, usersTable, type RequiredSkill, type SkillAuditResult } from "@workspace/db";
 import { and, eq, isNull } from "drizzle-orm";
-import { refreshAccessToken } from "./eve-sso";
-
-const ESI_BASE = "https://esi.evetech.net/latest";
-
-type CharacterSkillsResponse = {
-  skills: Array<{ skill_id: number; trained_skill_level: number }>;
-};
-
-export class SkillAuditError extends Error {
-  constructor(
-    message: string,
-    readonly code: "CHARACTER_NOT_FOUND" | "SKILL_AUTHORIZATION_REQUIRED" | "ESI_SKILLS_UNAVAILABLE",
-  ) {
-    super(message);
-  }
-}
+import { fetchTrainedSkills, refreshSkillTokens, SkillAuditError } from "./identity-skills-client";
+export { SkillAuditError } from "./identity-skills-client";
 
 export type SkillPlanForAudit = {
   id: number;
@@ -70,7 +56,7 @@ export async function auditCharacterSkills(input: {
   }
 
   if (character.tokenExpiry.getTime() <= Date.now() + 60_000) {
-    const refreshed = await refreshAccessToken(refreshToken);
+    const refreshed = await refreshSkillTokens(refreshToken);
     accessToken = refreshed.accessToken;
     refreshToken = refreshed.refreshToken;
     const tokenExpiry = new Date(Date.now() + refreshed.expiresIn * 1000);
@@ -86,26 +72,7 @@ export async function auditCharacterSkills(input: {
     }
   }
 
-  const response = await fetch(
-    `${ESI_BASE}/characters/${character.eveCharacterId}/skills/?datasource=tranquility`,
-    { headers: { Authorization: `Bearer ${accessToken}` } },
-  );
-  if (!response.ok) {
-    const code = response.status === 401 || response.status === 403
-      ? "SKILL_AUTHORIZATION_REQUIRED"
-      : "ESI_SKILLS_UNAVAILABLE";
-    throw new SkillAuditError(
-      response.status === 403
-        ? "The character authorization does not include skill access"
-        : "EVE skill data is temporarily unavailable",
-      code,
-    );
-  }
-
-  const payload = (await response.json()) as CharacterSkillsResponse;
-  const trained = new Map(
-    payload.skills.map((skill) => [skill.skill_id, skill.trained_skill_level]),
-  );
+  const trained = await fetchTrainedSkills(character.eveCharacterId, accessToken);
   const auditRequirements = (requirements: RequiredSkill[]) => requirements.map((requirement) => {
     const trainedLevel = trained.get(requirement.skillId) ?? 0;
     return {

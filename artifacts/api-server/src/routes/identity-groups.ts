@@ -296,7 +296,7 @@ router.get("/identity-groups/:id/members/:memberId/skill-plans", async (req: Req
           ? 409
           : 503;
       const message = error.code === "SKILL_AUTHORIZATION_REQUIRED"
-        ? "该成员需要重新绑定角色并授权技能读取后才能核验"
+        ? "该成员的技能读取授权已失效或缺失，请成员本人使用此角色重新进行 EVE 登录并授权技能读取；无需解绑角色或退出身份组"
         : error.code === "ESI_SKILLS_UNAVAILABLE"
           ? "EVE 技能数据暂时不可用，请稍后重试"
           : error.message;

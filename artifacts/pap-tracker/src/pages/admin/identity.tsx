@@ -38,7 +38,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { getErrorMessage } from "@/lib/api-error";
+import { getApiErrorCode, getErrorMessage } from "@/lib/api-error";
 import { BookOpenCheck, CheckCircle2, ChevronDown, ClipboardPaste, KeyRound, Loader2, LockKeyhole, LockOpen, Pencil, RefreshCw, ShieldCheck, Trash2, UsersRound, XCircle } from "lucide-react";
 
 const PERMISSIONS = [
@@ -101,8 +101,19 @@ function IdentityGroupMemberCard({
       enabled: expanded && Boolean(member.characterId),
       queryKey: ["/api/identity-groups", groupId, "members", member.id, "skill-plans"],
       staleTime: 30_000,
+      retry: false,
     },
   });
+  const skillErrorCode = getApiErrorCode(skillPlans.error);
+  const authorizationRequired = skillErrorCode === "SKILL_AUTHORIZATION_REQUIRED";
+  const skillErrorMessage = authorizationRequired
+    ? tr(
+      "该成员的技能读取授权已失效或缺失。请成员本人使用此角色重新进行 EVE 登录并授权技能读取，无需解绑角色或退出身份组。管理员无法代为授权。",
+      "This member's skill authorization is expired or missing. The member must sign in through EVE with this character and authorize skill access again. No unlinking or leaving the group is needed; an administrator cannot authorize on their behalf.",
+    )
+    : skillErrorCode === "ESI_SKILLS_UNAVAILABLE"
+      ? tr("EVE 技能数据暂时不可用，请稍后重试。这不代表该成员技能不达标。", "EVE skill data is temporarily unavailable. Please try again later; this does not mean the member failed the skill requirements.")
+      : getErrorMessage(skillPlans.error);
 
   return (
     <div className="rounded border border-border/50 bg-background/50 p-3">
@@ -132,7 +143,7 @@ function IdentityGroupMemberCard({
 
       {expanded && member.characterId && <div className="mt-3 space-y-3 border-t border-border/50 pt-3">
         {skillPlans.isPending ? <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />{tr("正在通过 ESI 核验技能方案…", "Auditing skill plans through ESI…")}</div>
-          : skillPlans.isError ? <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-destructive"><span>{getErrorMessage(skillPlans.error)}</span><Button size="sm" variant="outline" disabled={skillPlans.isFetching} onClick={() => void skillPlans.refetch()}><RefreshCw className={`mr-1 h-3.5 w-3.5 ${skillPlans.isFetching ? "animate-spin" : ""}`} />{tr("重试", "Retry")}</Button></div>
+          : skillPlans.isError ? <div role="alert" className={`flex flex-wrap items-center justify-between gap-2 text-sm ${authorizationRequired ? "text-amber-300" : "text-destructive"}`}><span>{skillErrorMessage}</span><Button size="sm" variant="outline" disabled={skillPlans.isFetching} onClick={() => void skillPlans.refetch()}><RefreshCw className={`mr-1 h-3.5 w-3.5 ${skillPlans.isFetching ? "animate-spin" : ""}`} />{authorizationRequired ? tr("授权后重新核验", "Check after authorization") : tr("重试", "Retry")}</Button></div>
             : skillPlans.data && <>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>

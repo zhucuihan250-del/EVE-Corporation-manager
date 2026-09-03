@@ -180,6 +180,13 @@ export async function getCharacterInfo(accessToken: string): Promise<{
   };
 }
 
+export class EveTokenRefreshError extends Error {
+  constructor(readonly authorizationRequired: boolean) {
+    super("EVE SSO token refresh failed");
+    this.name = "EveTokenRefreshError";
+  }
+}
+
 export async function refreshAccessToken(refreshToken: string): Promise<{
   accessToken: string;
   refreshToken: string;
@@ -193,6 +200,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<{
 
   const resp = await fetch(`${EVE_SSO_BASE}/v2/oauth/token`, {
     method: "POST",
+    signal: AbortSignal.timeout(15_000),
     headers: {
       Authorization: `Basic ${credentials}`,
       "Content-Type": "application/x-www-form-urlencoded",
@@ -204,9 +212,14 @@ export async function refreshAccessToken(refreshToken: string): Promise<{
   });
 
   if (!resp.ok) {
-    const text = await resp.text();
-    logger.error({ status: resp.status, body: text }, "EVE SSO token refresh failed");
-    throw new Error("EVE SSO token refresh failed");
+    const body: unknown = await resp.json().catch(() => null);
+    const invalidGrant = resp.status === 400
+      && body !== null && typeof body === "object"
+      && "error" in body && body.error === "invalid_grant";
+    // Never log the token endpoint body: only invalid_grant means the member
+    // must re-authorize. Configuration errors and outages must remain retryable.
+    logger.warn({ status: resp.status, invalidGrant }, "EVE SSO token refresh failed");
+    throw new EveTokenRefreshError(invalidGrant);
   }
 
   const data = (await resp.json()) as {

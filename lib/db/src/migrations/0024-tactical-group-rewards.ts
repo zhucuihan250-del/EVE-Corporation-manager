@@ -5,7 +5,7 @@ export const tacticalGroupRewardsMigration = {
   async up(client: PoolClient): Promise<void> {
     // Existing rewards remain general. Never make group rewards public on group deletion.
     await client.query(`
-      CREATE UNIQUE INDEX "identity_groups_corporation_id_unique"
+      CREATE UNIQUE INDEX IF NOT EXISTS "identity_groups_corporation_id_unique"
         ON "identity_groups" ("corporation_id", "id");
       ALTER TABLE "rewards" ADD COLUMN "identity_group_id" integer;
       ALTER TABLE "rewards" ADD CONSTRAINT "rewards_identity_group_corporation_fk"

@@ -15,6 +15,8 @@ before(async () => {
   await pg.exec(`
     CREATE TABLE identity_groups (id integer PRIMARY KEY, corporation_id integer NOT NULL,
       name text NOT NULL, category text NOT NULL, is_active boolean NOT NULL DEFAULT true);
+    -- Migration 0009 already created this index on existing installations.
+    CREATE UNIQUE INDEX identity_groups_corporation_id_unique ON identity_groups (corporation_id, id);
     CREATE TABLE identity_group_memberships (id serial PRIMARY KEY, corporation_id integer NOT NULL,
       group_id integer NOT NULL, user_id integer NOT NULL);
     CREATE TABLE rewards (id integer PRIMARY KEY, corporation_id integer NOT NULL, name text NOT NULL,

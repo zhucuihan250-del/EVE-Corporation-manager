@@ -1093,6 +1093,13 @@ export interface CreateManualPapBody {
 
 export interface Reward {
   id: number;
+  /**
+   * Null for general corporation rewards; otherwise restricted to current members of this tactical group.
+   * @nullable
+   */
+  identityGroupId?: number | null;
+  /** @nullable */
+  identityGroupName?: string | null;
   name: string;
   /** @nullable */
   description?: string | null;
@@ -1129,6 +1136,12 @@ export interface Reward {
 }
 
 export interface CreateRewardBody {
+  /**
+   * Active combat identity group in this corporation; null or omitted for a general reward.
+   * @minimum 1
+   * @nullable
+   */
+  identityGroupId?: number | null;
   name: string;
   /** @nullable */
   description?: string | null;
@@ -1148,6 +1161,12 @@ export interface CreateRewardBody {
 }
 
 export interface UpdateRewardBody {
+  /**
+   * Omit to keep current scope; null explicitly makes the reward general.
+   * @minimum 1
+   * @nullable
+   */
+  identityGroupId?: number | null;
   name?: string;
   /** @nullable */
   description?: string | null;
@@ -2314,6 +2333,21 @@ export type GetActivityReportParams = {
    */
   month?: string;
 };
+
+export type ListRewardsParams = {
+  /**
+   * Defaults to member. Manage requires the corporation admin role and does not grant redemption eligibility.
+   */
+  view?: ListRewardsView;
+};
+
+export type ListRewardsView =
+  (typeof ListRewardsView)[keyof typeof ListRewardsView];
+
+export const ListRewardsView = {
+  member: "member",
+  manage: "manage",
+} as const;
 
 export type ListIdentityGroupsParams = {
   includeInactive?: boolean;

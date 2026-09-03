@@ -77,6 +77,7 @@ import type {
   ListIdentityApplicationsParams,
   ListIdentityGroupsParams,
   ListReimbursementLossesParams,
+  ListRewardsParams,
   PapMarketAdminOverview,
   PapMarketOrder,
   PapMarketOverview,
@@ -2992,41 +2993,59 @@ export function useConnectCorporationRoster<
 }
 
 /**
- * @summary List all available rewards
+ * @summary List general and eligible group rewards, or all corporation rewards for administrators
  */
-export const getListRewardsUrl = () => {
-  return `/api/rewards`;
+export const getListRewardsUrl = (params?: ListRewardsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/rewards?${stringifiedParams}`
+    : `/api/rewards`;
 };
 
-export const listRewards = async (options?: RequestInit): Promise<Reward[]> => {
-  return customFetch<Reward[]>(getListRewardsUrl(), {
+export const listRewards = async (
+  params?: ListRewardsParams,
+  options?: RequestInit,
+): Promise<Reward[]> => {
+  return customFetch<Reward[]>(getListRewardsUrl(params), {
     ...options,
     method: "GET",
   });
 };
 
-export const getListRewardsQueryKey = () => {
-  return [`/api/rewards`] as const;
+export const getListRewardsQueryKey = (params?: ListRewardsParams) => {
+  return [`/api/rewards`, ...(params ? [params] : [])] as const;
 };
 
 export const getListRewardsQueryOptions = <
   TData = Awaited<ReturnType<typeof listRewards>>,
-  TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listRewards>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
+  TError = ErrorType<void>,
+>(
+  params?: ListRewardsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listRewards>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getListRewardsQueryKey();
+  const queryKey = queryOptions?.queryKey ?? getListRewardsQueryKey(params);
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof listRewards>>> = ({
     signal,
-  }) => listRewards({ signal, ...requestOptions });
+  }) => listRewards(params, { signal, ...requestOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof listRewards>>,
@@ -3038,24 +3057,27 @@ export const getListRewardsQueryOptions = <
 export type ListRewardsQueryResult = NonNullable<
   Awaited<ReturnType<typeof listRewards>>
 >;
-export type ListRewardsQueryError = ErrorType<unknown>;
+export type ListRewardsQueryError = ErrorType<void>;
 
 /**
- * @summary List all available rewards
+ * @summary List general and eligible group rewards, or all corporation rewards for administrators
  */
 
 export function useListRewards<
   TData = Awaited<ReturnType<typeof listRewards>>,
-  TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listRewards>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getListRewardsQueryOptions(options);
+  TError = ErrorType<void>,
+>(
+  params?: ListRewardsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listRewards>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListRewardsQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

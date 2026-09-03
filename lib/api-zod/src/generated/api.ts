@@ -1815,8 +1815,16 @@ export const GetRecentUnboundMembersResponse = zod.object({
 });
 
 /**
- * @summary List all available rewards
+ * @summary List general and eligible group rewards, or all corporation rewards for administrators
  */
+export const ListRewardsQueryParams = zod.object({
+  view: zod
+    .enum(["member", "manage"])
+    .optional()
+    .describe(
+      "Defaults to member. Manage requires the corporation admin role and does not grant redemption eligibility.",
+    ),
+});
 
 export const listRewardsResponseUserRedemptionCountMin = 0;
 
@@ -1824,6 +1832,13 @@ export const listRewardsResponseRemainingRedemptionsMin = 0;
 
 export const ListRewardsResponseItem = zod.object({
   id: zod.number(),
+  identityGroupId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Null for general corporation rewards; otherwise restricted to current members of this tactical group.",
+    ),
+  identityGroupName: zod.string().nullish(),
   name: zod.string(),
   description: zod.string().nullish(),
   papCost: zod.number(),
@@ -1851,6 +1866,13 @@ export const ListRewardsResponse = zod.array(ListRewardsResponseItem);
  */
 
 export const CreateRewardBody = zod.object({
+  identityGroupId: zod
+    .number()
+    .min(1)
+    .nullish()
+    .describe(
+      "Active combat identity group in this corporation; null or omitted for a general reward.",
+    ),
   name: zod.string(),
   description: zod.string().nullish(),
   papCost: zod.number(),
@@ -1867,6 +1889,13 @@ export const UpdateRewardParams = zod.object({
 });
 
 export const UpdateRewardBody = zod.object({
+  identityGroupId: zod
+    .number()
+    .min(1)
+    .nullish()
+    .describe(
+      "Omit to keep current scope; null explicitly makes the reward general.",
+    ),
   name: zod.string().optional(),
   description: zod.string().nullish(),
   papCost: zod.number().optional(),
@@ -1882,6 +1911,13 @@ export const updateRewardResponseRemainingRedemptionsMin = 0;
 
 export const UpdateRewardResponse = zod.object({
   id: zod.number(),
+  identityGroupId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Null for general corporation rewards; otherwise restricted to current members of this tactical group.",
+    ),
+  identityGroupName: zod.string().nullish(),
   name: zod.string(),
   description: zod.string().nullish(),
   papCost: zod.number(),

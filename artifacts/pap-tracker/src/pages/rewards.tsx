@@ -1,4 +1,4 @@
-import { useListRewards, useCreateRedemption, getGetDashboardSummaryQueryKey } from "@workspace/api-client-react";
+import { useListRewards, useCreateRedemption, getGetDashboardSummaryQueryKey, useGetMe } from "@workspace/api-client-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -6,10 +6,23 @@ import { Clock3, Loader2, Repeat2, ShoppingCart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { useParams } from "wouter";
+import { getErrorMessage } from "@/lib/api-error";
 
-export function Rewards() {
+export function TacticalRewards() {
+  const { id } = useParams<{ id: string }>();
+  return <Rewards identityGroupId={Number(id)} />;
+}
+
+export function Rewards({ identityGroupId }: { identityGroupId?: number } = {}) {
   const { t } = useTranslation();
-  const { data: rewards, isLoading } = useListRewards({ query: { queryKey: ["rewards"] } });
+  const { data: user } = useGetMe();
+  const group = user?.tacticalGroups?.find((candidate) => candidate.id === identityGroupId);
+  const allowed = identityGroupId === undefined || Boolean(user?.modules.identity && group);
+  const { data: visibleRewards, isLoading, error } = useListRewards(undefined, { query: {
+    queryKey: ["rewards", user?.corporationId, user?.id], enabled: Boolean(user && allowed),
+  } });
+  const rewards = identityGroupId === undefined ? visibleRewards : visibleRewards?.filter((reward) => reward.identityGroupId === identityGroupId);
   const createRedemption = useCreateRedemption();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -25,8 +38,13 @@ export function Rewards() {
           });
           queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
           queryClient.invalidateQueries({ queryKey: ["rewards"] });
+          queryClient.invalidateQueries({ queryKey: ["adminRewards"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/redemptions"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
         },
         onError: (err: any) => {
+          queryClient.invalidateQueries({ queryKey: ["rewards"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
           const errorCode = err?.data?.code;
           const errorMessage = err?.data?.error;
           toast({
@@ -45,17 +63,21 @@ export function Rewards() {
     );
   };
 
+  if (!allowed) return <div className="p-6 text-sm text-muted-foreground">{t("rewards.groupAccessDenied")}</div>;
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div>
-        <h1 className="text-2xl font-bold font-mono tracking-wider text-foreground mb-1 uppercase">{t("rewards.title")}</h1>
-        <p className="text-muted-foreground font-mono text-sm">{t("rewards.subtitle")}</p>
+        <h1 className="text-2xl font-bold font-mono tracking-wider text-foreground mb-1 uppercase">{group ? t("rewards.groupExclusive", { name: group.name }) : t("rewards.title")}</h1>
+        <p className="text-muted-foreground font-mono text-sm">{group ? t("rewards.groupSubtitle") : t("rewards.subtitle")}</p>
       </div>
 
       {isLoading ? (
         <div className="flex justify-center p-12">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
+      ) : error ? (
+        <div className="p-6 text-sm text-destructive">{getErrorMessage(error)}</div>
       ) : !rewards?.length ? (
         <Card className="bg-card/40 backdrop-blur border-border/50 rounded-sm">
           <CardContent className="p-12 text-center text-muted-foreground font-mono">
@@ -77,6 +99,7 @@ export function Rewards() {
                       {reward.papCost} PAP
                     </Badge>
                   </div>
+                  {reward.identityGroupId != null && <Badge variant="outline" className="w-fit text-violet-300 border-violet-400/30">{t("rewards.groupExclusive", { name: reward.identityGroupName ?? `#${reward.identityGroupId}` })}</Badge>}
                 </CardHeader>
                 <CardContent className="flex-1">
                   <p className="text-sm text-muted-foreground font-mono mb-4">{reward.description || "Standard issue item."}</p>

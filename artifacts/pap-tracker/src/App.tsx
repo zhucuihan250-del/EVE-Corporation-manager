@@ -31,6 +31,7 @@ const Layout = lazy(() => import("@/components/layout").then((module) => ({ defa
 const Dashboard = lazy(() => import("@/pages/dashboard").then((module) => ({ default: module.Dashboard })));
 const History = lazy(() => import("@/pages/history").then((module) => ({ default: module.History })));
 const Rewards = lazy(() => import("@/pages/rewards").then((module) => ({ default: module.Rewards })));
+const TacticalRewards = lazy(() => import("@/pages/rewards").then((module) => ({ default: module.TacticalRewards })));
 const Redemptions = lazy(() => import("@/pages/redemptions").then((module) => ({ default: module.Redemptions })));
 const PapMarket = lazy(() => import("@/pages/pap-market").then((module) => ({ default: module.PapMarket })));
 const Characters = lazy(() => import("@/pages/characters").then((module) => ({ default: module.Characters })));
@@ -212,6 +213,9 @@ function Router() {
       </Route>
       <Route path="/tactical/:id/reimbursements">
         {() => <ProtectedRoute component={TacticalReimbursements} module="reimbursement" requiresReimbursementOpen />}
+      </Route>
+      <Route path="/tactical/:id/rewards">
+        {() => <ProtectedRoute component={TacticalRewards} module="pap" />}
       </Route>
       <Route path="/tactical/:id">
         {() => <ProtectedRoute component={TacticalDashboard} module="identity" />}

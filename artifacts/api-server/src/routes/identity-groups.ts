@@ -8,6 +8,7 @@ import {
   identityGroupMembershipsTable,
   identityGroupSkillPlansTable,
   identityGroupsTable,
+  rewardsTable,
   usersTable,
   type CorporationSkillPlan,
   type RequiredSkill,
@@ -481,7 +482,7 @@ router.delete("/identity-groups/:id", async (req: Request, res: Response): Promi
       .for("update");
     if (!group) return { kind: "not_found" as const };
 
-    const [[members], [applications]] = await Promise.all([
+    const [[members], [applications], [rewards]] = await Promise.all([
       tx
         .select({ count: sql<number>`COUNT(*)::int` })
         .from(identityGroupMembershipsTable)
@@ -496,11 +497,16 @@ router.delete("/identity-groups/:id", async (req: Request, res: Response): Promi
           eq(identityGroupApplicationsTable.corporationId, corporationId),
           eq(identityGroupApplicationsTable.groupId, id),
         )),
+      tx.select({ count: sql<number>`COUNT(*)::int` }).from(rewardsTable).where(and(
+        eq(rewardsTable.corporationId, corporationId),
+        eq(rewardsTable.identityGroupId, id),
+      )),
     ]);
     const memberCount = Number(members?.count ?? 0);
     const applicationCount = Number(applications?.count ?? 0);
-    if (memberCount > 0 || applicationCount > 0) {
-      return { kind: "in_use" as const, memberCount, applicationCount };
+    const rewardCount = Number(rewards?.count ?? 0);
+    if (memberCount > 0 || applicationCount > 0 || rewardCount > 0) {
+      return { kind: "in_use" as const, memberCount, applicationCount, rewardCount };
     }
 
     await tx.delete(identityGroupsTable).where(and(
@@ -516,10 +522,11 @@ router.delete("/identity-groups/:id", async (req: Request, res: Response): Promi
   }
   if (result.kind === "in_use") {
     res.status(409).json({
-      error: `该身份组仍有 ${result.memberCount} 名成员和 ${result.applicationCount} 条申请记录。为保留权限与审核历史，请停用身份组，不可直接删除。`,
+      error: `该身份组仍有 ${result.memberCount} 名成员、${result.applicationCount} 条申请记录和 ${result.rewardCount} 件专属兑换物品。为保留权限、审核历史及兑换范围，请停用身份组，不可直接删除。`,
       code: "IDENTITY_GROUP_IN_USE",
       memberCount: result.memberCount,
       applicationCount: result.applicationCount,
+      rewardCount: result.rewardCount,
     });
     return;
   }

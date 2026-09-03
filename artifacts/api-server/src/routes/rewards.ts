@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { db, redemptionsTable, rewardsTable, usersTable } from "@workspace/db";
-import { and, count, desc, eq, ne } from "drizzle-orm";
+import { db, identityGroupsTable, redemptionsTable, rewardsTable, usersTable } from "@workspace/db";
+import { and, count, desc, eq, getTableColumns, ne } from "drizzle-orm";
 import { requireAuth, hasRole } from "../middlewares/auth";
 import { requireModule, requireTenant } from "../lib/tenant";
 import {
@@ -10,6 +10,7 @@ import {
   DeleteRewardParams,
 } from "@workspace/api-zod";
 import { addCalendarMonths, ensureCorporationJoinedAt } from "../lib/corporation-membership";
+import { rewardMemberVisibility, RewardScopeError, validateRewardGroupTarget } from "../lib/reward-access";
 
 const router: IRouter = Router();
 router.use("/rewards", requireAuth, requireTenant, requireModule("pap"));
@@ -20,8 +21,27 @@ function isValidOptionalPositiveInteger(value: number | null | undefined): boole
 
 // GET /api/rewards
 router.get("/rewards", requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const rewards = await db.select().from(rewardsTable)
-    .where(eq(rewardsTable.corporationId, req.tenant!.corporation.id))
+  const tenant = req.tenant!;
+  if (req.query.view !== undefined && !["member", "manage"].includes(req.query.view as string)) {
+    res.status(400).json({ error: "Invalid reward view" });
+    return;
+  }
+  const manage = req.query.view === "manage";
+  if (manage && !hasRole(tenant.membership.role, "admin")) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  const rewards = await db.select({
+    ...getTableColumns(rewardsTable),
+    identityGroupName: identityGroupsTable.name,
+  }).from(rewardsTable)
+    .leftJoin(identityGroupsTable, and(
+      eq(identityGroupsTable.id, rewardsTable.identityGroupId),
+      eq(identityGroupsTable.corporationId, tenant.corporation.id),
+    ))
+    .where(manage
+      ? eq(rewardsTable.corporationId, tenant.corporation.id)
+      : rewardMemberVisibility(tenant.corporation.id, tenant.user.id, tenant.corporation.identityEnabled))
     .orderBy(desc(rewardsTable.createdAt));
   const hasTenureLimitedRewards = rewards.some((reward) => reward.eligibilityMonths !== null);
   const hasRedemptionLimitedRewards = rewards.some((reward) => reward.maxRedemptionsPerUser !== null);
@@ -37,6 +57,7 @@ router.get("/rewards", requireAuth, async (req: Request, res: Response): Promise
       .from(redemptionsTable)
       .where(and(
         eq(redemptionsTable.userId, req.session.userId!),
+        eq(redemptionsTable.corporationId, tenant.corporation.id),
         ne(redemptionsTable.status, "cancelled"),
       ))
       .groupBy(redemptionsTable.rewardId)
@@ -96,21 +117,32 @@ router.post("/rewards", requireAuth, async (req: Request, res: Response): Promis
     return;
   }
 
-  const [reward] = await db
-    .insert(rewardsTable)
-    .values({
-      corporationId: req.tenant!.corporation.id,
-      name: body.data.name,
-      description: body.data.description ?? null,
-      papCost: body.data.papCost,
-      stock: body.data.stock ?? null,
-      eligibilityMonths: body.data.eligibilityMonths ?? null,
-      maxRedemptionsPerUser: body.data.maxRedemptionsPerUser ?? null,
-      isAvailable: true,
-    })
-    .returning();
-
-  res.status(201).json(reward);
+  try {
+    const reward = await db.transaction(async (tx) => {
+      await validateRewardGroupTarget(tx, req.tenant!.corporation.id, body.data.identityGroupId, req.tenant!.corporation.identityEnabled);
+      const [created] = await tx.insert(rewardsTable)
+        .values({
+          corporationId: req.tenant!.corporation.id,
+          identityGroupId: body.data.identityGroupId ?? null,
+          name: body.data.name,
+          description: body.data.description ?? null,
+          papCost: body.data.papCost,
+          stock: body.data.stock ?? null,
+          eligibilityMonths: body.data.eligibilityMonths ?? null,
+          maxRedemptionsPerUser: body.data.maxRedemptionsPerUser ?? null,
+          isAvailable: true,
+        })
+        .returning();
+      return created;
+    });
+    res.status(201).json(reward);
+  } catch (error) {
+    if (error instanceof RewardScopeError) {
+      res.status(400).json({ error: error.message, code: "INVALID_REWARD_GROUP" });
+      return;
+    }
+    throw error;
+  }
 });
 
 // PATCH /api/rewards/:id - admin only
@@ -142,6 +174,7 @@ router.patch("/rewards/:id", requireAuth, async (req: Request, res: Response): P
   }
 
   const updates: Partial<typeof rewardsTable.$inferInsert> = {};
+  if (body.data.identityGroupId !== undefined) updates.identityGroupId = body.data.identityGroupId;
   if (body.data.name !== undefined) updates.name = body.data.name;
   if (body.data.description !== undefined) updates.description = body.data.description;
   if (body.data.papCost !== undefined) updates.papCost = body.data.papCost;
@@ -150,21 +183,33 @@ router.patch("/rewards/:id", requireAuth, async (req: Request, res: Response): P
   if (body.data.maxRedemptionsPerUser !== undefined) updates.maxRedemptionsPerUser = body.data.maxRedemptionsPerUser;
   if (body.data.isAvailable !== undefined) updates.isAvailable = body.data.isAvailable;
 
-  const [reward] = await db
-    .update(rewardsTable)
-    .set(updates)
-    .where(and(
-      eq(rewardsTable.id, params.data.id),
-      eq(rewardsTable.corporationId, req.tenant!.corporation.id),
-    ))
-    .returning();
-
-  if (!reward) {
-    res.status(404).json({ error: "Reward not found" });
-    return;
+  try {
+    const reward = await db.transaction(async (tx) => {
+      const condition = and(
+        eq(rewardsTable.id, params.data.id),
+        eq(rewardsTable.corporationId, req.tenant!.corporation.id),
+      );
+      const [current] = await tx.select().from(rewardsTable).where(condition).for("update");
+      if (!current) return null;
+      if (body.data.identityGroupId !== current.identityGroupId) {
+        await validateRewardGroupTarget(tx, req.tenant!.corporation.id, body.data.identityGroupId, req.tenant!.corporation.identityEnabled);
+      }
+      if (Object.keys(updates).length === 0) return current;
+      const [updated] = await tx.update(rewardsTable).set(updates).where(condition).returning();
+      return updated;
+    });
+    if (!reward) {
+      res.status(404).json({ error: "Reward not found" });
+      return;
+    }
+    res.json(reward);
+  } catch (error) {
+    if (error instanceof RewardScopeError) {
+      res.status(400).json({ error: error.message, code: "INVALID_REWARD_GROUP" });
+      return;
+    }
+    throw error;
   }
-
-  res.json(reward);
 });
 
 // DELETE /api/rewards/:id - admin only

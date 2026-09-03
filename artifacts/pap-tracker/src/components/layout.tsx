@@ -154,6 +154,7 @@ export function Layout({ children }: { children: ReactNode }) {
                 <SidebarGroupLabel className="text-xs uppercase tracking-widest text-violet-300 font-mono">{group.name}</SidebarGroupLabel>
                 <SidebarGroupContent><SidebarMenu>{renderItems([
                   { href: `/tactical/${group.id}`, label: tr("战术面板", "Tactical dashboard"), icon: Swords, exact: true },
+                  ...(modules?.pap ? [{ href: `/tactical/${group.id}/rewards`, label: tr("专属兑换", "Exclusive rewards"), icon: Gift }] : []),
                   { href: `/tactical/${group.id}/reimbursements`, label: tr("专属补损", "Dedicated reimbursement"), icon: ReceiptText, disabled: user?.reimbursementOpen === false },
                 ])}</SidebarMenu></SidebarGroupContent>
               </SidebarGroup>

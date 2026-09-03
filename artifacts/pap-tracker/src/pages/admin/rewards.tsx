@@ -1,4 +1,4 @@
-import { useListRewards, useCreateReward, useUpdateReward, useDeleteReward, getListRewardsQueryKey } from "@workspace/api-client-react";
+import { useListRewards, useCreateReward, useUpdateReward, useDeleteReward, getListRewardsQueryKey, useListIdentityGroups, useGetMe, type Reward } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useTranslation } from "react-i18next";
+import { getErrorMessage } from "@/lib/api-error";
 
 function isOptionalPositiveInteger(value: string): boolean {
   return value === "" || (Number.isInteger(Number(value)) && Number(value) > 0);
@@ -18,7 +19,10 @@ function isOptionalPositiveInteger(value: string): boolean {
 
 export function AdminRewards() {
   const { t } = useTranslation();
-  const { data: rewards, isLoading } = useListRewards({ query: { queryKey: ["adminRewards"] } });
+  const { data: user } = useGetMe();
+  const { data: rewards, isLoading, error } = useListRewards({ view: "manage" }, { query: { queryKey: ["adminRewards", user?.corporationId, user?.id] } });
+  const groups = useListIdentityGroups({ includeInactive: true }, { query: { queryKey: ["/api/identity-groups", { includeInactive: true }, user?.corporationId, user?.id], enabled: Boolean(user?.modules.identity) } });
+  const tacticalGroups = (groups.data ?? []).filter((group) => group.category === "combat");
   const createReward = useCreateReward();
   const updateReward = useUpdateReward();
   const deleteReward = useDeleteReward();
@@ -36,6 +40,8 @@ export function AdminRewards() {
   const [stock, setStock] = useState("");
   const [eligibilityMonths, setEligibilityMonths] = useState("");
   const [maxRedemptionsPerUser, setMaxRedemptionsPerUser] = useState("");
+  const [identityGroupId, setIdentityGroupId] = useState("");
+  const [originalGroupId, setOriginalGroupId] = useState("");
 
   const invalidateRewardQueries = () => {
     queryClient.invalidateQueries({ queryKey: ["adminRewards"] });
@@ -50,6 +56,8 @@ export function AdminRewards() {
     setStock("");
     setEligibilityMonths("");
     setMaxRedemptionsPerUser("");
+    setIdentityGroupId("");
+    setOriginalGroupId("");
     setCurrentId(null);
     setEditMode(false);
   };
@@ -69,12 +77,15 @@ export function AdminRewards() {
       stock: stock ? Number(stock) : null,
       eligibilityMonths: parsedEligibilityMonths,
       maxRedemptionsPerUser: parsedMaxRedemptionsPerUser,
+      ...(editMode && identityGroupId === originalGroupId ? {} : { identityGroupId: identityGroupId ? Number(identityGroupId) : null }),
     };
+    const onError = (error: unknown) => toast({ title: t("adminRewards.saveFailed"), description: getErrorMessage(error), variant: "destructive" });
 
     if (editMode && currentId) {
       updateReward.mutate(
         { id: currentId, data: payload },
         {
+          onError,
           onSuccess: () => {
             toast({ title: t("adminRewards.assetUpdated"), description: t("adminRewards.assetUpdatedDesc") });
             invalidateRewardQueries();
@@ -87,6 +98,7 @@ export function AdminRewards() {
       createReward.mutate(
         { data: payload },
         {
+          onError,
           onSuccess: () => {
             toast({ title: t("adminRewards.assetCreated"), description: t("adminRewards.assetCreatedDesc") });
             invalidateRewardQueries();
@@ -98,15 +110,17 @@ export function AdminRewards() {
     }
   };
 
-  const openEdit = (reward: any) => {
+  const openEdit = (reward: Reward) => {
     setEditMode(true);
     setCurrentId(reward.id);
     setName(reward.name);
     setDescription(reward.description || "");
     setPapCost(reward.papCost.toString());
-    setStock(reward.stock !== null ? reward.stock.toString() : "");
+    setStock(reward.stock != null ? reward.stock.toString() : "");
     setEligibilityMonths(reward.eligibilityMonths !== null ? reward.eligibilityMonths.toString() : "");
     setMaxRedemptionsPerUser(reward.maxRedemptionsPerUser !== null ? reward.maxRedemptionsPerUser.toString() : "");
+    setIdentityGroupId(reward.identityGroupId?.toString() ?? "");
+    setOriginalGroupId(reward.identityGroupId?.toString() ?? "");
     setModalOpen(true);
   };
 
@@ -114,6 +128,7 @@ export function AdminRewards() {
     updateReward.mutate(
       { id, data: { isAvailable: !currentAvailable } },
       {
+        onError: (error) => toast({ title: t("adminRewards.saveFailed"), description: getErrorMessage(error), variant: "destructive" }),
         onSuccess: () => {
           toast({ title: t("adminRewards.statusUpdated"), description: t("adminRewards.statusUpdatedDesc") });
           invalidateRewardQueries();
@@ -168,6 +183,8 @@ export function AdminRewards() {
             <div className="p-8 flex justify-center">
               <Loader2 className="w-6 h-6 animate-spin text-primary" />
             </div>
+          ) : error ? (
+            <div className="p-8 text-sm text-destructive">{getErrorMessage(error)}</div>
           ) : !rewards?.length ? (
             <div className="p-8 text-center text-muted-foreground font-mono text-sm">
               {t("adminRewards.noAssets")}
@@ -192,6 +209,9 @@ export function AdminRewards() {
                       <div className="flex flex-col">
                         <span>{reward.name}</span>
                         <span className="text-xs text-muted-foreground line-clamp-1">{reward.description}</span>
+                        <span className={reward.identityGroupId != null ? "mt-1 text-xs text-violet-300" : "mt-1 text-xs text-muted-foreground"}>
+                          {reward.identityGroupId != null ? t("rewards.groupExclusive", { name: reward.identityGroupName ?? `#${reward.identityGroupId}` }) : t("adminRewards.generalScope")}
+                        </span>
                       </div>
                     </TableCell>
                     <TableCell className="font-mono font-bold text-primary">
@@ -256,6 +276,20 @@ export function AdminRewards() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="rewardGroup">{t("adminRewards.scope")}</Label>
+              <select id="rewardGroup" className="h-10 w-full rounded-sm border border-input bg-background px-3 text-sm" value={identityGroupId} onChange={(event) => setIdentityGroupId(event.target.value)}>
+                <option value="">{t("adminRewards.generalScope")}</option>
+                {identityGroupId && !tacticalGroups.some((group) => String(group.id) === identityGroupId) && (
+                  <option value={identityGroupId} disabled>{t("adminRewards.existingGroup", { id: identityGroupId })}</option>
+                )}
+                {tacticalGroups.map((group) => <option key={group.id} value={group.id} disabled={!group.isActive}>{group.name}{!group.isActive ? t("adminRewards.inactiveGroup") : ""}</option>)}
+              </select>
+              <p className="text-xs text-muted-foreground">{t("adminRewards.scopeHint")}</p>
+              {groups.isError && <p className="text-xs text-destructive">{getErrorMessage(groups.error)}</p>}
+              {groups.isLoading && <p className="text-xs text-muted-foreground">{t("adminRewards.loadingGroups")}</p>}
+              {originalGroupId && !identityGroupId && <p className="text-xs text-amber-400">{t("adminRewards.makeGeneralWarning")}</p>}
+            </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="name" className="text-right text-xs tracking-widest">{t("adminRewards.name")}</Label>
               <Input

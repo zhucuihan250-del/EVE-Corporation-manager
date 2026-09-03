@@ -153,6 +153,8 @@ export * from "./identitySkillPlanImportResultSourceFormat";
 export * from "./listIdentityApplicationsParams";
 export * from "./listIdentityGroupsParams";
 export * from "./listReimbursementLossesParams";
+export * from "./listRewardsParams";
+export * from "./listRewardsView";
 export * from "./papLedgerEntry";
 export * from "./papLedgerEntryType";
 export * from "./papMarketAdminLog";

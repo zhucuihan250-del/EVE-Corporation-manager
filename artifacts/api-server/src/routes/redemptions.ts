@@ -8,6 +8,7 @@ import { papRecordsTable } from "@workspace/db";
 import { addCalendarMonths, ensureCorporationJoinedAt } from "../lib/corporation-membership";
 import { availablePap, canonicalPapBalance, setPapBalance } from "../lib/pap-balance";
 import { writePapLedger } from "../lib/pap-ledger";
+import { lockRewardMembership, rewardMemberVisibility } from "../lib/reward-access";
 
 const router: IRouter = Router();
 router.use("/redemptions", requireAuth, requireTenant, requireModule("pap"));
@@ -92,7 +93,7 @@ router.post("/redemptions", requireAuth, async (req: Request, res: Response): Pr
 
   const [reward] = await db.select().from(rewardsTable).where(and(
     eq(rewardsTable.id, body.data.rewardId),
-    eq(rewardsTable.corporationId, req.tenant!.corporation.id),
+    rewardMemberVisibility(req.tenant!.corporation.id, req.tenant!.user.id, req.tenant!.corporation.identityEnabled),
   ));
   if (!reward) {
     res.status(404).json({ error: "Reward not found" });
@@ -125,11 +126,18 @@ router.post("/redemptions", requireAuth, async (req: Request, res: Response): Pr
         .from(rewardsTable)
         .where(and(
           eq(rewardsTable.id, reward.id),
-          eq(rewardsTable.corporationId, req.tenant!.corporation.id),
+          rewardMemberVisibility(req.tenant!.corporation.id, req.tenant!.user.id, req.tenant!.corporation.identityEnabled),
         ))
         .for("update");
       if (!currentReward) {
         throw new RedemptionRequestError(404, "Reward not found");
+      }
+
+      if (currentReward.identityGroupId !== null) {
+        // Lock current membership and group until commit so removal/deactivation cannot race PAP deduction.
+        if (!await lockRewardMembership(tx, req.tenant!.corporation.id, user.id, currentReward.identityGroupId)) {
+          throw new RedemptionRequestError(404, "Reward not found");
+        }
       }
 
       const [currentUser] = await tx

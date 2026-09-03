@@ -8,6 +8,13 @@
 
 export interface Reward {
   id: number;
+  /**
+   * Null for general corporation rewards; otherwise restricted to current members of this tactical group.
+   * @nullable
+   */
+  identityGroupId?: number | null;
+  /** @nullable */
+  identityGroupName?: string | null;
   name: string;
   /** @nullable */
   description?: string | null;

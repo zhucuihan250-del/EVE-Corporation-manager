@@ -7,6 +7,12 @@
  */
 
 export interface CreateRewardBody {
+  /**
+   * Active combat identity group in this corporation; null or omitted for a general reward.
+   * @minimum 1
+   * @nullable
+   */
+  identityGroupId?: number | null;
   name: string;
   /** @nullable */
   description?: string | null;

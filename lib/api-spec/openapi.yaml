@@ -767,7 +767,14 @@ paths:
     get:
       operationId: listRewards
       tags: [rewards]
-      summary: List all available rewards
+      summary: List general and eligible group rewards, or all corporation rewards for administrators
+      parameters:
+        - name: view
+          in: query
+          schema:
+            type: string
+            enum: [member, manage]
+          description: Defaults to member. Manage requires the corporation admin role and does not grant redemption eligibility.
       responses:
         "200":
           description: List of rewards
@@ -777,6 +784,8 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Reward"
+        "403":
+          description: Admin role required for manage view
     post:
       operationId: createReward
       tags: [rewards]
@@ -3567,6 +3576,11 @@ components:
       properties:
         id:
           type: integer
+        identityGroupId:
+          type: ["integer", "null"]
+          description: Null for general corporation rewards; otherwise restricted to current members of this tactical group.
+        identityGroupName:
+          type: ["string", "null"]
         name:
           type: string
         description:
@@ -3611,6 +3625,10 @@ components:
     CreateRewardBody:
       type: object
       properties:
+        identityGroupId:
+          type: ["integer", "null"]
+          minimum: 1
+          description: Active combat identity group in this corporation; null or omitted for a general reward.
         name:
           type: string
         description:
@@ -3632,6 +3650,10 @@ components:
     UpdateRewardBody:
       type: object
       properties:
+        identityGroupId:
+          type: ["integer", "null"]
+          minimum: 1
+          description: Omit to keep current scope; null explicitly makes the reward general.
         name:
           type: string
         description:

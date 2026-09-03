@@ -1,10 +1,10 @@
-import { useGetTacticalGroupDashboard } from "@workspace/api-client-react";
+import { useGetMe, useGetTacticalGroupDashboard } from "@workspace/api-client-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getErrorMessage } from "@/lib/api-error";
-import { Activity, Loader2, ReceiptText, ShieldCheck, Swords, Users } from "lucide-react";
+import { Activity, Gift, Loader2, ReceiptText, ShieldCheck, Swords, Users } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "wouter";
 
@@ -14,6 +14,7 @@ export function TacticalDashboard() {
   const params = useParams<{ id: string }>();
   const identityGroupId = Number(params.id);
   const dashboard = useGetTacticalGroupDashboard(identityGroupId);
+  const { data: user } = useGetMe();
 
   if (dashboard.isLoading) {
     return <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" />{tr("正在读取战术面板…", "Loading tactical dashboard…")}</div>;
@@ -31,7 +32,10 @@ export function TacticalDashboard() {
           <h1 className="text-2xl font-bold font-mono tracking-wider">{data.group.name}</h1>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{data.group.description || tr("暂无身份组说明", "No group description")}</p>
         </div>
-        <Button asChild><Link href={`/tactical/${identityGroupId}/reimbursements`}><ReceiptText className="mr-2 h-4 w-4" />{tr("进入专属补损", "Dedicated reimbursement")}</Link></Button>
+        <div className="flex flex-wrap gap-2">
+          {user?.modules.pap && user.tacticalGroups?.some((group) => group.id === identityGroupId) && <Button asChild variant="outline"><Link href={`/tactical/${identityGroupId}/rewards`}><Gift className="mr-2 h-4 w-4" />{tr("专属兑换", "Exclusive rewards")}</Link></Button>}
+          <Button asChild><Link href={`/tactical/${identityGroupId}/reimbursements`}><ReceiptText className="mr-2 h-4 w-4" />{tr("进入专属补损", "Dedicated reimbursement")}</Link></Button>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

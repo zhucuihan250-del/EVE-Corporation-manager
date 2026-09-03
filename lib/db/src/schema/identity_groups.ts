@@ -100,6 +100,7 @@ export const identityGroupsTable = pgTable(
       table.corporationId,
       table.name,
     ),
+    uniqueIndex("identity_groups_corporation_id_unique").on(table.corporationId, table.id),
   ],
 );
 

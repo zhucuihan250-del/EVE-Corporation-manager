@@ -7,6 +7,12 @@
  */
 
 export interface UpdateRewardBody {
+  /**
+   * Omit to keep current scope; null explicitly makes the reward general.
+   * @minimum 1
+   * @nullable
+   */
+  identityGroupId?: number | null;
   name?: string;
   /** @nullable */
   description?: string | null;

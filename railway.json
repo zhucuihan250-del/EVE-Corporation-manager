@@ -1,0 +1,10 @@
+{
+  "build": {
+    "buildCommand": "pnpm build"
+  },
+  "deploy": {
+    "startCommand": "pnpm start",
+    "healthcheckPath": "/api/healthz",
+    "healthcheckTimeout": 300
+  }
+}

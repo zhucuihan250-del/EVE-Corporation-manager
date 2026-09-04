@@ -42,6 +42,9 @@ export function AdminRewards() {
   const [maxRedemptionsPerUser, setMaxRedemptionsPerUser] = useState("");
   const [identityGroupId, setIdentityGroupId] = useState("");
   const [originalGroupId, setOriginalGroupId] = useState("");
+  const [selectedSkillPlanIds, setSelectedSkillPlanIds] = useState<number[]>([]);
+  const [skillPlanMatchMode, setSkillPlanMatchMode] = useState<"all" | "any">("all");
+  const selectedGroup = tacticalGroups.find((group) => String(group.id) === identityGroupId);
 
   const invalidateRewardQueries = () => {
     queryClient.invalidateQueries({ queryKey: ["adminRewards"] });
@@ -58,6 +61,8 @@ export function AdminRewards() {
     setMaxRedemptionsPerUser("");
     setIdentityGroupId("");
     setOriginalGroupId("");
+    setSelectedSkillPlanIds([]);
+    setSkillPlanMatchMode("all");
     setCurrentId(null);
     setEditMode(false);
   };
@@ -77,6 +82,8 @@ export function AdminRewards() {
       stock: stock ? Number(stock) : null,
       eligibilityMonths: parsedEligibilityMonths,
       maxRedemptionsPerUser: parsedMaxRedemptionsPerUser,
+      skillPlanIds: identityGroupId ? selectedSkillPlanIds : [],
+      skillPlanMatchMode,
       ...(editMode && identityGroupId === originalGroupId ? {} : { identityGroupId: identityGroupId ? Number(identityGroupId) : null }),
     };
     const onError = (error: unknown) => toast({ title: t("adminRewards.saveFailed"), description: getErrorMessage(error), variant: "destructive" });
@@ -121,6 +128,8 @@ export function AdminRewards() {
     setMaxRedemptionsPerUser(reward.maxRedemptionsPerUser !== null ? reward.maxRedemptionsPerUser.toString() : "");
     setIdentityGroupId(reward.identityGroupId?.toString() ?? "");
     setOriginalGroupId(reward.identityGroupId?.toString() ?? "");
+    setSelectedSkillPlanIds(reward.requiredSkillPlans.map((plan) => plan.id));
+    setSkillPlanMatchMode(reward.skillPlanMatchMode);
     setModalOpen(true);
   };
 
@@ -212,6 +221,14 @@ export function AdminRewards() {
                         <span className={reward.identityGroupId != null ? "mt-1 text-xs text-violet-300" : "mt-1 text-xs text-muted-foreground"}>
                           {reward.identityGroupId != null ? t("rewards.groupExclusive", { name: reward.identityGroupName ?? `#${reward.identityGroupId}` }) : t("adminRewards.generalScope")}
                         </span>
+                        {reward.requiredSkillPlans.length > 0 && (
+                          <span className="mt-1 text-xs text-cyan-300">
+                            {t("adminRewards.skillGateSummary", {
+                              mode: reward.skillPlanMatchMode === "any" ? t("adminRewards.matchAny") : t("adminRewards.matchAll"),
+                              plans: reward.requiredSkillPlans.map((plan) => plan.name).join("、"),
+                            })}
+                          </span>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="font-mono font-bold text-primary">
@@ -266,7 +283,7 @@ export function AdminRewards() {
       </Card>
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto bg-card border-primary/20 rounded-sm font-mono">
+        <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto bg-card border-primary/20 rounded-sm font-mono">
           <DialogHeader>
             <DialogTitle className="tracking-wider uppercase text-primary flex items-center gap-2">
               <Gift className="w-5 h-5" /> {editMode ? t("adminRewards.modifyAsset") : t("adminRewards.registerAsset")}
@@ -278,7 +295,16 @@ export function AdminRewards() {
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="rewardGroup">{t("adminRewards.scope")}</Label>
-              <select id="rewardGroup" className="h-10 w-full rounded-sm border border-input bg-background px-3 text-sm" value={identityGroupId} onChange={(event) => setIdentityGroupId(event.target.value)}>
+              <select
+                id="rewardGroup"
+                className="h-10 w-full rounded-sm border border-input bg-background px-3 text-sm"
+                value={identityGroupId}
+                onChange={(event) => {
+                  setIdentityGroupId(event.target.value);
+                  setSelectedSkillPlanIds([]);
+                  setSkillPlanMatchMode("all");
+                }}
+              >
                 <option value="">{t("adminRewards.generalScope")}</option>
                 {identityGroupId && !tacticalGroups.some((group) => String(group.id) === identityGroupId) && (
                   <option value={identityGroupId} disabled>{t("adminRewards.existingGroup", { id: identityGroupId })}</option>
@@ -290,6 +316,58 @@ export function AdminRewards() {
               {groups.isLoading && <p className="text-xs text-muted-foreground">{t("adminRewards.loadingGroups")}</p>}
               {originalGroupId && !identityGroupId && <p className="text-xs text-amber-400">{t("adminRewards.makeGeneralWarning")}</p>}
             </div>
+            {identityGroupId && (
+              <div className="space-y-3 rounded-sm border border-cyan-400/20 bg-cyan-400/5 p-3">
+                <div>
+                  <Label>{t("adminRewards.skillRequirements")}</Label>
+                  <p className="mt-1 text-xs text-muted-foreground">{t("adminRewards.skillRequirementsHint")}</p>
+                </div>
+                {!selectedGroup ? (
+                  <p className="text-xs text-amber-400">{t("adminRewards.groupPlansUnavailable")}</p>
+                ) : selectedGroup.skillPlans.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">{t("adminRewards.noGroupSkillPlans")}</p>
+                ) : (
+                  <div className="space-y-2">
+                    {selectedGroup.skillPlans.map((plan) => {
+                      const selected = selectedSkillPlanIds.includes(plan.id);
+                      return (
+                        <label key={plan.id} className="flex cursor-pointer items-start gap-2 rounded-sm border border-border/40 bg-background/30 p-2 text-xs">
+                          <input
+                            type="checkbox"
+                            className="mt-0.5"
+                            checked={selected}
+                            onChange={(event) => setSelectedSkillPlanIds((current) => event.target.checked
+                              ? [...current, plan.id]
+                              : current.filter((id) => id !== plan.id))}
+                          />
+                          <span className="min-w-0">
+                            <span className="text-foreground">{plan.name}</span>
+                            <span className="ml-2 text-muted-foreground">{t("adminRewards.skillCount", { count: plan.requiredSkills.length })}</span>
+                            {!plan.isActive && <span className="ml-2 text-amber-400">{t("adminRewards.inactivePlan")}</span>}
+                            {plan.description && <span className="mt-1 block text-muted-foreground">{plan.description}</span>}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+                {selectedSkillPlanIds.length > 1 && (
+                  <div className="space-y-1">
+                    <Label htmlFor="rewardSkillMatchMode" className="text-xs">{t("adminRewards.matchMode")}</Label>
+                    <select
+                      id="rewardSkillMatchMode"
+                      className="h-9 w-full rounded-sm border border-input bg-background px-3 text-xs"
+                      value={skillPlanMatchMode}
+                      onChange={(event) => setSkillPlanMatchMode(event.target.value as "all" | "any")}
+                    >
+                      <option value="all">{t("adminRewards.matchAll")}</option>
+                      <option value="any">{t("adminRewards.matchAny")}</option>
+                    </select>
+                  </div>
+                )}
+                {selectedSkillPlanIds.length === 0 && <p className="text-xs text-muted-foreground">{t("adminRewards.noSkillGate")}</p>}
+              </div>
+            )}
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="name" className="text-right text-xs tracking-widest">{t("adminRewards.name")}</Label>
               <Input

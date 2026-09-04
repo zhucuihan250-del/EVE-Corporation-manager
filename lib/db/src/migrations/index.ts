@@ -23,6 +23,7 @@ import { papMarketMigration } from "./0021-pap-market";
 import { fixedActivityPapDeductionMigration } from "./0022-fixed-activity-pap-deduction";
 import { reimbursementFixedNpcCargoMigration } from "./0023-reimbursement-fixed-npc-cargo";
 import { tacticalGroupRewardsMigration } from "./0024-tactical-group-rewards";
+import { tacticalRewardSkillPlansMigration } from "./0025-tactical-reward-skill-plans";
 
 type Migration = {
   id: string;
@@ -54,6 +55,7 @@ const migrations: Migration[] = [
   fixedActivityPapDeductionMigration,
   reimbursementFixedNpcCargoMigration,
   tacticalGroupRewardsMigration,
+  tacticalRewardSkillPlansMigration,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {

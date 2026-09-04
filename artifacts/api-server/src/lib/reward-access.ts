@@ -1,5 +1,12 @@
-import { identityGroupMembershipsTable, identityGroupsTable, rewardsTable } from "@workspace/db/schema";
-import { and, eq, isNull, or, sql } from "drizzle-orm";
+import {
+  corporationSkillPlansTable,
+  identityGroupMembershipsTable,
+  identityGroupSkillPlansTable,
+  identityGroupsTable,
+  rewardSkillPlansTable,
+  rewardsTable,
+} from "@workspace/db/schema";
+import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import type { db } from "@workspace/db";
 
 type RewardTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -13,6 +20,62 @@ export async function lockRewardMembership(tx: RewardTransaction, corporationId:
     .where(activeRewardGroupConditions(corporationId, groupId))
     .for("share");
   return Boolean(membership);
+}
+
+export async function validateRewardSkillPlanTargets(
+  tx: RewardTransaction,
+  corporationId: number,
+  groupId: number | null,
+  skillPlanIds: number[],
+): Promise<void> {
+  if (skillPlanIds.length === 0) return;
+  if (groupId === null) {
+    throw new RewardScopeError("只有行动组专属兑换物品可以设置技能方案");
+  }
+  const rows = await tx
+    .select({ id: identityGroupSkillPlansTable.skillPlanId })
+    .from(identityGroupSkillPlansTable)
+    .innerJoin(identityGroupsTable, and(
+      eq(identityGroupsTable.corporationId, identityGroupSkillPlansTable.corporationId),
+      eq(identityGroupsTable.id, identityGroupSkillPlansTable.groupId),
+      eq(identityGroupsTable.category, "combat"),
+      eq(identityGroupsTable.isActive, true),
+    ))
+    .innerJoin(corporationSkillPlansTable, and(
+      eq(corporationSkillPlansTable.corporationId, identityGroupSkillPlansTable.corporationId),
+      eq(corporationSkillPlansTable.id, identityGroupSkillPlansTable.skillPlanId),
+      eq(corporationSkillPlansTable.isActive, true),
+    ))
+    .where(and(
+      eq(identityGroupSkillPlansTable.corporationId, corporationId),
+      eq(identityGroupSkillPlansTable.groupId, groupId),
+      inArray(identityGroupSkillPlansTable.skillPlanId, skillPlanIds),
+    ))
+    .for("share");
+  if (rows.length !== skillPlanIds.length) {
+    throw new RewardScopeError("技能要求只能选择该行动组内已启用的技能方案");
+  }
+}
+
+export async function replaceRewardSkillPlans(
+  tx: RewardTransaction,
+  corporationId: number,
+  rewardId: number,
+  groupId: number | null,
+  skillPlanIds: number[],
+): Promise<void> {
+  await tx.delete(rewardSkillPlansTable).where(and(
+    eq(rewardSkillPlansTable.corporationId, corporationId),
+    eq(rewardSkillPlansTable.rewardId, rewardId),
+  ));
+  if (groupId !== null && skillPlanIds.length > 0) {
+    await tx.insert(rewardSkillPlansTable).values(skillPlanIds.map((skillPlanId) => ({
+      corporationId,
+      rewardId,
+      identityGroupId: groupId,
+      skillPlanId,
+    })));
+  }
 }
 
 export async function validateRewardGroupTarget(

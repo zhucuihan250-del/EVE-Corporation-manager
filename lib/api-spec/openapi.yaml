@@ -844,6 +844,31 @@ paths:
         "404":
           description: Reward not found
 
+  /rewards/{id}/skill-eligibility:
+    post:
+      operationId: checkRewardSkillEligibility
+      tags: [rewards]
+      summary: Audit the current tactical group member against this reward's skill plans
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Current skill eligibility result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillAuditResult"
+        "404":
+          description: Reward is not visible to this member
+        "409":
+          description: Character authorization or reward skill plan state needs attention
+        "503":
+          description: EVE skill service is temporarily unavailable
+
   /redemptions:
     get:
       operationId: listRedemptions
@@ -3595,6 +3620,13 @@ components:
         maxRedemptionsPerUser:
           type: ["integer", "null"]
           minimum: 1
+        skillPlanMatchMode:
+          type: string
+          enum: [all, any]
+        requiredSkillPlans:
+          type: array
+          items:
+            $ref: "#/components/schemas/RewardSkillPlanSummary"
         userRedemptionCount:
           type: ["integer", "null"]
           minimum: 0
@@ -3619,8 +3651,20 @@ components:
         - papCost
         - eligibilityMonths
         - maxRedemptionsPerUser
+        - skillPlanMatchMode
+        - requiredSkillPlans
         - isAvailable
         - createdAt
+
+    RewardSkillPlanSummary:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        description: { type: string }
+        requiredSkillCount: { type: integer, minimum: 0 }
+        isActive: { type: boolean }
+      required: [id, name, description, requiredSkillCount, isActive]
 
     CreateRewardBody:
       type: object
@@ -3643,6 +3687,15 @@ components:
         maxRedemptionsPerUser:
           type: ["integer", "null"]
           minimum: 1
+        skillPlanIds:
+          type: array
+          maxItems: 50
+          uniqueItems: true
+          items: { type: integer, minimum: 1 }
+          description: Active skill plans already attached to the selected tactical group.
+        skillPlanMatchMode:
+          type: string
+          enum: [all, any]
       required:
         - name
         - papCost
@@ -3668,6 +3721,15 @@ components:
         maxRedemptionsPerUser:
           type: ["integer", "null"]
           minimum: 1
+        skillPlanIds:
+          type: array
+          maxItems: 50
+          uniqueItems: true
+          items: { type: integer, minimum: 1 }
+          description: Replaces the reward's skill requirements. Only valid for a tactical group reward.
+        skillPlanMatchMode:
+          type: string
+          enum: [all, any]
         isAvailable:
           type: boolean
 

@@ -8,7 +8,17 @@ import { papRecordsTable } from "@workspace/db";
 import { addCalendarMonths, ensureCorporationJoinedAt } from "../lib/corporation-membership";
 import { availablePap, canonicalPapBalance, setPapBalance } from "../lib/pap-balance";
 import { writePapLedger } from "../lib/pap-ledger";
-import { lockRewardMembership, rewardMemberVisibility } from "../lib/reward-access";
+import {
+  rewardMemberVisibility,
+} from "../lib/reward-access";
+import {
+  assertRewardSkillGateUnchanged,
+  auditRewardSkillGate,
+  loadRewardSkillGate,
+  RewardSkillGateError,
+  type RewardSkillGate,
+} from "../lib/reward-skill-gate";
+import { SkillAuditError } from "../lib/identity-skills";
 
 const router: IRouter = Router();
 router.use("/redemptions", requireAuth, requireTenant, requireModule("pap"));
@@ -22,6 +32,32 @@ class RedemptionRequestError extends Error {
     super(message);
     this.name = "RedemptionRequestError";
   }
+}
+
+function rewardSkillRequestError(error: unknown): RedemptionRequestError | null {
+  if (error instanceof RewardSkillGateError) {
+    return new RedemptionRequestError(error.status, error.message, error.code);
+  }
+  if (error instanceof SkillAuditError) {
+    if (error.code === "SKILL_AUTHORIZATION_REQUIRED") {
+      return new RedemptionRequestError(
+        409,
+        "用于该行动组的角色需要重新进行 EVE 授权后才能兑换",
+        error.code,
+      );
+    }
+    if (error.code === "CHARACTER_NOT_FOUND") {
+      return new RedemptionRequestError(
+        409,
+        "无法确认用于该行动组的角色，请先重新登录并绑定角色",
+        "REWARD_SKILL_CHARACTER_UNAVAILABLE",
+      );
+    }
+    if (error.code === "ESI_SKILLS_UNAVAILABLE") {
+      return new RedemptionRequestError(503, "EVE 技能服务暂时不可用，请稍后重试", error.code);
+    }
+  }
+  return null;
 }
 
 function formatRedemption(r: {
@@ -106,6 +142,30 @@ router.post("/redemptions", requireAuth, async (req: Request, res: Response): Pr
     return;
   }
 
+  let skillGate: RewardSkillGate;
+  try {
+    skillGate = await loadRewardSkillGate(req.tenant!.corporation.id, user.id, reward);
+    const audit = await auditRewardSkillGate(skillGate, user.id, req.tenant!.corporation.id);
+    if (!audit.passed) {
+      throw new RedemptionRequestError(
+        403,
+        "尚未达到该兑换物品要求的技能方案",
+        "REWARD_SKILL_REQUIREMENTS_NOT_MET",
+      );
+    }
+  } catch (error) {
+    const requestError = rewardSkillRequestError(error);
+    if (requestError) {
+      res.status(requestError.status).json({ error: requestError.message, code: requestError.code });
+      return;
+    }
+    if (error instanceof RedemptionRequestError) {
+      res.status(error.status).json({ error: error.message, code: error.code });
+      return;
+    }
+    throw error;
+  }
+
   let corporationJoinedAt = user.corporationJoinedAt;
   if (reward.eligibilityMonths !== null && !corporationJoinedAt) {
     corporationJoinedAt = await ensureCorporationJoinedAt(user);
@@ -134,10 +194,14 @@ router.post("/redemptions", requireAuth, async (req: Request, res: Response): Pr
       }
 
       if (currentReward.identityGroupId !== null) {
-        // Lock current membership and group until commit so removal/deactivation cannot race PAP deduction.
-        if (!await lockRewardMembership(tx, req.tenant!.corporation.id, user.id, currentReward.identityGroupId)) {
-          throw new RedemptionRequestError(404, "Reward not found");
-        }
+        // Re-lock membership and plan rows so neither group access nor audited requirements can race PAP deduction.
+        await assertRewardSkillGateUnchanged(
+          tx,
+          req.tenant!.corporation.id,
+          user.id,
+          currentReward,
+          skillGate,
+        );
       }
 
       const [currentUser] = await tx
@@ -265,6 +329,11 @@ router.post("/redemptions", requireAuth, async (req: Request, res: Response): Pr
 
     res.status(201).json(result);
   } catch (error) {
+    const skillError = rewardSkillRequestError(error);
+    if (skillError) {
+      res.status(skillError.status).json({ error: skillError.message, code: skillError.code });
+      return;
+    }
     if (error instanceof RedemptionRequestError) {
       res.status(error.status).json({
         error: error.message,

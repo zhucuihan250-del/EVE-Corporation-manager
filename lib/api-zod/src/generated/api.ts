@@ -1826,6 +1826,8 @@ export const ListRewardsQueryParams = zod.object({
     ),
 });
 
+export const listRewardsResponseRequiredSkillPlansItemRequiredSkillCountMin = 0;
+
 export const listRewardsResponseUserRedemptionCountMin = 0;
 
 export const listRewardsResponseRemainingRedemptionsMin = 0;
@@ -1845,6 +1847,18 @@ export const ListRewardsResponseItem = zod.object({
   stock: zod.number().nullish(),
   eligibilityMonths: zod.number().min(1).nullable(),
   maxRedemptionsPerUser: zod.number().min(1).nullable(),
+  skillPlanMatchMode: zod.enum(["all", "any"]),
+  requiredSkillPlans: zod.array(
+    zod.object({
+      id: zod.number(),
+      name: zod.string(),
+      description: zod.string(),
+      requiredSkillCount: zod
+        .number()
+        .min(listRewardsResponseRequiredSkillPlansItemRequiredSkillCountMin),
+      isActive: zod.boolean(),
+    }),
+  ),
   userRedemptionCount: zod
     .number()
     .min(listRewardsResponseUserRedemptionCountMin)
@@ -1865,6 +1879,8 @@ export const ListRewardsResponse = zod.array(ListRewardsResponseItem);
  * @summary Create a new reward (admin only)
  */
 
+export const createRewardBodySkillPlanIdsMax = 50;
+
 export const CreateRewardBody = zod.object({
   identityGroupId: zod
     .number()
@@ -1879,6 +1895,14 @@ export const CreateRewardBody = zod.object({
   stock: zod.number().nullish(),
   eligibilityMonths: zod.number().min(1).nullish(),
   maxRedemptionsPerUser: zod.number().min(1).nullish(),
+  skillPlanIds: zod
+    .array(zod.number().min(1))
+    .max(createRewardBodySkillPlanIdsMax)
+    .optional()
+    .describe(
+      "Active skill plans already attached to the selected tactical group.",
+    ),
+  skillPlanMatchMode: zod.enum(["all", "any"]).optional(),
 });
 
 /**
@@ -1887,6 +1911,8 @@ export const CreateRewardBody = zod.object({
 export const UpdateRewardParams = zod.object({
   id: zod.coerce.number(),
 });
+
+export const updateRewardBodySkillPlanIdsMax = 50;
 
 export const UpdateRewardBody = zod.object({
   identityGroupId: zod
@@ -1902,8 +1928,18 @@ export const UpdateRewardBody = zod.object({
   stock: zod.number().nullish(),
   eligibilityMonths: zod.number().min(1).nullish(),
   maxRedemptionsPerUser: zod.number().min(1).nullish(),
+  skillPlanIds: zod
+    .array(zod.number().min(1))
+    .max(updateRewardBodySkillPlanIdsMax)
+    .optional()
+    .describe(
+      "Replaces the reward's skill requirements. Only valid for a tactical group reward.",
+    ),
+  skillPlanMatchMode: zod.enum(["all", "any"]).optional(),
   isAvailable: zod.boolean().optional(),
 });
+
+export const updateRewardResponseRequiredSkillPlansItemRequiredSkillCountMin = 0;
 
 export const updateRewardResponseUserRedemptionCountMin = 0;
 
@@ -1924,6 +1960,18 @@ export const UpdateRewardResponse = zod.object({
   stock: zod.number().nullish(),
   eligibilityMonths: zod.number().min(1).nullable(),
   maxRedemptionsPerUser: zod.number().min(1).nullable(),
+  skillPlanMatchMode: zod.enum(["all", "any"]),
+  requiredSkillPlans: zod.array(
+    zod.object({
+      id: zod.number(),
+      name: zod.string(),
+      description: zod.string(),
+      requiredSkillCount: zod
+        .number()
+        .min(updateRewardResponseRequiredSkillPlansItemRequiredSkillCountMin),
+      isActive: zod.boolean(),
+    }),
+  ),
   userRedemptionCount: zod
     .number()
     .min(updateRewardResponseUserRedemptionCountMin)
@@ -1944,6 +1992,68 @@ export const UpdateRewardResponse = zod.object({
  */
 export const DeleteRewardParams = zod.object({
   id: zod.coerce.number(),
+});
+
+/**
+ * @summary Audit the current tactical group member against this reward's skill plans
+ */
+export const CheckRewardSkillEligibilityParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const checkRewardSkillEligibilityResponseSkillsItemOneLevelMax = 5;
+
+export const checkRewardSkillEligibilityResponsePlansItemSkillsItemOneLevelMax = 5;
+
+export const CheckRewardSkillEligibilityResponse = zod.object({
+  checkedAt: zod.coerce.date(),
+  passed: zod.boolean(),
+  skills: zod.array(
+    zod
+      .object({
+        skillId: zod.number(),
+        name: zod.string(),
+        level: zod
+          .number()
+          .min(1)
+          .max(checkRewardSkillEligibilityResponseSkillsItemOneLevelMax),
+      })
+      .and(
+        zod.object({
+          trainedLevel: zod.number(),
+          passed: zod.boolean(),
+        }),
+      ),
+  ),
+  matchMode: zod.enum(["all", "any"]).optional(),
+  plans: zod
+    .array(
+      zod.object({
+        planId: zod.number().nullable(),
+        name: zod.string(),
+        passed: zod.boolean(),
+        skills: zod.array(
+          zod
+            .object({
+              skillId: zod.number(),
+              name: zod.string(),
+              level: zod
+                .number()
+                .min(1)
+                .max(
+                  checkRewardSkillEligibilityResponsePlansItemSkillsItemOneLevelMax,
+                ),
+            })
+            .and(
+              zod.object({
+                trainedLevel: zod.number(),
+                passed: zod.boolean(),
+              }),
+            ),
+        ),
+      }),
+    )
+    .optional(),
 });
 
 /**

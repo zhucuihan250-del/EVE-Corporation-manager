@@ -5,6 +5,8 @@
  * EVE Online PAP Tracking System API
  * OpenAPI spec version: 0.1.0
  */
+import type { RewardSkillPlanMatchMode } from "./rewardSkillPlanMatchMode";
+import type { RewardSkillPlanSummary } from "./rewardSkillPlanSummary";
 
 export interface Reward {
   id: number;
@@ -31,6 +33,8 @@ export interface Reward {
    * @nullable
    */
   maxRedemptionsPerUser: number | null;
+  skillPlanMatchMode: RewardSkillPlanMatchMode;
+  requiredSkillPlans: RewardSkillPlanSummary[];
   /**
    * @minimum 0
    * @nullable

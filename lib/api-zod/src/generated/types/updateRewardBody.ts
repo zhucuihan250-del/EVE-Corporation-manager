@@ -5,6 +5,7 @@
  * EVE Online PAP Tracking System API
  * OpenAPI spec version: 0.1.0
  */
+import type { UpdateRewardBodySkillPlanMatchMode } from "./updateRewardBodySkillPlanMatchMode";
 
 export interface UpdateRewardBody {
   /**
@@ -29,5 +30,11 @@ export interface UpdateRewardBody {
    * @nullable
    */
   maxRedemptionsPerUser?: number | null;
+  /**
+   * Replaces the reward's skill requirements. Only valid for a tactical group reward.
+   * @maxItems 50
+   */
+  skillPlanIds?: number[];
+  skillPlanMatchMode?: UpdateRewardBodySkillPlanMatchMode;
   isAvailable?: boolean;
 }

@@ -96,6 +96,7 @@ import type {
   SearchFittingCatalogParams,
   SetIdentityGroupApplicationWindow200,
   SetIdentityGroupApplicationWindowBody,
+  SkillAuditResult,
   SuccessResponse,
   SyncCorporationWallet200,
   TacticalGroupDashboard,
@@ -3341,6 +3342,90 @@ export const useDeleteReward = <
   TContext
 > => {
   return useMutation(getDeleteRewardMutationOptions(options));
+};
+
+/**
+ * @summary Audit the current tactical group member against this reward's skill plans
+ */
+export const getCheckRewardSkillEligibilityUrl = (id: number) => {
+  return `/api/rewards/${id}/skill-eligibility`;
+};
+
+export const checkRewardSkillEligibility = async (
+  id: number,
+  options?: RequestInit,
+): Promise<SkillAuditResult> => {
+  return customFetch<SkillAuditResult>(getCheckRewardSkillEligibilityUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getCheckRewardSkillEligibilityMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof checkRewardSkillEligibility>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof checkRewardSkillEligibility>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["checkRewardSkillEligibility"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof checkRewardSkillEligibility>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return checkRewardSkillEligibility(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CheckRewardSkillEligibilityMutationResult = NonNullable<
+  Awaited<ReturnType<typeof checkRewardSkillEligibility>>
+>;
+
+export type CheckRewardSkillEligibilityMutationError = ErrorType<void>;
+
+/**
+ * @summary Audit the current tactical group member against this reward's skill plans
+ */
+export const useCheckRewardSkillEligibility = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof checkRewardSkillEligibility>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof checkRewardSkillEligibility>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getCheckRewardSkillEligibilityMutationOptions(options));
 };
 
 /**

@@ -8,12 +8,13 @@ import {
   identityGroupMembershipsTable,
   identityGroupSkillPlansTable,
   identityGroupsTable,
+  rewardSkillPlansTable,
   rewardsTable,
   usersTable,
   type CorporationSkillPlan,
   type RequiredSkill,
 } from "@workspace/db";
-import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, notInArray, sql } from "drizzle-orm";
 import { hasRole, requireAuth } from "../middlewares/auth";
 import { auditCharacterSkills, SkillAuditError } from "../lib/identity-skills";
 import { importSkillPlanText, SkillPlanImportError } from "../lib/skill-plan-import";
@@ -404,7 +405,37 @@ router.patch("/identity-groups/:id", async (req: Request, res: Response): Promis
   if (skillPlanMatchMode !== undefined) updates.skillPlanMatchMode = skillPlanMatchMode;
   if (typeof req.body.applicationOpen === "boolean") updates.applicationOpen = req.body.applicationOpen;
   if (typeof req.body.isActive === "boolean") updates.isActive = req.body.isActive;
-  const group = await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
+    if (skillPlanIds !== undefined) {
+      await tx
+        .select({ id: identityGroupSkillPlansTable.id })
+        .from(identityGroupSkillPlansTable)
+        .where(and(
+          eq(identityGroupSkillPlansTable.corporationId, tenant.corporation.id),
+          eq(identityGroupSkillPlansTable.groupId, id),
+        ))
+        .for("update");
+      const removedPlanUse = await tx
+        .select({ rewardName: rewardsTable.name })
+        .from(rewardSkillPlansTable)
+        .innerJoin(rewardsTable, and(
+          eq(rewardsTable.corporationId, rewardSkillPlansTable.corporationId),
+          eq(rewardsTable.id, rewardSkillPlansTable.rewardId),
+        ))
+        .where(and(
+          eq(rewardSkillPlansTable.corporationId, tenant.corporation.id),
+          eq(rewardSkillPlansTable.identityGroupId, id),
+          ...(skillPlanIds.length > 0
+            ? [notInArray(rewardSkillPlansTable.skillPlanId, skillPlanIds)]
+            : []),
+        ));
+      if (removedPlanUse.length > 0) {
+        return {
+          kind: "skill_plan_in_use" as const,
+          rewardNames: [...new Set(removedPlanUse.map((row) => row.rewardName))],
+        };
+      }
+    }
     let updated = existing;
     if (Object.keys(updates).length) {
       [updated] = await tx.update(identityGroupsTable).set(updates).where(and(
@@ -425,8 +456,17 @@ router.patch("/identity-groups/:id", async (req: Request, res: Response): Promis
         })));
       }
     }
-    return updated;
+    return { kind: "updated" as const, group: updated };
   });
+  if (result.kind === "skill_plan_in_use") {
+    res.status(409).json({
+      error: `以下兑换物品仍在使用将被移除的技能方案：${result.rewardNames.join("、")}。请先编辑兑换物品。`,
+      code: "SKILL_PLAN_USED_BY_REWARD",
+      rewardNames: result.rewardNames,
+    });
+    return;
+  }
+  const group = result.group;
   const responsePlans = skillPlans ?? (await getSkillPlansByGroup(tenant.corporation.id, [id])).get(id) ?? [];
   res.json({ ...group, skillPlans: responsePlans, isMember: false, latestApplication: null });
 });

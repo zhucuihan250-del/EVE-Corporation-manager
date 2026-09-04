@@ -5,6 +5,7 @@
  * EVE Online PAP Tracking System API
  * OpenAPI spec version: 0.1.0
  */
+import type { CreateRewardBodySkillPlanMatchMode } from "./createRewardBodySkillPlanMatchMode";
 
 export interface CreateRewardBody {
   /**
@@ -29,4 +30,10 @@ export interface CreateRewardBody {
    * @nullable
    */
   maxRedemptionsPerUser?: number | null;
+  /**
+   * Active skill plans already attached to the selected tactical group.
+   * @maxItems 50
+   */
+  skillPlanIds?: number[];
+  skillPlanMatchMode?: CreateRewardBodySkillPlanMatchMode;
 }

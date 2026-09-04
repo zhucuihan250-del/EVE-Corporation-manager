@@ -1091,6 +1091,23 @@ export interface CreateManualPapBody {
   reason: string;
 }
 
+export type RewardSkillPlanMatchMode =
+  (typeof RewardSkillPlanMatchMode)[keyof typeof RewardSkillPlanMatchMode];
+
+export const RewardSkillPlanMatchMode = {
+  all: "all",
+  any: "any",
+} as const;
+
+export interface RewardSkillPlanSummary {
+  id: number;
+  name: string;
+  description: string;
+  /** @minimum 0 */
+  requiredSkillCount: number;
+  isActive: boolean;
+}
+
 export interface Reward {
   id: number;
   /**
@@ -1116,6 +1133,8 @@ export interface Reward {
    * @nullable
    */
   maxRedemptionsPerUser: number | null;
+  skillPlanMatchMode: RewardSkillPlanMatchMode;
+  requiredSkillPlans: RewardSkillPlanSummary[];
   /**
    * @minimum 0
    * @nullable
@@ -1134,6 +1153,14 @@ export interface Reward {
   isAvailable: boolean;
   createdAt: string;
 }
+
+export type CreateRewardBodySkillPlanMatchMode =
+  (typeof CreateRewardBodySkillPlanMatchMode)[keyof typeof CreateRewardBodySkillPlanMatchMode];
+
+export const CreateRewardBodySkillPlanMatchMode = {
+  all: "all",
+  any: "any",
+} as const;
 
 export interface CreateRewardBody {
   /**
@@ -1158,7 +1185,21 @@ export interface CreateRewardBody {
    * @nullable
    */
   maxRedemptionsPerUser?: number | null;
+  /**
+   * Active skill plans already attached to the selected tactical group.
+   * @maxItems 50
+   */
+  skillPlanIds?: number[];
+  skillPlanMatchMode?: CreateRewardBodySkillPlanMatchMode;
 }
+
+export type UpdateRewardBodySkillPlanMatchMode =
+  (typeof UpdateRewardBodySkillPlanMatchMode)[keyof typeof UpdateRewardBodySkillPlanMatchMode];
+
+export const UpdateRewardBodySkillPlanMatchMode = {
+  all: "all",
+  any: "any",
+} as const;
 
 export interface UpdateRewardBody {
   /**
@@ -1183,6 +1224,12 @@ export interface UpdateRewardBody {
    * @nullable
    */
   maxRedemptionsPerUser?: number | null;
+  /**
+   * Replaces the reward's skill requirements. Only valid for a tactical group reward.
+   * @maxItems 50
+   */
+  skillPlanIds?: number[];
+  skillPlanMatchMode?: UpdateRewardBodySkillPlanMatchMode;
   isAvailable?: boolean;
 }
 

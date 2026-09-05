@@ -7,6 +7,7 @@ import {
   settleDueActivityMonths,
 } from "./lib/activity-monthly-settlement";
 import { resumeRecentBattleReportGeneration } from "./lib/battle-reports";
+import { startSystemMonitoringJobs } from "./lib/system-monitoring-jobs";
 
 const rawPort = process.env["PORT"];
 
@@ -96,6 +97,7 @@ prepareDatabase()
         void runActivitySettlementSweep();
       }, ACTIVITY_SETTLEMENT_SWEEP_INTERVAL_MS);
       activitySettlementSweep.unref();
+      startSystemMonitoringJobs();
     });
   })
   .catch((err) => {

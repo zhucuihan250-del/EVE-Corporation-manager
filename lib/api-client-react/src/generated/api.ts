@@ -48,7 +48,9 @@ import type {
   CreateCourierRouteBody,
   CreateDiplomacyCaseBody,
   CreateFleetBody,
+  CreateManualIntelReportBody,
   CreateManualPapBody,
+  CreateMonitoredSystemBody,
   CreateMyCourierRouteBody,
   CreatePapMarketOrderBody,
   CreateRedemptionBody,
@@ -67,6 +69,7 @@ import type {
   Fleet,
   GetActivityReportParams,
   HealthStatus,
+  HeartbeatIntelBridgeBody,
   IdentityApplication,
   IdentityGroup,
   IdentityGroupInput,
@@ -74,10 +77,18 @@ import type {
   IdentityGroupMemberSkillPlans,
   IdentitySkillPlanImportInput,
   IdentitySkillPlanImportResult,
+  IntelBridge,
+  IntelBridgeConfig,
+  IntelBridgeEventBatch,
+  IntelBridgeIngestionResult,
+  IntelBridgePairing,
   ListIdentityApplicationsParams,
   ListIdentityGroupsParams,
   ListReimbursementLossesParams,
   ListRewardsParams,
+  MonitoredSystem,
+  PairIntelBridgeBody,
+  PairIntelBridgeResponse,
   PapMarketAdminOverview,
   PapMarketOrder,
   PapMarketOverview,
@@ -99,6 +110,8 @@ import type {
   SkillAuditResult,
   SuccessResponse,
   SyncCorporationWallet200,
+  SystemIntelEvent,
+  SystemMonitoringDashboard,
   TacticalGroupDashboard,
   TakePapMarketOrderBody,
   TopContributor,
@@ -107,6 +120,8 @@ import type {
   UpdateCourierOrderBody,
   UpdateDiplomacyCaseBody,
   UpdateFleetBody,
+  UpdateIntelBridgeBody,
+  UpdateMonitoredSystemBody,
   UpdateRedemptionBody,
   UpdateReimbursementBody,
   UpdateReimbursementWindowBody,
@@ -4370,6 +4385,1004 @@ export const useDeleteAnnouncement = <
   TContext
 > => {
   return useMutation(getDeleteAnnouncementMutationOptions(options));
+};
+
+/**
+ * @summary Get the active corporation's monitored systems and recent intelligence
+ */
+export const getGetSystemMonitoringDashboardUrl = () => {
+  return `/api/system-monitoring`;
+};
+
+export const getSystemMonitoringDashboard = async (
+  options?: RequestInit,
+): Promise<SystemMonitoringDashboard> => {
+  return customFetch<SystemMonitoringDashboard>(
+    getGetSystemMonitoringDashboardUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetSystemMonitoringDashboardQueryKey = () => {
+  return [`/api/system-monitoring`] as const;
+};
+
+export const getGetSystemMonitoringDashboardQueryOptions = <
+  TData = Awaited<ReturnType<typeof getSystemMonitoringDashboard>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getSystemMonitoringDashboard>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetSystemMonitoringDashboardQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getSystemMonitoringDashboard>>
+  > = ({ signal }) =>
+    getSystemMonitoringDashboard({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getSystemMonitoringDashboard>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetSystemMonitoringDashboardQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getSystemMonitoringDashboard>>
+>;
+export type GetSystemMonitoringDashboardQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get the active corporation's monitored systems and recent intelligence
+ */
+
+export function useGetSystemMonitoringDashboard<
+  TData = Awaited<ReturnType<typeof getSystemMonitoringDashboard>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getSystemMonitoringDashboard>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetSystemMonitoringDashboardQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Submit a named manual hostile report
+ */
+export const getCreateManualIntelReportUrl = () => {
+  return `/api/system-monitoring/reports`;
+};
+
+export const createManualIntelReport = async (
+  createManualIntelReportBody: CreateManualIntelReportBody,
+  options?: RequestInit,
+): Promise<SystemIntelEvent> => {
+  return customFetch<SystemIntelEvent>(getCreateManualIntelReportUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createManualIntelReportBody),
+  });
+};
+
+export const getCreateManualIntelReportMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createManualIntelReport>>,
+    TError,
+    { data: BodyType<CreateManualIntelReportBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createManualIntelReport>>,
+  TError,
+  { data: BodyType<CreateManualIntelReportBody> },
+  TContext
+> => {
+  const mutationKey = ["createManualIntelReport"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createManualIntelReport>>,
+    { data: BodyType<CreateManualIntelReportBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createManualIntelReport(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateManualIntelReportMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createManualIntelReport>>
+>;
+export type CreateManualIntelReportMutationBody =
+  BodyType<CreateManualIntelReportBody>;
+export type CreateManualIntelReportMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Submit a named manual hostile report
+ */
+export const useCreateManualIntelReport = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createManualIntelReport>>,
+    TError,
+    { data: BodyType<CreateManualIntelReportBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createManualIntelReport>>,
+  TError,
+  { data: BodyType<CreateManualIntelReportBody> },
+  TContext
+> => {
+  return useMutation(getCreateManualIntelReportMutationOptions(options));
+};
+
+/**
+ * @summary List monitored-system configuration for fleet managers
+ */
+export const getListMonitoredSystemsUrl = () => {
+  return `/api/system-monitoring/systems`;
+};
+
+export const listMonitoredSystems = async (
+  options?: RequestInit,
+): Promise<MonitoredSystem[]> => {
+  return customFetch<MonitoredSystem[]>(getListMonitoredSystemsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListMonitoredSystemsQueryKey = () => {
+  return [`/api/system-monitoring/systems`] as const;
+};
+
+export const getListMonitoredSystemsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listMonitoredSystems>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listMonitoredSystems>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListMonitoredSystemsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listMonitoredSystems>>
+  > = ({ signal }) => listMonitoredSystems({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listMonitoredSystems>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListMonitoredSystemsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listMonitoredSystems>>
+>;
+export type ListMonitoredSystemsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List monitored-system configuration for fleet managers
+ */
+
+export function useListMonitoredSystems<
+  TData = Awaited<ReturnType<typeof listMonitoredSystems>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listMonitoredSystems>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListMonitoredSystemsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Add or reactivate a monitored system
+ */
+export const getCreateMonitoredSystemUrl = () => {
+  return `/api/system-monitoring/systems`;
+};
+
+export const createMonitoredSystem = async (
+  createMonitoredSystemBody: CreateMonitoredSystemBody,
+  options?: RequestInit,
+): Promise<MonitoredSystem> => {
+  return customFetch<MonitoredSystem>(getCreateMonitoredSystemUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createMonitoredSystemBody),
+  });
+};
+
+export const getCreateMonitoredSystemMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createMonitoredSystem>>,
+    TError,
+    { data: BodyType<CreateMonitoredSystemBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createMonitoredSystem>>,
+  TError,
+  { data: BodyType<CreateMonitoredSystemBody> },
+  TContext
+> => {
+  const mutationKey = ["createMonitoredSystem"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createMonitoredSystem>>,
+    { data: BodyType<CreateMonitoredSystemBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createMonitoredSystem(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateMonitoredSystemMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createMonitoredSystem>>
+>;
+export type CreateMonitoredSystemMutationBody =
+  BodyType<CreateMonitoredSystemBody>;
+export type CreateMonitoredSystemMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Add or reactivate a monitored system
+ */
+export const useCreateMonitoredSystem = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createMonitoredSystem>>,
+    TError,
+    { data: BodyType<CreateMonitoredSystemBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createMonitoredSystem>>,
+  TError,
+  { data: BodyType<CreateMonitoredSystemBody> },
+  TContext
+> => {
+  return useMutation(getCreateMonitoredSystemMutationOptions(options));
+};
+
+/**
+ * @summary Update or disable a monitored system
+ */
+export const getUpdateMonitoredSystemUrl = (id: number) => {
+  return `/api/system-monitoring/systems/${id}`;
+};
+
+export const updateMonitoredSystem = async (
+  id: number,
+  updateMonitoredSystemBody: UpdateMonitoredSystemBody,
+  options?: RequestInit,
+): Promise<MonitoredSystem> => {
+  return customFetch<MonitoredSystem>(getUpdateMonitoredSystemUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateMonitoredSystemBody),
+  });
+};
+
+export const getUpdateMonitoredSystemMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateMonitoredSystem>>,
+    TError,
+    { id: number; data: BodyType<UpdateMonitoredSystemBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateMonitoredSystem>>,
+  TError,
+  { id: number; data: BodyType<UpdateMonitoredSystemBody> },
+  TContext
+> => {
+  const mutationKey = ["updateMonitoredSystem"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateMonitoredSystem>>,
+    { id: number; data: BodyType<UpdateMonitoredSystemBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateMonitoredSystem(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateMonitoredSystemMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateMonitoredSystem>>
+>;
+export type UpdateMonitoredSystemMutationBody =
+  BodyType<UpdateMonitoredSystemBody>;
+export type UpdateMonitoredSystemMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update or disable a monitored system
+ */
+export const useUpdateMonitoredSystem = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateMonitoredSystem>>,
+    TError,
+    { id: number; data: BodyType<UpdateMonitoredSystemBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateMonitoredSystem>>,
+  TError,
+  { id: number; data: BodyType<UpdateMonitoredSystemBody> },
+  TContext
+> => {
+  return useMutation(getUpdateMonitoredSystemMutationOptions(options));
+};
+
+/**
+ * @summary Create a one-time bridge pairing code
+ */
+export const getCreateIntelBridgePairingUrl = () => {
+  return `/api/system-monitoring/pairings`;
+};
+
+export const createIntelBridgePairing = async (
+  options?: RequestInit,
+): Promise<IntelBridgePairing> => {
+  return customFetch<IntelBridgePairing>(getCreateIntelBridgePairingUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getCreateIntelBridgePairingMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createIntelBridgePairing>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createIntelBridgePairing>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["createIntelBridgePairing"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createIntelBridgePairing>>,
+    void
+  > = () => {
+    return createIntelBridgePairing(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateIntelBridgePairingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createIntelBridgePairing>>
+>;
+
+export type CreateIntelBridgePairingMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create a one-time bridge pairing code
+ */
+export const useCreateIntelBridgePairing = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createIntelBridgePairing>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createIntelBridgePairing>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getCreateIntelBridgePairingMutationOptions(options));
+};
+
+/**
+ * @summary List the active corporation's bridge devices
+ */
+export const getListIntelBridgesUrl = () => {
+  return `/api/system-monitoring/bridges`;
+};
+
+export const listIntelBridges = async (
+  options?: RequestInit,
+): Promise<IntelBridge[]> => {
+  return customFetch<IntelBridge[]>(getListIntelBridgesUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListIntelBridgesQueryKey = () => {
+  return [`/api/system-monitoring/bridges`] as const;
+};
+
+export const getListIntelBridgesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listIntelBridges>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listIntelBridges>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListIntelBridgesQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listIntelBridges>>
+  > = ({ signal }) => listIntelBridges({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listIntelBridges>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListIntelBridgesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listIntelBridges>>
+>;
+export type ListIntelBridgesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List the active corporation's bridge devices
+ */
+
+export function useListIntelBridges<
+  TData = Awaited<ReturnType<typeof listIntelBridges>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listIntelBridges>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListIntelBridgesQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update channels or revoke a bridge device
+ */
+export const getUpdateIntelBridgeUrl = (id: number) => {
+  return `/api/system-monitoring/bridges/${id}`;
+};
+
+export const updateIntelBridge = async (
+  id: number,
+  updateIntelBridgeBody: UpdateIntelBridgeBody,
+  options?: RequestInit,
+): Promise<IntelBridge> => {
+  return customFetch<IntelBridge>(getUpdateIntelBridgeUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateIntelBridgeBody),
+  });
+};
+
+export const getUpdateIntelBridgeMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateIntelBridge>>,
+    TError,
+    { id: number; data: BodyType<UpdateIntelBridgeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateIntelBridge>>,
+  TError,
+  { id: number; data: BodyType<UpdateIntelBridgeBody> },
+  TContext
+> => {
+  const mutationKey = ["updateIntelBridge"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateIntelBridge>>,
+    { id: number; data: BodyType<UpdateIntelBridgeBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateIntelBridge(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateIntelBridgeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateIntelBridge>>
+>;
+export type UpdateIntelBridgeMutationBody = BodyType<UpdateIntelBridgeBody>;
+export type UpdateIntelBridgeMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update channels or revoke a bridge device
+ */
+export const useUpdateIntelBridge = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateIntelBridge>>,
+    TError,
+    { id: number; data: BodyType<UpdateIntelBridgeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateIntelBridge>>,
+  TError,
+  { id: number; data: BodyType<UpdateIntelBridgeBody> },
+  TContext
+> => {
+  return useMutation(getUpdateIntelBridgeMutationOptions(options));
+};
+
+/**
+ * @summary Pair a local bridge using a one-time code
+ */
+export const getPairIntelBridgeUrl = () => {
+  return `/api/system-monitoring/bridge/pair`;
+};
+
+export const pairIntelBridge = async (
+  pairIntelBridgeBody: PairIntelBridgeBody,
+  options?: RequestInit,
+): Promise<PairIntelBridgeResponse> => {
+  return customFetch<PairIntelBridgeResponse>(getPairIntelBridgeUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(pairIntelBridgeBody),
+  });
+};
+
+export const getPairIntelBridgeMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof pairIntelBridge>>,
+    TError,
+    { data: BodyType<PairIntelBridgeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof pairIntelBridge>>,
+  TError,
+  { data: BodyType<PairIntelBridgeBody> },
+  TContext
+> => {
+  const mutationKey = ["pairIntelBridge"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof pairIntelBridge>>,
+    { data: BodyType<PairIntelBridgeBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return pairIntelBridge(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PairIntelBridgeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof pairIntelBridge>>
+>;
+export type PairIntelBridgeMutationBody = BodyType<PairIntelBridgeBody>;
+export type PairIntelBridgeMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Pair a local bridge using a one-time code
+ */
+export const usePairIntelBridge = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof pairIntelBridge>>,
+    TError,
+    { data: BodyType<PairIntelBridgeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof pairIntelBridge>>,
+  TError,
+  { data: BodyType<PairIntelBridgeBody> },
+  TContext
+> => {
+  return useMutation(getPairIntelBridgeMutationOptions(options));
+};
+
+/**
+ * @summary Get chat-channel and monitored-system configuration using a bridge bearer token
+ */
+export const getGetIntelBridgeConfigUrl = () => {
+  return `/api/system-monitoring/bridge/config`;
+};
+
+export const getIntelBridgeConfig = async (
+  options?: RequestInit,
+): Promise<IntelBridgeConfig> => {
+  return customFetch<IntelBridgeConfig>(getGetIntelBridgeConfigUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetIntelBridgeConfigQueryKey = () => {
+  return [`/api/system-monitoring/bridge/config`] as const;
+};
+
+export const getGetIntelBridgeConfigQueryOptions = <
+  TData = Awaited<ReturnType<typeof getIntelBridgeConfig>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getIntelBridgeConfig>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetIntelBridgeConfigQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getIntelBridgeConfig>>
+  > = ({ signal }) => getIntelBridgeConfig({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getIntelBridgeConfig>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetIntelBridgeConfigQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getIntelBridgeConfig>>
+>;
+export type GetIntelBridgeConfigQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get chat-channel and monitored-system configuration using a bridge bearer token
+ */
+
+export function useGetIntelBridgeConfig<
+  TData = Awaited<ReturnType<typeof getIntelBridgeConfig>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getIntelBridgeConfig>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetIntelBridgeConfigQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update bridge health using a bridge bearer token
+ */
+export const getHeartbeatIntelBridgeUrl = () => {
+  return `/api/system-monitoring/bridge/heartbeat`;
+};
+
+export const heartbeatIntelBridge = async (
+  heartbeatIntelBridgeBody: HeartbeatIntelBridgeBody,
+  options?: RequestInit,
+): Promise<SuccessResponse> => {
+  return customFetch<SuccessResponse>(getHeartbeatIntelBridgeUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(heartbeatIntelBridgeBody),
+  });
+};
+
+export const getHeartbeatIntelBridgeMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof heartbeatIntelBridge>>,
+    TError,
+    { data: BodyType<HeartbeatIntelBridgeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof heartbeatIntelBridge>>,
+  TError,
+  { data: BodyType<HeartbeatIntelBridgeBody> },
+  TContext
+> => {
+  const mutationKey = ["heartbeatIntelBridge"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof heartbeatIntelBridge>>,
+    { data: BodyType<HeartbeatIntelBridgeBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return heartbeatIntelBridge(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type HeartbeatIntelBridgeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof heartbeatIntelBridge>>
+>;
+export type HeartbeatIntelBridgeMutationBody =
+  BodyType<HeartbeatIntelBridgeBody>;
+export type HeartbeatIntelBridgeMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update bridge health using a bridge bearer token
+ */
+export const useHeartbeatIntelBridge = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof heartbeatIntelBridge>>,
+    TError,
+    { data: BodyType<HeartbeatIntelBridgeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof heartbeatIntelBridge>>,
+  TError,
+  { data: BodyType<HeartbeatIntelBridgeBody> },
+  TContext
+> => {
+  return useMutation(getHeartbeatIntelBridgeMutationOptions(options));
+};
+
+/**
+ * @summary Submit locally filtered named chat events using a bridge bearer token
+ */
+export const getIngestIntelBridgeEventsUrl = () => {
+  return `/api/system-monitoring/bridge/events`;
+};
+
+export const ingestIntelBridgeEvents = async (
+  intelBridgeEventBatch: IntelBridgeEventBatch,
+  options?: RequestInit,
+): Promise<IntelBridgeIngestionResult> => {
+  return customFetch<IntelBridgeIngestionResult>(
+    getIngestIntelBridgeEventsUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(intelBridgeEventBatch),
+    },
+  );
+};
+
+export const getIngestIntelBridgeEventsMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof ingestIntelBridgeEvents>>,
+    TError,
+    { data: BodyType<IntelBridgeEventBatch> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof ingestIntelBridgeEvents>>,
+  TError,
+  { data: BodyType<IntelBridgeEventBatch> },
+  TContext
+> => {
+  const mutationKey = ["ingestIntelBridgeEvents"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof ingestIntelBridgeEvents>>,
+    { data: BodyType<IntelBridgeEventBatch> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return ingestIntelBridgeEvents(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type IngestIntelBridgeEventsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof ingestIntelBridgeEvents>>
+>;
+export type IngestIntelBridgeEventsMutationBody =
+  BodyType<IntelBridgeEventBatch>;
+export type IngestIntelBridgeEventsMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Submit locally filtered named chat events using a bridge bearer token
+ */
+export const useIngestIntelBridgeEvents = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof ingestIntelBridgeEvents>>,
+    TError,
+    { data: BodyType<IntelBridgeEventBatch> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof ingestIntelBridgeEvents>>,
+  TError,
+  { data: BodyType<IntelBridgeEventBatch> },
+  TContext
+> => {
+  return useMutation(getIngestIntelBridgeEventsMutationOptions(options));
 };
 
 export const getListIdentityGroupsUrl = (params?: ListIdentityGroupsParams) => {

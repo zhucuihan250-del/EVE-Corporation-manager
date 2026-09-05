@@ -2246,6 +2246,417 @@ export const DeleteAnnouncementParams = zod.object({
   id: zod.coerce.number(),
 });
 
+/**
+ * @summary Get the active corporation's monitored systems and recent intelligence
+ */
+export const GetSystemMonitoringDashboardResponse = zod.object({
+  generatedAt: zod.coerce.date(),
+  monitors: zod.array(
+    zod
+      .object({
+        id: zod.number(),
+        corporationId: zod.number(),
+        solarSystemId: zod.number(),
+        solarSystemName: zod.string(),
+        isActive: zod.boolean(),
+        burstWindowMinutes: zod.number(),
+        burstThreshold: zod.number(),
+        highValueThreshold: zod.number(),
+        activityMultiplier: zod.number(),
+        notes: zod.string().nullable(),
+        createdBy: zod.number().nullable(),
+        createdAt: zod.coerce.date(),
+        updatedAt: zod.coerce.date(),
+      })
+      .and(
+        zod.object({
+          risk: zod.enum(["safe", "info", "warning", "danger", "critical"]),
+          activeEventCount: zod.number(),
+          recentKillCount: zod.number(),
+          lastEventAt: zod.coerce.date().nullable(),
+          latestActivity: zod.union([
+            zod.object({
+              id: zod.number(),
+              corporationId: zod.number(),
+              monitorId: zod.number(),
+              solarSystemId: zod.number(),
+              sampledAt: zod.coerce.date(),
+              jumps: zod.number(),
+              shipKills: zod.number(),
+              podKills: zod.number(),
+              npcKills: zod.number(),
+              jumpBaseline: zod.number().nullable(),
+              killBaseline: zod.number().nullable(),
+              isAnomalous: zod.boolean(),
+              createdAt: zod.coerce.date(),
+            }),
+            zod.null(),
+          ]),
+        }),
+      ),
+  ),
+  events: zod.array(
+    zod.object({
+      id: zod.number(),
+      corporationId: zod.number(),
+      monitorId: zod.number(),
+      relayBridgeId: zod.number().nullable(),
+      reporterUserId: zod.number().nullable(),
+      reporterCharacterName: zod.string().nullable(),
+      source: zod.enum(["chat", "manual", "killmail", "activity"]),
+      eventType: zod.enum([
+        "hostile_report",
+        "player_kill",
+        "corporation_loss",
+        "kill_burst",
+        "special_ship",
+        "high_value",
+        "activity_spike",
+      ]),
+      severity: zod.enum(["info", "warning", "danger", "critical"]),
+      confidence: zod.enum(["unconfirmed", "reported", "confirmed"]),
+      solarSystemId: zod.number(),
+      solarSystemName: zod.string(),
+      summary: zod.string(),
+      rawMessage: zod.string().nullable(),
+      enemyCount: zod.number().nullable(),
+      shipTags: zod.array(zod.string()),
+      direction: zod.string().nullable(),
+      killmailId: zod.number().nullable(),
+      zkillboardUrl: zod.string().nullable(),
+      totalValue: zod.number().nullable(),
+      metadata: zod.record(zod.string(), zod.unknown()),
+      occurredAt: zod.coerce.date(),
+      receivedAt: zod.coerce.date(),
+      expiresAt: zod.coerce.date().nullable(),
+      dedupeKey: zod.string(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+  bridgeStatus: zod.object({
+    total: zod.number(),
+    online: zod.number(),
+  }),
+});
+
+/**
+ * @summary Submit a named manual hostile report
+ */
+export const createManualIntelReportBodyEnemyCountMin = 0;
+export const createManualIntelReportBodyEnemyCountMax = 1000;
+
+export const createManualIntelReportBodyShipTagsMax = 20;
+
+export const createManualIntelReportBodyDirectionMax = 120;
+
+export const createManualIntelReportBodyMessageMax = 2000;
+
+export const CreateManualIntelReportBody = zod.object({
+  monitorId: zod.number(),
+  enemyCount: zod
+    .number()
+    .min(createManualIntelReportBodyEnemyCountMin)
+    .max(createManualIntelReportBodyEnemyCountMax)
+    .nullish(),
+  shipTags: zod
+    .array(zod.string())
+    .max(createManualIntelReportBodyShipTagsMax)
+    .optional(),
+  direction: zod
+    .string()
+    .max(createManualIntelReportBodyDirectionMax)
+    .nullish(),
+  message: zod.string().min(1).max(createManualIntelReportBodyMessageMax),
+  ttlMinutes: zod.union([
+    zod.literal(5),
+    zod.literal(10),
+    zod.literal(20),
+    zod.literal(30),
+    zod.literal(60),
+  ]),
+});
+
+/**
+ * @summary List monitored-system configuration for fleet managers
+ */
+export const ListMonitoredSystemsResponseItem = zod.object({
+  id: zod.number(),
+  corporationId: zod.number(),
+  solarSystemId: zod.number(),
+  solarSystemName: zod.string(),
+  isActive: zod.boolean(),
+  burstWindowMinutes: zod.number(),
+  burstThreshold: zod.number(),
+  highValueThreshold: zod.number(),
+  activityMultiplier: zod.number(),
+  notes: zod.string().nullable(),
+  createdBy: zod.number().nullable(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListMonitoredSystemsResponse = zod.array(
+  ListMonitoredSystemsResponseItem,
+);
+
+/**
+ * @summary Add or reactivate a monitored system
+ */
+export const createMonitoredSystemBodySolarSystemNameMin = 2;
+export const createMonitoredSystemBodySolarSystemNameMax = 100;
+
+export const createMonitoredSystemBodyBurstWindowMinutesDefault = 10;
+export const createMonitoredSystemBodyBurstWindowMinutesMax = 60;
+
+export const createMonitoredSystemBodyBurstThresholdDefault = 3;
+export const createMonitoredSystemBodyBurstThresholdMin = 2;
+export const createMonitoredSystemBodyBurstThresholdMax = 50;
+
+export const createMonitoredSystemBodyHighValueThresholdDefault = 1000000000;
+export const createMonitoredSystemBodyHighValueThresholdMin = 0;
+export const createMonitoredSystemBodyHighValueThresholdMax = 1000000000000000;
+
+export const createMonitoredSystemBodyActivityMultiplierDefault = 1.5;
+export const createMonitoredSystemBodyActivityMultiplierMax = 20;
+
+export const createMonitoredSystemBodyNotesMax = 2000;
+
+export const CreateMonitoredSystemBody = zod.object({
+  solarSystemName: zod
+    .string()
+    .min(createMonitoredSystemBodySolarSystemNameMin)
+    .max(createMonitoredSystemBodySolarSystemNameMax),
+  burstWindowMinutes: zod
+    .number()
+    .min(1)
+    .max(createMonitoredSystemBodyBurstWindowMinutesMax)
+    .default(createMonitoredSystemBodyBurstWindowMinutesDefault),
+  burstThreshold: zod
+    .number()
+    .min(createMonitoredSystemBodyBurstThresholdMin)
+    .max(createMonitoredSystemBodyBurstThresholdMax)
+    .default(createMonitoredSystemBodyBurstThresholdDefault),
+  highValueThreshold: zod
+    .number()
+    .min(createMonitoredSystemBodyHighValueThresholdMin)
+    .max(createMonitoredSystemBodyHighValueThresholdMax)
+    .default(createMonitoredSystemBodyHighValueThresholdDefault),
+  activityMultiplier: zod
+    .number()
+    .min(1)
+    .max(createMonitoredSystemBodyActivityMultiplierMax)
+    .default(createMonitoredSystemBodyActivityMultiplierDefault),
+  notes: zod.string().max(createMonitoredSystemBodyNotesMax).nullish(),
+});
+
+/**
+ * @summary Update or disable a monitored system
+ */
+export const UpdateMonitoredSystemParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const updateMonitoredSystemBodyBurstWindowMinutesMax = 60;
+
+export const updateMonitoredSystemBodyBurstThresholdMin = 2;
+export const updateMonitoredSystemBodyBurstThresholdMax = 50;
+
+export const updateMonitoredSystemBodyHighValueThresholdMin = 0;
+export const updateMonitoredSystemBodyHighValueThresholdMax = 1000000000000000;
+
+export const updateMonitoredSystemBodyActivityMultiplierMax = 20;
+
+export const updateMonitoredSystemBodyNotesMax = 2000;
+
+export const UpdateMonitoredSystemBody = zod.object({
+  isActive: zod.boolean().optional(),
+  burstWindowMinutes: zod
+    .number()
+    .min(1)
+    .max(updateMonitoredSystemBodyBurstWindowMinutesMax)
+    .optional(),
+  burstThreshold: zod
+    .number()
+    .min(updateMonitoredSystemBodyBurstThresholdMin)
+    .max(updateMonitoredSystemBodyBurstThresholdMax)
+    .optional(),
+  highValueThreshold: zod
+    .number()
+    .min(updateMonitoredSystemBodyHighValueThresholdMin)
+    .max(updateMonitoredSystemBodyHighValueThresholdMax)
+    .optional(),
+  activityMultiplier: zod
+    .number()
+    .min(1)
+    .max(updateMonitoredSystemBodyActivityMultiplierMax)
+    .optional(),
+  notes: zod.string().max(updateMonitoredSystemBodyNotesMax).nullish(),
+});
+
+export const UpdateMonitoredSystemResponse = zod.object({
+  id: zod.number(),
+  corporationId: zod.number(),
+  solarSystemId: zod.number(),
+  solarSystemName: zod.string(),
+  isActive: zod.boolean(),
+  burstWindowMinutes: zod.number(),
+  burstThreshold: zod.number(),
+  highValueThreshold: zod.number(),
+  activityMultiplier: zod.number(),
+  notes: zod.string().nullable(),
+  createdBy: zod.number().nullable(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary List the active corporation's bridge devices
+ */
+export const ListIntelBridgesResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  devicePlatform: zod.string().nullable(),
+  channelNames: zod.array(zod.string()),
+  isActive: zod.boolean(),
+  lastSeenAt: zod.coerce.date().nullable(),
+  lastError: zod.string().nullable(),
+  createdAt: zod.coerce.date(),
+  ownerUserId: zod.number().nullable(),
+  ownerName: zod.string().nullable(),
+});
+export const ListIntelBridgesResponse = zod.array(ListIntelBridgesResponseItem);
+
+/**
+ * @summary Update channels or revoke a bridge device
+ */
+export const UpdateIntelBridgeParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const updateIntelBridgeBodyNameMax = 120;
+
+export const updateIntelBridgeBodyChannelNamesItemMax = 120;
+
+export const updateIntelBridgeBodyChannelNamesMax = 20;
+
+export const UpdateIntelBridgeBody = zod.object({
+  name: zod.string().min(1).max(updateIntelBridgeBodyNameMax).optional(),
+  channelNames: zod
+    .array(zod.string().min(1).max(updateIntelBridgeBodyChannelNamesItemMax))
+    .max(updateIntelBridgeBodyChannelNamesMax)
+    .optional(),
+  isActive: zod.boolean().optional(),
+});
+
+export const UpdateIntelBridgeResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  devicePlatform: zod.string().nullable(),
+  channelNames: zod.array(zod.string()),
+  isActive: zod.boolean(),
+  lastSeenAt: zod.coerce.date().nullable(),
+  lastError: zod.string().nullable(),
+  createdAt: zod.coerce.date(),
+  ownerUserId: zod.number().nullable(),
+  ownerName: zod.string().nullable(),
+});
+
+/**
+ * @summary Pair a local bridge using a one-time code
+ */
+export const pairIntelBridgeBodyCodeMin = 12;
+export const pairIntelBridgeBodyCodeMax = 64;
+
+export const pairIntelBridgeBodyNameMax = 120;
+
+export const pairIntelBridgeBodyPlatformMax = 120;
+
+export const pairIntelBridgeBodyChannelNamesItemMax = 120;
+
+export const pairIntelBridgeBodyChannelNamesMax = 20;
+
+export const PairIntelBridgeBody = zod.object({
+  code: zod
+    .string()
+    .min(pairIntelBridgeBodyCodeMin)
+    .max(pairIntelBridgeBodyCodeMax),
+  name: zod.string().min(1).max(pairIntelBridgeBodyNameMax),
+  platform: zod.string().max(pairIntelBridgeBodyPlatformMax).nullish(),
+  channelNames: zod
+    .array(zod.string().min(1).max(pairIntelBridgeBodyChannelNamesItemMax))
+    .max(pairIntelBridgeBodyChannelNamesMax)
+    .optional(),
+});
+
+/**
+ * @summary Get chat-channel and monitored-system configuration using a bridge bearer token
+ */
+export const GetIntelBridgeConfigResponse = zod.object({
+  bridgeId: zod.number(),
+  corporationId: zod.number(),
+  corporationName: zod.string(),
+  channelNames: zod.array(zod.string()),
+  monitoredSystems: zod.array(
+    zod.object({
+      id: zod.number(),
+      solarSystemId: zod.number(),
+      solarSystemName: zod.string(),
+    }),
+  ),
+});
+
+/**
+ * @summary Update bridge health using a bridge bearer token
+ */
+export const heartbeatIntelBridgeBodyLastErrorMax = 1000;
+
+export const HeartbeatIntelBridgeBody = zod.object({
+  lastError: zod.string().max(heartbeatIntelBridgeBodyLastErrorMax).nullish(),
+});
+
+export const HeartbeatIntelBridgeResponse = zod.object({
+  success: zod.boolean(),
+  message: zod.string().optional(),
+});
+
+/**
+ * @summary Submit locally filtered named chat events using a bridge bearer token
+ */
+export const ingestIntelBridgeEventsBodyEventsItemChannelNameMax = 120;
+
+export const ingestIntelBridgeEventsBodyEventsItemReporterCharacterNameMax = 120;
+
+export const ingestIntelBridgeEventsBodyEventsItemMessageMax = 2000;
+
+export const ingestIntelBridgeEventsBodyEventsMax = 100;
+
+export const IngestIntelBridgeEventsBody = zod.object({
+  events: zod
+    .array(
+      zod.object({
+        channelName: zod
+          .string()
+          .min(1)
+          .max(ingestIntelBridgeEventsBodyEventsItemChannelNameMax),
+        reporterCharacterName: zod
+          .string()
+          .min(1)
+          .max(ingestIntelBridgeEventsBodyEventsItemReporterCharacterNameMax),
+        message: zod
+          .string()
+          .min(1)
+          .max(ingestIntelBridgeEventsBodyEventsItemMessageMax),
+        occurredAt: zod.coerce.date(),
+      }),
+    )
+    .max(ingestIntelBridgeEventsBodyEventsMax),
+});
+
+export const IngestIntelBridgeEventsResponse = zod.object({
+  accepted: zod.number(),
+  duplicates: zod.number(),
+  ignored: zod.number(),
+});
+
 export const ListIdentityGroupsQueryParams = zod.object({
   includeInactive: zod.coerce.boolean().optional(),
 });

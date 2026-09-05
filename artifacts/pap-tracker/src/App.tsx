@@ -49,6 +49,7 @@ const TacticalDashboard = lazy(() => import("@/pages/tactical-dashboard").then((
 const ReimbursementSettings = lazy(() => import("@/pages/reimbursement-settings").then((module) => ({ default: module.ReimbursementSettings })));
 const Economy = lazy(() => import("@/pages/economy").then((module) => ({ default: module.Economy })));
 const Structures = lazy(() => import("@/pages/structures").then((module) => ({ default: module.Structures })));
+const SystemMonitoring = lazy(() => import("@/pages/system-monitoring").then((module) => ({ default: module.SystemMonitoring })));
 const AdminDashboard = lazy(() => import("@/pages/admin").then((module) => ({ default: module.AdminDashboard })));
 const AdminUsers = lazy(() => import("@/pages/admin/users").then((module) => ({ default: module.AdminUsers })));
 const AdminFleets = lazy(() => import("@/pages/admin/fleets").then((module) => ({ default: module.AdminFleets })));
@@ -56,10 +57,10 @@ const AdminRewards = lazy(() => import("@/pages/admin/rewards").then((module) =>
 const AdminRedemptions = lazy(() => import("@/pages/admin/redemptions").then((module) => ({ default: module.AdminRedemptions })));
 const AdminPap = lazy(() => import("@/pages/admin/pap").then((module) => ({ default: module.AdminPap })));
 const AdminPapMarket = lazy(() => import("@/pages/admin/pap-market").then((module) => ({ default: module.AdminPapMarket })));
-const AdminAnnouncements = lazy(() => import("@/pages/admin/announcements").then((module) => ({ default: module.AdminAnnouncements })));
 const AdminActivity = lazy(() => import("@/pages/admin/activity").then((module) => ({ default: module.AdminActivity })));
 const AdminIdentity = lazy(() => import("@/pages/admin/identity").then((module) => ({ default: module.AdminIdentity })));
 const AdminCourier = lazy(() => import("@/pages/admin/courier").then((module) => ({ default: module.AdminCourier })));
+const AdminSystemMonitoring = lazy(() => import("@/pages/admin/system-monitoring").then((module) => ({ default: module.AdminSystemMonitoring })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -199,6 +200,9 @@ function Router() {
       <Route path="/battle-reports">
         {() => <ProtectedRoute component={BattleReports} module="fleet" />}
       </Route>
+      <Route path="/system-monitoring">
+        {() => <ProtectedRoute component={SystemMonitoring} module="fleet" />}
+      </Route>
       <Route path="/identity-groups">
         {() => <ProtectedRoute component={IdentityGroups} module="identity" />}
       </Route>
@@ -271,7 +275,10 @@ function Router() {
         {() => <ProtectedRoute component={AdminFleets} minRole="fc" module="fleet" permissionAlternative="fleet.manage" />}
       </Route>
       <Route path="/admin/announcements">
-        {() => <ProtectedRoute component={AdminAnnouncements} minRole="fc" module="fleet" permissionAlternative="fleet.manage" />}
+        {() => <ProtectedRoute component={AdminSystemMonitoring} minRole="fc" module="fleet" permissionAlternative="fleet.manage" />}
+      </Route>
+      <Route path="/admin/system-monitoring">
+        {() => <ProtectedRoute component={AdminSystemMonitoring} minRole="fc" module="fleet" permissionAlternative="fleet.manage" />}
       </Route>
 
       <Route component={NotFound} />

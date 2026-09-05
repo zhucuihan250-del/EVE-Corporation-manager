@@ -1044,6 +1044,357 @@ export interface CreateAnnouncementBody {
   notes?: string;
 }
 
+export interface MonitoredSystem {
+  id: number;
+  corporationId: number;
+  solarSystemId: number;
+  solarSystemName: string;
+  isActive: boolean;
+  burstWindowMinutes: number;
+  burstThreshold: number;
+  highValueThreshold: number;
+  activityMultiplier: number;
+  /** @nullable */
+  notes: string | null;
+  /** @nullable */
+  createdBy: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SystemActivitySample {
+  id: number;
+  corporationId: number;
+  monitorId: number;
+  solarSystemId: number;
+  sampledAt: string;
+  jumps: number;
+  shipKills: number;
+  podKills: number;
+  npcKills: number;
+  /** @nullable */
+  jumpBaseline: number | null;
+  /** @nullable */
+  killBaseline: number | null;
+  isAnomalous: boolean;
+  createdAt: string;
+}
+
+export type SystemIntelEventSource =
+  (typeof SystemIntelEventSource)[keyof typeof SystemIntelEventSource];
+
+export const SystemIntelEventSource = {
+  chat: "chat",
+  manual: "manual",
+  killmail: "killmail",
+  activity: "activity",
+} as const;
+
+export type SystemIntelEventEventType =
+  (typeof SystemIntelEventEventType)[keyof typeof SystemIntelEventEventType];
+
+export const SystemIntelEventEventType = {
+  hostile_report: "hostile_report",
+  player_kill: "player_kill",
+  corporation_loss: "corporation_loss",
+  kill_burst: "kill_burst",
+  special_ship: "special_ship",
+  high_value: "high_value",
+  activity_spike: "activity_spike",
+} as const;
+
+export type SystemIntelEventSeverity =
+  (typeof SystemIntelEventSeverity)[keyof typeof SystemIntelEventSeverity];
+
+export const SystemIntelEventSeverity = {
+  info: "info",
+  warning: "warning",
+  danger: "danger",
+  critical: "critical",
+} as const;
+
+export type SystemIntelEventConfidence =
+  (typeof SystemIntelEventConfidence)[keyof typeof SystemIntelEventConfidence];
+
+export const SystemIntelEventConfidence = {
+  unconfirmed: "unconfirmed",
+  reported: "reported",
+  confirmed: "confirmed",
+} as const;
+
+export type SystemIntelEventMetadata = { [key: string]: unknown };
+
+export interface SystemIntelEvent {
+  id: number;
+  corporationId: number;
+  monitorId: number;
+  /** @nullable */
+  relayBridgeId: number | null;
+  /** @nullable */
+  reporterUserId: number | null;
+  /** @nullable */
+  reporterCharacterName: string | null;
+  source: SystemIntelEventSource;
+  eventType: SystemIntelEventEventType;
+  severity: SystemIntelEventSeverity;
+  confidence: SystemIntelEventConfidence;
+  solarSystemId: number;
+  solarSystemName: string;
+  summary: string;
+  /** @nullable */
+  rawMessage: string | null;
+  /** @nullable */
+  enemyCount: number | null;
+  shipTags: string[];
+  /** @nullable */
+  direction: string | null;
+  /** @nullable */
+  killmailId: number | null;
+  /** @nullable */
+  zkillboardUrl: string | null;
+  /** @nullable */
+  totalValue: number | null;
+  metadata: SystemIntelEventMetadata;
+  occurredAt: string;
+  receivedAt: string;
+  /** @nullable */
+  expiresAt: string | null;
+  dedupeKey: string;
+  createdAt: string;
+}
+
+export type SystemMonitorSummaryRisk =
+  (typeof SystemMonitorSummaryRisk)[keyof typeof SystemMonitorSummaryRisk];
+
+export const SystemMonitorSummaryRisk = {
+  safe: "safe",
+  info: "info",
+  warning: "warning",
+  danger: "danger",
+  critical: "critical",
+} as const;
+
+export type SystemMonitorSummary = MonitoredSystem & {
+  risk: SystemMonitorSummaryRisk;
+  activeEventCount: number;
+  recentKillCount: number;
+  /** @nullable */
+  lastEventAt: string | null;
+  latestActivity: SystemActivitySample | null;
+};
+
+export type SystemMonitoringDashboardBridgeStatus = {
+  total: number;
+  online: number;
+};
+
+export interface SystemMonitoringDashboard {
+  generatedAt: string;
+  monitors: SystemMonitorSummary[];
+  events: SystemIntelEvent[];
+  bridgeStatus: SystemMonitoringDashboardBridgeStatus;
+}
+
+export type CreateManualIntelReportBodyTtlMinutes =
+  (typeof CreateManualIntelReportBodyTtlMinutes)[keyof typeof CreateManualIntelReportBodyTtlMinutes];
+
+export const CreateManualIntelReportBodyTtlMinutes = {
+  NUMBER_5: 5,
+  NUMBER_10: 10,
+  NUMBER_20: 20,
+  NUMBER_30: 30,
+  NUMBER_60: 60,
+} as const;
+
+export interface CreateManualIntelReportBody {
+  monitorId: number;
+  /**
+   * @minimum 0
+   * @maximum 1000
+   * @nullable
+   */
+  enemyCount?: number | null;
+  /** @maxItems 20 */
+  shipTags?: string[];
+  /**
+   * @maxLength 120
+   * @nullable
+   */
+  direction?: string | null;
+  /**
+   * @minLength 1
+   * @maxLength 2000
+   */
+  message: string;
+  ttlMinutes: CreateManualIntelReportBodyTtlMinutes;
+}
+
+export interface CreateMonitoredSystemBody {
+  /**
+   * @minLength 2
+   * @maxLength 100
+   */
+  solarSystemName: string;
+  /**
+   * @minimum 1
+   * @maximum 60
+   */
+  burstWindowMinutes?: number;
+  /**
+   * @minimum 2
+   * @maximum 50
+   */
+  burstThreshold?: number;
+  /**
+   * @minimum 0
+   * @maximum 1000000000000000
+   */
+  highValueThreshold?: number;
+  /**
+   * @minimum 1
+   * @maximum 20
+   */
+  activityMultiplier?: number;
+  /**
+   * @maxLength 2000
+   * @nullable
+   */
+  notes?: string | null;
+}
+
+export interface UpdateMonitoredSystemBody {
+  isActive?: boolean;
+  /**
+   * @minimum 1
+   * @maximum 60
+   */
+  burstWindowMinutes?: number;
+  /**
+   * @minimum 2
+   * @maximum 50
+   */
+  burstThreshold?: number;
+  /**
+   * @minimum 0
+   * @maximum 1000000000000000
+   */
+  highValueThreshold?: number;
+  /**
+   * @minimum 1
+   * @maximum 20
+   */
+  activityMultiplier?: number;
+  /**
+   * @maxLength 2000
+   * @nullable
+   */
+  notes?: string | null;
+}
+
+export interface IntelBridgePairing {
+  code: string;
+  expiresAt: string;
+}
+
+export interface IntelBridge {
+  id: number;
+  name: string;
+  /** @nullable */
+  devicePlatform: string | null;
+  channelNames: string[];
+  isActive: boolean;
+  /** @nullable */
+  lastSeenAt: string | null;
+  /** @nullable */
+  lastError: string | null;
+  createdAt: string;
+  /** @nullable */
+  ownerUserId: number | null;
+  /** @nullable */
+  ownerName: string | null;
+}
+
+export interface UpdateIntelBridgeBody {
+  /**
+   * @minLength 1
+   * @maxLength 120
+   */
+  name?: string;
+  /** @maxItems 20 */
+  channelNames?: string[];
+  isActive?: boolean;
+}
+
+export interface PairIntelBridgeBody {
+  /**
+   * @minLength 12
+   * @maxLength 64
+   */
+  code: string;
+  /**
+   * @minLength 1
+   * @maxLength 120
+   */
+  name: string;
+  /**
+   * @maxLength 120
+   * @nullable
+   */
+  platform?: string | null;
+  /** @maxItems 20 */
+  channelNames?: string[];
+}
+
+export interface PairIntelBridgeResponse {
+  bridgeId: number;
+  corporationId: number;
+  token: string;
+}
+
+export type IntelBridgeConfigMonitoredSystemsItem = {
+  id: number;
+  solarSystemId: number;
+  solarSystemName: string;
+};
+
+export interface IntelBridgeConfig {
+  bridgeId: number;
+  corporationId: number;
+  corporationName: string;
+  channelNames: string[];
+  monitoredSystems: IntelBridgeConfigMonitoredSystemsItem[];
+}
+
+export interface IntelBridgeEvent {
+  /**
+   * @minLength 1
+   * @maxLength 120
+   */
+  channelName: string;
+  /**
+   * @minLength 1
+   * @maxLength 120
+   */
+  reporterCharacterName: string;
+  /**
+   * @minLength 1
+   * @maxLength 2000
+   */
+  message: string;
+  occurredAt: string;
+}
+
+export interface IntelBridgeEventBatch {
+  /** @maxItems 100 */
+  events: IntelBridgeEvent[];
+}
+
+export interface IntelBridgeIngestionResult {
+  accepted: number;
+  duplicates: number;
+  ignored: number;
+}
+
 export interface ScanFleetResponse {
   awarded: number;
   skipped: number;
@@ -2395,6 +2746,14 @@ export const ListRewardsView = {
   member: "member",
   manage: "manage",
 } as const;
+
+export type HeartbeatIntelBridgeBody = {
+  /**
+   * @maxLength 1000
+   * @nullable
+   */
+  lastError?: string | null;
+};
 
 export type ListIdentityGroupsParams = {
   includeInactive?: boolean;

@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useGetDashboardSummary, useGetRecentFleets, useListAnnouncements, useListFleets } from "@workspace/api-client-react";
-import { Target, Activity, Award, Swords, Radio, CalendarClock, Shield, TrendingUp } from "lucide-react";
+import { useGetDashboardSummary, useGetRecentFleets, useGetSystemMonitoringDashboard, useListFleets } from "@workspace/api-client-react";
+import { Target, Activity, Award, Swords, Radio, Shield, TrendingUp } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,7 @@ import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { apiUrl } from "@/lib/api";
+import { Link } from "wouter";
 
 type PapHistoryEntry = { date: string; pap: number };
 
@@ -39,16 +40,10 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
   );
 }
 
-type RallyLevel = "MAX CTA" | "CTA" | "战略" | "散打";
-const RALLY_LEVEL_COLORS: Record<RallyLevel, string> = {
-  "MAX CTA": "bg-red-500/20 text-red-400 border-red-500/30 border",
-  "CTA": "bg-orange-500/20 text-orange-400 border-orange-500/30 border",
-  "战略": "bg-yellow-500/20 text-yellow-400 border-yellow-500/30 border",
-  "散打": "bg-green-500/20 text-green-400 border-green-500/30 border",
-};
-
 export function Dashboard() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const zh = i18n.language.startsWith("zh");
+  const tr = (cn: string, en: string) => zh ? cn : en;
   const { data: summary, isLoading: isSummaryLoading } = useGetDashboardSummary({
     query: { queryKey: ["dashboardSummary"] }
   });
@@ -61,13 +56,12 @@ export function Dashboard() {
     query: { queryKey: ["dashboardFleets"] }
   });
 
-  const { data: announcements, isLoading: isAnnouncementsLoading } = useListAnnouncements({
-    query: { queryKey: ["announcements"] }
+  const { data: monitoring, isLoading: isMonitoringLoading } = useGetSystemMonitoringDashboard({
+    query: { queryKey: ["systemMonitoring", "dashboard"], refetchInterval: 30_000 }
   });
 
   const allFleetList = Array.isArray(allFleets) ? allFleets : [];
   const recentFleetList = Array.isArray(recentFleets) ? recentFleets : [];
-  const announcementList = Array.isArray(announcements) ? announcements : [];
   const activeFleets = allFleetList.filter((f) => f.isActive);
   const pastFleets = recentFleetList.filter((f) => !f.isActive);
   const { data: papHistory, isLoading: isPapHistoryLoading } = usePapHistory();
@@ -265,53 +259,35 @@ export function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Fleet Notices (舰队预告) */}
+        {/* Solar-system monitoring */}
         <Card className="bg-card/20 border-border/50 rounded-sm flex flex-col">
           <CardHeader className="border-b border-border/30">
             <CardTitle className="text-sm font-mono tracking-wider uppercase flex items-center justify-between">
-              <span>{t("dashboard.systemBroadcasts")}</span>
+              <span>{tr("星系监控", "System Monitoring")}</span>
               <Radio className="w-4 h-4 text-primary animate-pulse" />
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0 flex-1 flex flex-col">
-            {isAnnouncementsLoading ? (
+            {isMonitoringLoading ? (
               <div className="p-8 flex flex-col gap-3">
                 <Skeleton className="h-16 w-full bg-card/50" />
                 <Skeleton className="h-16 w-full bg-card/50" />
               </div>
-            ) : !announcementList.length ? (
+            ) : !monitoring?.monitors.length ? (
               <div className="flex-1 flex flex-col items-center justify-center p-8 text-muted-foreground font-mono text-sm">
                 <div className="w-12 h-12 rounded-full border border-dashed border-border flex items-center justify-center mb-4">
                   <Radio className="w-6 h-6 text-muted-foreground/50" />
                 </div>
-                <p>{t("dashboard.noActiveFleets")}</p>
+                <p>{tr("暂无监控星系。", "No monitored systems.")}</p>
               </div>
             ) : (
               <div className="divide-y divide-border/30 overflow-auto max-h-80">
-                {announcementList.map((ann) => {
-                  const level = ann.rallyLevel as RallyLevel;
-                  const colorClass = RALLY_LEVEL_COLORS[level] ?? "bg-muted/20 text-muted-foreground border-border/30 border";
-                  return (
-                    <div key={ann.id} className="p-4 hover:bg-primary/5 transition-colors">
-                      <div className="flex items-center gap-2 mb-2 flex-wrap">
-                        <Badge className={`font-mono text-[10px] rounded-sm px-2 py-0.5 ${colorClass}`}>
-                          {ann.rallyLevel}
-                        </Badge>
-                        <div className="flex items-center gap-1 text-muted-foreground font-mono text-xs">
-                          <CalendarClock className="w-3 h-3" />
-                          {format(new Date(ann.scheduledAt), "MM-dd HH:mm")}
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between text-xs font-mono">
-                        <span className="text-muted-foreground">{t("dashboard.fc")}: <span className="text-foreground">{ann.fc}</span></span>
-                        <span className="text-muted-foreground">📍 {ann.rallyPoint}</span>
-                      </div>
-                      {ann.notes && (
-                        <p className="font-mono text-xs text-muted-foreground/70 mt-1 italic">{ann.notes}</p>
-                      )}
-                    </div>
-                  );
-                })}
+                {monitoring.monitors.slice(0, 8).map((monitor) => (
+                  <Link key={monitor.id} href="/system-monitoring" className="p-4 flex items-center justify-between gap-3 hover:bg-primary/5 transition-colors">
+                    <div><div className="font-mono text-sm font-medium text-foreground">{monitor.solarSystemName}</div><div className="mt-1 text-xs font-mono text-muted-foreground">{tr("近窗口击杀", "Window kills")}: {monitor.recentKillCount} · {tr("有效警报", "Active alerts")}: {monitor.activeEventCount}</div></div>
+                    <Badge variant="outline" className={monitor.risk === "critical" ? "border-rose-500/50 text-rose-300" : monitor.risk === "danger" ? "border-orange-500/50 text-orange-300" : monitor.risk === "warning" ? "border-amber-500/50 text-amber-300" : "border-emerald-500/50 text-emerald-300"}>{monitor.risk === "critical" ? tr("严重", "CRITICAL") : monitor.risk === "danger" ? tr("危险", "DANGER") : monitor.risk === "warning" ? tr("注意", "CAUTION") : tr("安全", "SAFE")}</Badge>
+                  </Link>
+                ))}
               </div>
             )}
           </CardContent>

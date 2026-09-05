@@ -60,6 +60,7 @@ export function Layout({ children }: { children: ReactNode }) {
   if (modules?.courier) serviceItems.push({ href: "/courier", label: tr("快递", "Courier"), icon: Truck });
   if (modules?.fleet) {
     serviceItems.push(
+      { href: "/system-monitoring", label: tr("星系监控", "System monitoring"), icon: Radio },
       { href: "/battle-reports", label: t("nav.battleReports"), icon: Crosshair },
       { href: "/fitting", label: t("nav.fitting"), icon: Wrench },
     );
@@ -92,7 +93,7 @@ export function Layout({ children }: { children: ReactNode }) {
     commandItems.push(
       { href: "/admin/fleets", label: t("nav.fleets"), icon: Swords },
       { href: "/command/battle-replays", label: t("nav.battleReplay"), icon: BrainCircuit },
-      { href: "/admin/announcements", label: t("nav.announcements"), icon: Radio },
+      { href: "/admin/system-monitoring", label: tr("星系监控管理", "System monitoring"), icon: Radio },
     );
   }
   if (isAdmin && modules?.pap) {

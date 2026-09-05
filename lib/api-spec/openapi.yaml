@@ -44,6 +44,8 @@ tags:
     description: Director-only corporation economy
   - name: pap-market
     description: Corporation-isolated PAP player market and administration
+  - name: system-monitoring
+    description: Corporation-isolated solar-system intelligence and local chat-log bridge
 
 paths:
   /healthz:
@@ -1086,6 +1088,214 @@ paths:
           description: Announcement deleted
         "403":
           description: Forbidden
+
+  /system-monitoring:
+    get:
+      operationId: getSystemMonitoringDashboard
+      tags: [system-monitoring]
+      summary: Get the active corporation's monitored systems and recent intelligence
+      responses:
+        "200":
+          description: System monitoring dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemMonitoringDashboard"
+
+  /system-monitoring/reports:
+    post:
+      operationId: createManualIntelReport
+      tags: [system-monitoring]
+      summary: Submit a named manual hostile report
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateManualIntelReportBody"
+      responses:
+        "201":
+          description: Intel report created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemIntelEvent"
+
+  /system-monitoring/systems:
+    get:
+      operationId: listMonitoredSystems
+      tags: [system-monitoring]
+      summary: List monitored-system configuration for fleet managers
+      responses:
+        "200":
+          description: Monitored systems
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MonitoredSystem" }
+    post:
+      operationId: createMonitoredSystem
+      tags: [system-monitoring]
+      summary: Add or reactivate a monitored system
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMonitoredSystemBody"
+      responses:
+        "201":
+          description: Monitored system created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MonitoredSystem"
+
+  /system-monitoring/systems/{id}:
+    patch:
+      operationId: updateMonitoredSystem
+      tags: [system-monitoring]
+      summary: Update or disable a monitored system
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMonitoredSystemBody"
+      responses:
+        "200":
+          description: Monitored system updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MonitoredSystem"
+
+  /system-monitoring/pairings:
+    post:
+      operationId: createIntelBridgePairing
+      tags: [system-monitoring]
+      summary: Create a one-time bridge pairing code
+      responses:
+        "201":
+          description: Pairing code created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntelBridgePairing"
+
+  /system-monitoring/bridges:
+    get:
+      operationId: listIntelBridges
+      tags: [system-monitoring]
+      summary: List the active corporation's bridge devices
+      responses:
+        "200":
+          description: Bridge devices
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/IntelBridge" }
+
+  /system-monitoring/bridges/{id}:
+    patch:
+      operationId: updateIntelBridge
+      tags: [system-monitoring]
+      summary: Update channels or revoke a bridge device
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateIntelBridgeBody"
+      responses:
+        "200":
+          description: Bridge updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntelBridge"
+
+  /system-monitoring/bridge/pair:
+    post:
+      operationId: pairIntelBridge
+      tags: [system-monitoring]
+      summary: Pair a local bridge using a one-time code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PairIntelBridgeBody"
+      responses:
+        "201":
+          description: Bridge paired; the device token is returned once
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PairIntelBridgeResponse"
+
+  /system-monitoring/bridge/config:
+    get:
+      operationId: getIntelBridgeConfig
+      tags: [system-monitoring]
+      summary: Get chat-channel and monitored-system configuration using a bridge bearer token
+      responses:
+        "200":
+          description: Bridge configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntelBridgeConfig"
+
+  /system-monitoring/bridge/heartbeat:
+    post:
+      operationId: heartbeatIntelBridge
+      tags: [system-monitoring]
+      summary: Update bridge health using a bridge bearer token
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lastError: { type: [string, "null"], maxLength: 1000 }
+      responses:
+        "200":
+          description: Heartbeat accepted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SuccessResponse" }
+
+  /system-monitoring/bridge/events:
+    post:
+      operationId: ingestIntelBridgeEvents
+      tags: [system-monitoring]
+      summary: Submit locally filtered named chat events using a bridge bearer token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntelBridgeEventBatch"
+      responses:
+        "200":
+          description: Bridge ingestion result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntelBridgeIngestionResult"
 
   /identity-groups:
     get:
@@ -3525,6 +3735,245 @@ components:
         - scheduledAt
         - rallyPoint
         - rallyLevel
+
+    MonitoredSystem:
+      type: object
+      properties:
+        id: { type: integer }
+        corporationId: { type: integer }
+        solarSystemId: { type: integer }
+        solarSystemName: { type: string }
+        isActive: { type: boolean }
+        burstWindowMinutes: { type: integer }
+        burstThreshold: { type: integer }
+        highValueThreshold: { type: number }
+        activityMultiplier: { type: number }
+        notes: { type: [string, "null"] }
+        createdBy: { type: [integer, "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, corporationId, solarSystemId, solarSystemName, isActive, burstWindowMinutes, burstThreshold, highValueThreshold, activityMultiplier, notes, createdBy, createdAt, updatedAt]
+
+    SystemActivitySample:
+      type: object
+      properties:
+        id: { type: integer }
+        corporationId: { type: integer }
+        monitorId: { type: integer }
+        solarSystemId: { type: integer }
+        sampledAt: { type: string, format: date-time }
+        jumps: { type: integer }
+        shipKills: { type: integer }
+        podKills: { type: integer }
+        npcKills: { type: integer }
+        jumpBaseline: { type: [number, "null"] }
+        killBaseline: { type: [number, "null"] }
+        isAnomalous: { type: boolean }
+        createdAt: { type: string, format: date-time }
+      required: [id, corporationId, monitorId, solarSystemId, sampledAt, jumps, shipKills, podKills, npcKills, jumpBaseline, killBaseline, isAnomalous, createdAt]
+
+    SystemIntelEvent:
+      type: object
+      properties:
+        id: { type: integer }
+        corporationId: { type: integer }
+        monitorId: { type: integer }
+        relayBridgeId: { type: [integer, "null"] }
+        reporterUserId: { type: [integer, "null"] }
+        reporterCharacterName: { type: [string, "null"] }
+        source: { type: string, enum: [chat, manual, killmail, activity] }
+        eventType: { type: string, enum: [hostile_report, player_kill, corporation_loss, kill_burst, special_ship, high_value, activity_spike] }
+        severity: { type: string, enum: [info, warning, danger, critical] }
+        confidence: { type: string, enum: [unconfirmed, reported, confirmed] }
+        solarSystemId: { type: integer }
+        solarSystemName: { type: string }
+        summary: { type: string }
+        rawMessage: { type: [string, "null"] }
+        enemyCount: { type: [integer, "null"] }
+        shipTags:
+          type: array
+          items: { type: string }
+        direction: { type: [string, "null"] }
+        killmailId: { type: [integer, "null"] }
+        zkillboardUrl: { type: [string, "null"] }
+        totalValue: { type: [number, "null"] }
+        metadata:
+          type: object
+          additionalProperties: true
+        occurredAt: { type: string, format: date-time }
+        receivedAt: { type: string, format: date-time }
+        expiresAt: { type: [string, "null"], format: date-time }
+        dedupeKey: { type: string }
+        createdAt: { type: string, format: date-time }
+      required: [id, corporationId, monitorId, relayBridgeId, reporterUserId, reporterCharacterName, source, eventType, severity, confidence, solarSystemId, solarSystemName, summary, rawMessage, enemyCount, shipTags, direction, killmailId, zkillboardUrl, totalValue, metadata, occurredAt, receivedAt, expiresAt, dedupeKey, createdAt]
+
+    SystemMonitorSummary:
+      allOf:
+        - $ref: "#/components/schemas/MonitoredSystem"
+        - type: object
+          properties:
+            risk: { type: string, enum: [safe, info, warning, danger, critical] }
+            activeEventCount: { type: integer }
+            recentKillCount: { type: integer }
+            lastEventAt: { type: [string, "null"], format: date-time }
+            latestActivity:
+              oneOf:
+                - $ref: "#/components/schemas/SystemActivitySample"
+                - type: "null"
+          required: [risk, activeEventCount, recentKillCount, lastEventAt, latestActivity]
+
+    SystemMonitoringDashboard:
+      type: object
+      properties:
+        generatedAt: { type: string, format: date-time }
+        monitors:
+          type: array
+          items: { $ref: "#/components/schemas/SystemMonitorSummary" }
+        events:
+          type: array
+          items: { $ref: "#/components/schemas/SystemIntelEvent" }
+        bridgeStatus:
+          type: object
+          properties:
+            total: { type: integer }
+            online: { type: integer }
+          required: [total, online]
+      required: [generatedAt, monitors, events, bridgeStatus]
+
+    CreateManualIntelReportBody:
+      type: object
+      properties:
+        monitorId: { type: integer }
+        enemyCount: { type: [integer, "null"], minimum: 0, maximum: 1000 }
+        shipTags:
+          type: array
+          maxItems: 20
+          items: { type: string }
+        direction: { type: [string, "null"], maxLength: 120 }
+        message: { type: string, minLength: 1, maxLength: 2000 }
+        ttlMinutes: { type: integer, enum: [5, 10, 20, 30, 60] }
+      required: [monitorId, message, ttlMinutes]
+
+    CreateMonitoredSystemBody:
+      type: object
+      properties:
+        solarSystemName: { type: string, minLength: 2, maxLength: 100 }
+        burstWindowMinutes: { type: integer, minimum: 1, maximum: 60, default: 10 }
+        burstThreshold: { type: integer, minimum: 2, maximum: 50, default: 3 }
+        highValueThreshold: { type: number, minimum: 0, maximum: 1000000000000000, default: 1000000000 }
+        activityMultiplier: { type: number, minimum: 1, maximum: 20, default: 1.5 }
+        notes: { type: [string, "null"], maxLength: 2000 }
+      required: [solarSystemName]
+
+    UpdateMonitoredSystemBody:
+      type: object
+      properties:
+        isActive: { type: boolean }
+        burstWindowMinutes: { type: integer, minimum: 1, maximum: 60 }
+        burstThreshold: { type: integer, minimum: 2, maximum: 50 }
+        highValueThreshold: { type: number, minimum: 0, maximum: 1000000000000000 }
+        activityMultiplier: { type: number, minimum: 1, maximum: 20 }
+        notes: { type: [string, "null"], maxLength: 2000 }
+
+    IntelBridgePairing:
+      type: object
+      properties:
+        code: { type: string }
+        expiresAt: { type: string, format: date-time }
+      required: [code, expiresAt]
+
+    IntelBridge:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        devicePlatform: { type: [string, "null"] }
+        channelNames:
+          type: array
+          items: { type: string }
+        isActive: { type: boolean }
+        lastSeenAt: { type: [string, "null"], format: date-time }
+        lastError: { type: [string, "null"] }
+        createdAt: { type: string, format: date-time }
+        ownerUserId: { type: [integer, "null"] }
+        ownerName: { type: [string, "null"] }
+      required: [id, name, devicePlatform, channelNames, isActive, lastSeenAt, lastError, createdAt, ownerUserId, ownerName]
+
+    UpdateIntelBridgeBody:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        channelNames:
+          type: array
+          maxItems: 20
+          items: { type: string, minLength: 1, maxLength: 120 }
+        isActive: { type: boolean }
+
+    PairIntelBridgeBody:
+      type: object
+      properties:
+        code: { type: string, minLength: 12, maxLength: 64 }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        platform: { type: [string, "null"], maxLength: 120 }
+        channelNames:
+          type: array
+          maxItems: 20
+          items: { type: string, minLength: 1, maxLength: 120 }
+      required: [code, name]
+
+    PairIntelBridgeResponse:
+      type: object
+      properties:
+        bridgeId: { type: integer }
+        corporationId: { type: integer }
+        token: { type: string }
+      required: [bridgeId, corporationId, token]
+
+    IntelBridgeConfig:
+      type: object
+      properties:
+        bridgeId: { type: integer }
+        corporationId: { type: integer }
+        corporationName: { type: string }
+        channelNames:
+          type: array
+          items: { type: string }
+        monitoredSystems:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              solarSystemId: { type: integer }
+              solarSystemName: { type: string }
+            required: [id, solarSystemId, solarSystemName]
+      required: [bridgeId, corporationId, corporationName, channelNames, monitoredSystems]
+
+    IntelBridgeEvent:
+      type: object
+      properties:
+        channelName: { type: string, minLength: 1, maxLength: 120 }
+        reporterCharacterName: { type: string, minLength: 1, maxLength: 120 }
+        message: { type: string, minLength: 1, maxLength: 2000 }
+        occurredAt: { type: string, format: date-time }
+      required: [channelName, reporterCharacterName, message, occurredAt]
+
+    IntelBridgeEventBatch:
+      type: object
+      properties:
+        events:
+          type: array
+          maxItems: 100
+          items: { $ref: "#/components/schemas/IntelBridgeEvent" }
+      required: [events]
+
+    IntelBridgeIngestionResult:
+      type: object
+      properties:
+        accepted: { type: integer }
+        duplicates: { type: integer }
+        ignored: { type: integer }
+      required: [accepted, duplicates, ignored]
 
     ScanFleetResponse:
       type: object

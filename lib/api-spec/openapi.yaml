@@ -1676,11 +1676,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                status: { type: string }
-                internalNotes: { type: string }
-              required: [status]
+              $ref: "#/components/schemas/UpdateDiplomacyCaseBody"
       responses:
         "200":
           description: Diplomacy case updated
@@ -4719,10 +4715,35 @@ components:
         evidenceUrl: { type: ["string", "null"] }
         urgency: { type: string, enum: [normal, high, urgent] }
         status: { type: string, enum: [submitted, accepted, investigating, waiting, resolved, rejected, closed] }
+        publicReply: { type: ["string", "null"] }
         internalNotes: { type: ["string", "null"] }
+        assignedTo: { type: ["integer", "null"] }
+        assignedName: { type: ["string", "null"] }
+        resolvedAt: { type: ["string", "null"], format: date-time }
+        closedAt: { type: ["string", "null"], format: date-time }
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/DiplomacyCaseEvent"
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
-      required: [id, corporationId, submittedBy, submitterCharacterId, submitterName, category, counterparty, subject, description, urgency, status, createdAt, updatedAt]
+      required: [id, corporationId, submittedBy, submitterCharacterId, submitterName, category, counterparty, subject, description, urgency, status, publicReply, internalNotes, assignedTo, assignedName, resolvedAt, closedAt, events, createdAt, updatedAt]
+
+    DiplomacyCaseEvent:
+      type: object
+      properties:
+        id: { type: integer }
+        corporationId: { type: integer }
+        caseId: { type: integer }
+        actorUserId: { type: ["integer", "null"] }
+        actorName: { type: string }
+        eventType: { type: string, enum: [submitted, assigned, unassigned, status_changed, public_reply, internal_note] }
+        visibility: { type: string, enum: [public, internal] }
+        fromStatus: { type: ["string", "null"] }
+        toStatus: { type: ["string", "null"] }
+        message: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+      required: [id, corporationId, caseId, actorUserId, actorName, eventType, visibility, fromStatus, toStatus, message, createdAt]
 
     CreateDiplomacyCaseBody:
       type: object
@@ -4734,6 +4755,14 @@ components:
         evidenceUrl: { type: string }
         urgency: { type: string, enum: [normal, high, urgent] }
       required: [category, counterparty, subject, description, urgency]
+
+    UpdateDiplomacyCaseBody:
+      type: object
+      properties:
+        status: { type: string, enum: [submitted, accepted, investigating, waiting, resolved, rejected, closed] }
+        publicReply: { type: string, maxLength: 10000 }
+        internalNotes: { type: string, maxLength: 10000 }
+        assignment: { type: string, enum: [self, unassigned] }
 
     FleetReimbursementRule:
       type: object

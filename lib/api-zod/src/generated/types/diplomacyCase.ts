@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { DiplomacyCaseCategory } from "./diplomacyCaseCategory";
+import type { DiplomacyCaseEvent } from "./diplomacyCaseEvent";
 import type { DiplomacyCaseStatus } from "./diplomacyCaseStatus";
 import type { DiplomacyCaseUrgency } from "./diplomacyCaseUrgency";
 
@@ -24,7 +25,18 @@ export interface DiplomacyCase {
   urgency: DiplomacyCaseUrgency;
   status: DiplomacyCaseStatus;
   /** @nullable */
-  internalNotes?: string | null;
+  publicReply: string | null;
+  /** @nullable */
+  internalNotes: string | null;
+  /** @nullable */
+  assignedTo: number | null;
+  /** @nullable */
+  assignedName: string | null;
+  /** @nullable */
+  resolvedAt: Date | null;
+  /** @nullable */
+  closedAt: Date | null;
+  events: DiplomacyCaseEvent[];
   createdAt: Date;
   updatedAt: Date;
 }

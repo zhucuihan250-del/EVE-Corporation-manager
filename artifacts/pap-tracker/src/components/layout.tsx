@@ -40,6 +40,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const isFleetManager = isFc || Boolean(user?.permissions.includes("fleet.manage"));
   const isActivityManager = isAdmin || Boolean(user?.permissions.includes("activity.manage"));
   const isIdentityManager = isAdmin || Boolean(user?.permissions.includes("identity.manage"));
+  const isDiplomacyManager = isAdmin || Boolean(user?.permissions.includes("diplomacy.manage"));
 
   const serviceItems: NavItem[] = [];
   if (modules?.pap) {
@@ -85,6 +86,9 @@ export function Layout({ children }: { children: ReactNode }) {
   }
   if (isIdentityManager && modules?.identity) {
     commandItems.push({ href: "/admin/identity", label: tr("身份组审核", "Identity review"), icon: ShieldCheck });
+  }
+  if (isDiplomacyManager && modules?.diplomacy) {
+    commandItems.push({ href: "/admin/diplomacy", label: tr("外交管理", "Diplomacy management"), icon: Handshake });
   }
   if (isAdmin && modules?.courier) {
     commandItems.push({ href: "/admin/courier", label: tr("快递管理", "Courier management"), icon: Truck });

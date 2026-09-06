@@ -25,6 +25,7 @@ import { reimbursementFixedNpcCargoMigration } from "./0023-reimbursement-fixed-
 import { tacticalGroupRewardsMigration } from "./0024-tactical-group-rewards";
 import { tacticalRewardSkillPlansMigration } from "./0025-tactical-reward-skill-plans";
 import { systemMonitoringMigration } from "./0026-system-monitoring";
+import { diplomacyManagementMigration } from "./0027-diplomacy-management";
 
 type Migration = {
   id: string;
@@ -58,6 +59,7 @@ const migrations: Migration[] = [
   tacticalGroupRewardsMigration,
   tacticalRewardSkillPlansMigration,
   systemMonitoringMigration,
+  diplomacyManagementMigration,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {

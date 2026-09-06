@@ -59,6 +59,7 @@ const AdminPap = lazy(() => import("@/pages/admin/pap").then((module) => ({ defa
 const AdminPapMarket = lazy(() => import("@/pages/admin/pap-market").then((module) => ({ default: module.AdminPapMarket })));
 const AdminActivity = lazy(() => import("@/pages/admin/activity").then((module) => ({ default: module.AdminActivity })));
 const AdminIdentity = lazy(() => import("@/pages/admin/identity").then((module) => ({ default: module.AdminIdentity })));
+const AdminDiplomacy = lazy(() => import("@/pages/admin/diplomacy").then((module) => ({ default: module.AdminDiplomacy })));
 const AdminCourier = lazy(() => import("@/pages/admin/courier").then((module) => ({ default: module.AdminCourier })));
 const AdminSystemMonitoring = lazy(() => import("@/pages/admin/system-monitoring").then((module) => ({ default: module.AdminSystemMonitoring })));
 
@@ -266,6 +267,9 @@ function Router() {
       </Route>
       <Route path="/admin/identity">
         {() => <ProtectedRoute component={AdminIdentity} minRole="admin" module="identity" permissionAlternative="identity.manage" />}
+      </Route>
+      <Route path="/admin/diplomacy">
+        {() => <ProtectedRoute component={AdminDiplomacy} minRole="admin" module="diplomacy" permissionAlternative="diplomacy.manage" />}
       </Route>
       <Route path="/admin/courier">
         {() => <ProtectedRoute component={AdminCourier} minRole="admin" module="courier" />}

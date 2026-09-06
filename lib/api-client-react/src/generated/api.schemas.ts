@@ -2100,6 +2100,44 @@ export const DiplomacyCaseStatus = {
   closed: "closed",
 } as const;
 
+export type DiplomacyCaseEventEventType =
+  (typeof DiplomacyCaseEventEventType)[keyof typeof DiplomacyCaseEventEventType];
+
+export const DiplomacyCaseEventEventType = {
+  submitted: "submitted",
+  assigned: "assigned",
+  unassigned: "unassigned",
+  status_changed: "status_changed",
+  public_reply: "public_reply",
+  internal_note: "internal_note",
+} as const;
+
+export type DiplomacyCaseEventVisibility =
+  (typeof DiplomacyCaseEventVisibility)[keyof typeof DiplomacyCaseEventVisibility];
+
+export const DiplomacyCaseEventVisibility = {
+  public: "public",
+  internal: "internal",
+} as const;
+
+export interface DiplomacyCaseEvent {
+  id: number;
+  corporationId: number;
+  caseId: number;
+  /** @nullable */
+  actorUserId: number | null;
+  actorName: string;
+  eventType: DiplomacyCaseEventEventType;
+  visibility: DiplomacyCaseEventVisibility;
+  /** @nullable */
+  fromStatus: string | null;
+  /** @nullable */
+  toStatus: string | null;
+  /** @nullable */
+  message: string | null;
+  createdAt: string;
+}
+
 export interface DiplomacyCase {
   id: number;
   corporationId: number;
@@ -2115,7 +2153,18 @@ export interface DiplomacyCase {
   urgency: DiplomacyCaseUrgency;
   status: DiplomacyCaseStatus;
   /** @nullable */
-  internalNotes?: string | null;
+  publicReply: string | null;
+  /** @nullable */
+  internalNotes: string | null;
+  /** @nullable */
+  assignedTo: number | null;
+  /** @nullable */
+  assignedName: string | null;
+  /** @nullable */
+  resolvedAt: string | null;
+  /** @nullable */
+  closedAt: string | null;
+  events: DiplomacyCaseEvent[];
   createdAt: string;
   updatedAt: string;
 }
@@ -2148,6 +2197,36 @@ export interface CreateDiplomacyCaseBody {
   description: string;
   evidenceUrl?: string;
   urgency: CreateDiplomacyCaseBodyUrgency;
+}
+
+export type UpdateDiplomacyCaseBodyStatus =
+  (typeof UpdateDiplomacyCaseBodyStatus)[keyof typeof UpdateDiplomacyCaseBodyStatus];
+
+export const UpdateDiplomacyCaseBodyStatus = {
+  submitted: "submitted",
+  accepted: "accepted",
+  investigating: "investigating",
+  waiting: "waiting",
+  resolved: "resolved",
+  rejected: "rejected",
+  closed: "closed",
+} as const;
+
+export type UpdateDiplomacyCaseBodyAssignment =
+  (typeof UpdateDiplomacyCaseBodyAssignment)[keyof typeof UpdateDiplomacyCaseBodyAssignment];
+
+export const UpdateDiplomacyCaseBodyAssignment = {
+  self: "self",
+  unassigned: "unassigned",
+} as const;
+
+export interface UpdateDiplomacyCaseBody {
+  status?: UpdateDiplomacyCaseBodyStatus;
+  /** @maxLength 10000 */
+  publicReply?: string;
+  /** @maxLength 10000 */
+  internalNotes?: string;
+  assignment?: UpdateDiplomacyCaseBodyAssignment;
 }
 
 export interface ReimbursementValidation {
@@ -2790,11 +2869,6 @@ export const ReviewIdentityApplicationBodyStatus = {
 export type ReviewIdentityApplicationBody = {
   status: ReviewIdentityApplicationBodyStatus;
   reviewerNotes?: string;
-};
-
-export type UpdateDiplomacyCaseBody = {
-  status: string;
-  internalNotes?: string;
 };
 
 export type ListReimbursementLossesParams = {

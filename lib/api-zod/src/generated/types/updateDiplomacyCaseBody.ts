@@ -5,8 +5,14 @@
  * EVE Online PAP Tracking System API
  * OpenAPI spec version: 0.1.0
  */
+import type { UpdateDiplomacyCaseBodyAssignment } from "./updateDiplomacyCaseBodyAssignment";
+import type { UpdateDiplomacyCaseBodyStatus } from "./updateDiplomacyCaseBodyStatus";
 
-export type UpdateDiplomacyCaseBody = {
-  status: string;
+export interface UpdateDiplomacyCaseBody {
+  status?: UpdateDiplomacyCaseBodyStatus;
+  /** @maxLength 10000 */
+  publicReply?: string;
+  /** @maxLength 10000 */
   internalNotes?: string;
-};
+  assignment?: UpdateDiplomacyCaseBodyAssignment;
+}

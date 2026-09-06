@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test:diplomacy": "esbuild src/lib/diplomacy-management.test.ts src/lib/diplomacy-management-database.test.ts --bundle --platform=node --format=esm --external:@electric-sql/pglite --external:drizzle-orm --external:drizzle-orm/* --outdir=node_modules/.cache/diplomacy-tests && node --test \"$PWD/node_modules/.cache/diplomacy-tests/diplomacy-management.test.js\" && node --test \"$PWD/node_modules/.cache/diplomacy-tests/diplomacy-management-database.test.js\"",
     "test:rewards": "esbuild src/lib/reward-access.test.ts --bundle --platform=node --format=esm --external:@electric-sql/pglite --external:drizzle-orm --external:drizzle-orm/* --outfile=node_modules/.cache/reward-access.test.mjs && node node_modules/.cache/reward-access.test.mjs",
     "dev": "export NODE_ENV=development && pnpm run build && pnpm run start",
     "build": "node ./build.mjs",

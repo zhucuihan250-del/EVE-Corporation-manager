@@ -3431,7 +3431,34 @@ export const ListDiplomacyCasesResponseItem = zod.object({
     "rejected",
     "closed",
   ]),
-  internalNotes: zod.string().nullish(),
+  publicReply: zod.string().nullable(),
+  internalNotes: zod.string().nullable(),
+  assignedTo: zod.number().nullable(),
+  assignedName: zod.string().nullable(),
+  resolvedAt: zod.coerce.date().nullable(),
+  closedAt: zod.coerce.date().nullable(),
+  events: zod.array(
+    zod.object({
+      id: zod.number(),
+      corporationId: zod.number(),
+      caseId: zod.number(),
+      actorUserId: zod.number().nullable(),
+      actorName: zod.string(),
+      eventType: zod.enum([
+        "submitted",
+        "assigned",
+        "unassigned",
+        "status_changed",
+        "public_reply",
+        "internal_note",
+      ]),
+      visibility: zod.enum(["public", "internal"]),
+      fromStatus: zod.string().nullable(),
+      toStatus: zod.string().nullable(),
+      message: zod.string().nullable(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -3459,9 +3486,31 @@ export const UpdateDiplomacyCaseParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const updateDiplomacyCaseBodyPublicReplyMax = 10000;
+
+export const updateDiplomacyCaseBodyInternalNotesMax = 10000;
+
 export const UpdateDiplomacyCaseBody = zod.object({
-  status: zod.string(),
-  internalNotes: zod.string().optional(),
+  status: zod
+    .enum([
+      "submitted",
+      "accepted",
+      "investigating",
+      "waiting",
+      "resolved",
+      "rejected",
+      "closed",
+    ])
+    .optional(),
+  publicReply: zod
+    .string()
+    .max(updateDiplomacyCaseBodyPublicReplyMax)
+    .optional(),
+  internalNotes: zod
+    .string()
+    .max(updateDiplomacyCaseBodyInternalNotesMax)
+    .optional(),
+  assignment: zod.enum(["self", "unassigned"]).optional(),
 });
 
 export const UpdateDiplomacyCaseResponse = zod.object({
@@ -3492,7 +3541,34 @@ export const UpdateDiplomacyCaseResponse = zod.object({
     "rejected",
     "closed",
   ]),
-  internalNotes: zod.string().nullish(),
+  publicReply: zod.string().nullable(),
+  internalNotes: zod.string().nullable(),
+  assignedTo: zod.number().nullable(),
+  assignedName: zod.string().nullable(),
+  resolvedAt: zod.coerce.date().nullable(),
+  closedAt: zod.coerce.date().nullable(),
+  events: zod.array(
+    zod.object({
+      id: zod.number(),
+      corporationId: zod.number(),
+      caseId: zod.number(),
+      actorUserId: zod.number().nullable(),
+      actorName: zod.string(),
+      eventType: zod.enum([
+        "submitted",
+        "assigned",
+        "unassigned",
+        "status_changed",
+        "public_reply",
+        "internal_note",
+      ]),
+      visibility: zod.enum(["public", "internal"]),
+      fromStatus: zod.string().nullable(),
+      toStatus: zod.string().nullable(),
+      message: zod.string().nullable(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });

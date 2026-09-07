@@ -1062,6 +1062,11 @@ export interface MonitoredSystem {
   updatedAt: string;
 }
 
+export interface SolarSystemSearchResult {
+  solarSystemId: number;
+  solarSystemName: string;
+}
+
 export interface SystemActivitySample {
   id: number;
   corporationId: number;
@@ -2825,6 +2830,14 @@ export const ListRewardsView = {
   member: "member",
   manage: "manage",
 } as const;
+
+export type SearchSolarSystemsForMonitoringParams = {
+  /**
+   * @minLength 2
+   * @maxLength 100
+   */
+  q: string;
+};
 
 export type HeartbeatIntelBridgeBody = {
   /**

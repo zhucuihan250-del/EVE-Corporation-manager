@@ -2377,6 +2377,27 @@ export const CreateManualIntelReportBody = zod.object({
 });
 
 /**
+ * @summary Search the official EVE solar-system catalog for monitoring
+ */
+export const searchSolarSystemsForMonitoringQueryQMin = 2;
+export const searchSolarSystemsForMonitoringQueryQMax = 100;
+
+export const SearchSolarSystemsForMonitoringQueryParams = zod.object({
+  q: zod.coerce
+    .string()
+    .min(searchSolarSystemsForMonitoringQueryQMin)
+    .max(searchSolarSystemsForMonitoringQueryQMax),
+});
+
+export const SearchSolarSystemsForMonitoringResponseItem = zod.object({
+  solarSystemId: zod.number(),
+  solarSystemName: zod.string(),
+});
+export const SearchSolarSystemsForMonitoringResponse = zod.array(
+  SearchSolarSystemsForMonitoringResponseItem,
+);
+
+/**
  * @summary List monitored-system configuration for fleet managers
  */
 export const ListMonitoredSystemsResponseItem = zod.object({

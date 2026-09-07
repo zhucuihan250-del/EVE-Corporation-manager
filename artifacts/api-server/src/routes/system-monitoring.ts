@@ -12,6 +12,7 @@ import {
   listMonitoredSystems,
   loadSystemMonitoringDashboard,
   pairBridge,
+  removeMonitoredSystem,
   updateBridge,
   updateBridgeHeartbeat,
   updateMonitoredSystem,
@@ -268,11 +269,9 @@ router.post(
       });
       res.status(201).json(created);
     } catch (error) {
-      res
-        .status(400)
-        .json({
-          error: error instanceof Error ? error.message : "无法添加监控星系",
-        });
+      res.status(400).json({
+        error: error instanceof Error ? error.message : "无法添加监控星系",
+      });
     }
   },
 );
@@ -344,6 +343,27 @@ router.patch(
       return;
     }
     res.json(updated);
+  },
+);
+
+router.delete(
+  "/system-monitoring/systems/:id",
+  async (req: Request, res: Response): Promise<void> => {
+    if (!managerAllowed(req)) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      res.status(400).json({ error: "监控星系编号无效" });
+      return;
+    }
+    const removed = await removeMonitoredSystem(req.tenant!.corporation.id, id);
+    if (!removed) {
+      res.status(404).json({ error: "监控星系不存在" });
+      return;
+    }
+    res.status(204).send();
   },
 );
 

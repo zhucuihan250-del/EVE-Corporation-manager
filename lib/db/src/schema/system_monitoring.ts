@@ -34,6 +34,7 @@ export const monitoredSystemsTable = pgTable(
       .notNull()
       .default(1.5),
     notes: text("notes"),
+    removedAt: timestamp("removed_at", { withTimezone: true }),
     createdBy: integer("created_by").references(() => usersTable.id, {
       onDelete: "set null",
     }),
@@ -57,6 +58,10 @@ export const monitoredSystemsTable = pgTable(
     index("monitored_systems_corporation_active_idx").on(
       table.corporationId,
       table.isActive,
+    ),
+    index("monitored_systems_corporation_removed_idx").on(
+      table.corporationId,
+      table.removedAt,
     ),
   ],
 );

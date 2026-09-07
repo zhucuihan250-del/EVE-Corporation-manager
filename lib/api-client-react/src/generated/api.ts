@@ -4917,6 +4917,90 @@ export const useUpdateMonitoredSystem = <
 };
 
 /**
+ * @summary Remove a monitored system while retaining its history
+ */
+export const getDeleteMonitoredSystemUrl = (id: number) => {
+  return `/api/system-monitoring/systems/${id}`;
+};
+
+export const deleteMonitoredSystem = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteMonitoredSystemUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteMonitoredSystemMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteMonitoredSystem>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteMonitoredSystem>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteMonitoredSystem"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteMonitoredSystem>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteMonitoredSystem(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteMonitoredSystemMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteMonitoredSystem>>
+>;
+
+export type DeleteMonitoredSystemMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Remove a monitored system while retaining its history
+ */
+export const useDeleteMonitoredSystem = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteMonitoredSystem>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteMonitoredSystem>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteMonitoredSystemMutationOptions(options));
+};
+
+/**
  * @summary Create a one-time bridge pairing code
  */
 export const getCreateIntelBridgePairingUrl = () => {

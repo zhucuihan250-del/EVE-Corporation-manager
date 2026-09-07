@@ -1057,6 +1057,8 @@ export interface MonitoredSystem {
   /** @nullable */
   notes: string | null;
   /** @nullable */
+  removedAt: string | null;
+  /** @nullable */
   createdBy: number | null;
   createdAt: string;
   updatedAt: string;

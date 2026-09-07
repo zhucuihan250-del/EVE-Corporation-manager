@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { PGlite } from "@electric-sql/pglite";
 import { systemMonitoringMigration } from "../../../../lib/db/src/migrations/0026-system-monitoring";
+import { monitoredSystemRemovalMigration } from "../../../../lib/db/src/migrations/0028-monitored-system-removal";
 
 async function database() {
   const pg = new PGlite();
@@ -15,6 +16,9 @@ async function database() {
   await systemMonitoringMigration.up({
     query: (sql: string) => pg.exec(sql),
   } as unknown as Parameters<typeof systemMonitoringMigration.up>[0]);
+  await monitoredSystemRemovalMigration.up({
+    query: (sql: string) => pg.exec(sql),
+  } as unknown as Parameters<typeof monitoredSystemRemovalMigration.up>[0]);
   return pg;
 }
 
@@ -79,6 +83,46 @@ test("system monitoring migration keeps event history when a monitor is disabled
       "SELECT COUNT(*)::int AS count FROM system_intel_events",
     );
     assert.equal(result.rows[0]?.count, 1);
+  } finally {
+    await pg.close();
+  }
+});
+
+test("removing a monitor preserves history and allows the same system to be restored", async () => {
+  const pg = await database();
+  try {
+    await pg.query(`
+      INSERT INTO monitored_systems
+        (corporation_id, solar_system_id, solar_system_name, created_by)
+      VALUES (1001, 30000142, 'Jita', 1)
+    `);
+    await pg.query(`
+      INSERT INTO system_intel_events
+        (corporation_id, monitor_id, source, event_type, severity, confidence,
+         solar_system_id, solar_system_name, summary, occurred_at, dedupe_key)
+      VALUES
+        (1001, 1, 'manual', 'hostile_report', 'warning', 'reported',
+         30000142, 'Jita', 'historic report', now(), 'event-removed')
+    `);
+    await pg.query(
+      "UPDATE monitored_systems SET is_active = false, removed_at = now() WHERE corporation_id = 1001 AND id = 1",
+    );
+    const history = await pg.query<{ count: number }>(
+      "SELECT COUNT(*)::int AS count FROM system_intel_events WHERE corporation_id = 1001 AND monitor_id = 1",
+    );
+    assert.equal(history.rows[0]?.count, 1);
+
+    await pg.query(
+      "UPDATE monitored_systems SET is_active = true, removed_at = NULL WHERE corporation_id = 1001 AND solar_system_id = 30000142",
+    );
+    const restored = await pg.query<{
+      is_active: boolean;
+      removed_at: Date | null;
+    }>(
+      "SELECT is_active, removed_at FROM monitored_systems WHERE corporation_id = 1001 AND id = 1",
+    );
+    assert.equal(restored.rows[0]?.is_active, true);
+    assert.equal(restored.rows[0]?.removed_at, null);
   } finally {
     await pg.close();
   }

@@ -5,14 +5,26 @@ import {
   getListMonitoredSystemsQueryKey,
   useCreateIntelBridgePairing,
   useCreateMonitoredSystem,
+  useDeleteMonitoredSystem,
   useListIntelBridges,
   useListMonitoredSystems,
   useSearchSolarSystemsForMonitoring,
   useUpdateIntelBridge,
   useUpdateMonitoredSystem,
   type IntelBridgePairing,
+  type MonitoredSystem,
   type SolarSystemSearchResult,
 } from "@workspace/api-client-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +36,14 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/api-error";
@@ -35,12 +55,14 @@ import {
   Laptop,
   Loader2,
   MapPin,
+  Pencil,
   Plus,
   Power,
   Radio,
   RefreshCw,
   Search,
   ShieldCheck,
+  Trash2,
 } from "lucide-react";
 
 const BRIDGE_ONLINE_MS = 90_000;
@@ -50,6 +72,22 @@ function formatIsk(value: number): string {
     return `${(value / 1_000_000_000).toFixed(1)}b ISK`;
   return `${(value / 1_000_000).toFixed(0)}m ISK`;
 }
+
+type MonitorConditionDraft = {
+  burstWindowMinutes: string;
+  burstThreshold: string;
+  highValueBillions: string;
+  activityMultiplier: string;
+  notes: string;
+};
+
+const EMPTY_MONITOR_DRAFT: MonitorConditionDraft = {
+  burstWindowMinutes: "10",
+  burstThreshold: "3",
+  highValueBillions: "1",
+  activityMultiplier: "1.5",
+  notes: "",
+};
 
 export function AdminSystemMonitoring() {
   const { i18n } = useTranslation();
@@ -65,6 +103,7 @@ export function AdminSystemMonitoring() {
   });
   const createSystem = useCreateMonitoredSystem();
   const updateSystem = useUpdateMonitoredSystem();
+  const deleteSystem = useDeleteMonitoredSystem();
   const createPairing = useCreateIntelBridgePairing();
   const updateBridge = useUpdateIntelBridge();
   const [solarSystemName, setSolarSystemName] = useState("");
@@ -77,6 +116,14 @@ export function AdminSystemMonitoring() {
   const [highValueBillions, setHighValueBillions] = useState("1");
   const [activityMultiplier, setActivityMultiplier] = useState("1.5");
   const [notes, setNotes] = useState("");
+  const [editingSystem, setEditingSystem] = useState<MonitoredSystem | null>(
+    null,
+  );
+  const [editDraft, setEditDraft] =
+    useState<MonitorConditionDraft>(EMPTY_MONITOR_DRAFT);
+  const [removeTarget, setRemoveTarget] = useState<MonitoredSystem | null>(
+    null,
+  );
   const [pairing, setPairing] = useState<IntelBridgePairing | null>(null);
   const [channelDrafts, setChannelDrafts] = useState<Record<number, string>>(
     {},
@@ -94,10 +141,7 @@ export function AdminSystemMonitoring() {
 
   useEffect(() => {
     const query = solarSystemName.trim();
-    const timer = window.setTimeout(
-      () => setDebouncedSystemQuery(query),
-      250,
-    );
+    const timer = window.setTimeout(() => setDebouncedSystemQuery(query), 250);
     return () => window.clearTimeout(timer);
   }, [solarSystemName]);
 
@@ -154,6 +198,89 @@ export function AdminSystemMonitoring() {
           }),
       },
     );
+
+  const beginEditingSystem = (system: MonitoredSystem) => {
+    setEditingSystem(system);
+    setEditDraft({
+      burstWindowMinutes: String(system.burstWindowMinutes),
+      burstThreshold: String(system.burstThreshold),
+      highValueBillions: String(system.highValueThreshold / 1_000_000_000),
+      activityMultiplier: String(system.activityMultiplier),
+      notes: system.notes ?? "",
+    });
+  };
+
+  const editBurstWindow = Number(editDraft.burstWindowMinutes);
+  const editBurstThreshold = Number(editDraft.burstThreshold);
+  const editHighValueBillions = Number(editDraft.highValueBillions);
+  const editActivityMultiplier = Number(editDraft.activityMultiplier);
+  const editIsValid =
+    editDraft.burstWindowMinutes.trim() !== "" &&
+    editDraft.burstThreshold.trim() !== "" &&
+    editDraft.highValueBillions.trim() !== "" &&
+    editDraft.activityMultiplier.trim() !== "" &&
+    Number.isInteger(editBurstWindow) &&
+    editBurstWindow >= 1 &&
+    editBurstWindow <= 60 &&
+    Number.isInteger(editBurstThreshold) &&
+    editBurstThreshold >= 2 &&
+    editBurstThreshold <= 50 &&
+    Number.isFinite(editHighValueBillions) &&
+    editHighValueBillions >= 0 &&
+    editHighValueBillions <= 1_000_000 &&
+    Number.isFinite(editActivityMultiplier) &&
+    editActivityMultiplier >= 1 &&
+    editActivityMultiplier <= 20 &&
+    editDraft.notes.length <= 2_000;
+
+  const saveEditedSystem = () => {
+    if (!editingSystem || !editIsValid) return;
+    updateSystem.mutate(
+      {
+        id: editingSystem.id,
+        data: {
+          burstWindowMinutes: editBurstWindow,
+          burstThreshold: editBurstThreshold,
+          highValueThreshold: editHighValueBillions * 1_000_000_000,
+          activityMultiplier: editActivityMultiplier,
+          notes: editDraft.notes.trim() || null,
+        },
+      },
+      {
+        onSuccess: async () => {
+          setEditingSystem(null);
+          await invalidateSystems();
+          toast({ title: tr("监控条件已保存", "Monitoring conditions saved") });
+        },
+        onError: (error) =>
+          toast({
+            title: tr("保存失败", "Save failed"),
+            description: getErrorMessage(error),
+            variant: "destructive",
+          }),
+      },
+    );
+  };
+
+  const confirmRemoveSystem = () => {
+    if (!removeTarget) return;
+    deleteSystem.mutate(
+      { id: removeTarget.id },
+      {
+        onSuccess: async () => {
+          setRemoveTarget(null);
+          await invalidateSystems();
+          toast({ title: tr("监控星系已移除", "Monitored system removed") });
+        },
+        onError: (error) =>
+          toast({
+            title: tr("移除失败", "Removal failed"),
+            description: getErrorMessage(error),
+            variant: "destructive",
+          }),
+      },
+    );
+  };
 
   const generatePairing = () =>
     createPairing.mutate(undefined, {
@@ -257,14 +384,18 @@ export function AdminSystemMonitoring() {
                     role="listbox"
                     className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-xl"
                   >
-                    {debouncedSystemQuery !== solarSystemName.trim() || systemSearch.isFetching ? (
+                    {debouncedSystemQuery !== solarSystemName.trim() ||
+                    systemSearch.isFetching ? (
                       <div className="flex items-center gap-2 px-3 py-3 text-sm text-muted-foreground">
                         <Loader2 className="h-4 w-4 animate-spin" />
                         {tr("搜索中…", "Searching…")}
                       </div>
                     ) : systemSearch.isError ? (
                       <div className="px-3 py-3 text-sm text-destructive">
-                        {tr("星系搜索暂时不可用", "System search is temporarily unavailable")}
+                        {tr(
+                          "星系搜索暂时不可用",
+                          "System search is temporarily unavailable",
+                        )}
                       </div>
                     ) : !systemSearch.data?.length ? (
                       <div className="px-3 py-3 text-sm text-muted-foreground">
@@ -276,7 +407,10 @@ export function AdminSystemMonitoring() {
                           key={system.solarSystemId}
                           type="button"
                           role="option"
-                          aria-selected={selectedSystem?.solarSystemId === system.solarSystemId}
+                          aria-selected={
+                            selectedSystem?.solarSystemId ===
+                            system.solarSystemId
+                          }
                           className="flex w-full items-center justify-between rounded-sm px-3 py-2 text-left text-sm hover:bg-accent"
                           onMouseDown={(event) => event.preventDefault()}
                           onClick={() => {
@@ -285,10 +419,15 @@ export function AdminSystemMonitoring() {
                             setShowSystemResults(false);
                           }}
                         >
-                          <span className="font-medium">{system.solarSystemName}</span>
+                          <span className="font-medium">
+                            {system.solarSystemName}
+                          </span>
                           <span className="flex items-center gap-2 text-xs text-muted-foreground">
                             {system.solarSystemId}
-                            {selectedSystem?.solarSystemId === system.solarSystemId && <Check className="h-4 w-4 text-primary" />}
+                            {selectedSystem?.solarSystemId ===
+                              system.solarSystemId && (
+                              <Check className="h-4 w-4 text-primary" />
+                            )}
                           </span>
                         </button>
                       ))
@@ -298,8 +437,14 @@ export function AdminSystemMonitoring() {
               </div>
               <p className="text-xs text-muted-foreground">
                 {selectedSystem
-                  ? tr(`已选择：${selectedSystem.solarSystemName}`, `Selected: ${selectedSystem.solarSystemName}`)
-                  : tr("输入至少2个字符，例如74L。", "Enter at least 2 characters, for example 74L.")}
+                  ? tr(
+                      `已选择：${selectedSystem.solarSystemName}`,
+                      `Selected: ${selectedSystem.solarSystemName}`,
+                    )
+                  : tr(
+                      "输入至少2个字符，例如74L。",
+                      "Enter at least 2 characters, for example 74L.",
+                    )}
               </p>
             </div>
             <div className="space-y-2">
@@ -422,17 +567,35 @@ export function AdminSystemMonitoring() {
                       </p>
                     )}
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => toggleSystem(system.id, !system.isActive)}
-                    disabled={updateSystem.isPending}
-                  >
-                    <Power className="mr-2 h-4 w-4" />
-                    {system.isActive
-                      ? tr("停止监控", "Disable")
-                      : tr("重新启用", "Enable")}
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => beginEditingSystem(system)}
+                    >
+                      <Pencil className="mr-2 h-4 w-4" />
+                      {tr("编辑条件", "Edit conditions")}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => toggleSystem(system.id, !system.isActive)}
+                      disabled={updateSystem.isPending}
+                    >
+                      <Power className="mr-2 h-4 w-4" />
+                      {system.isActive
+                        ? tr("停止监控", "Disable")
+                        : tr("重新启用", "Enable")}
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setRemoveTarget(system)}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      {tr("移除", "Remove")}
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -631,6 +794,156 @@ export function AdminSystemMonitoring() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog
+        open={editingSystem !== null}
+        onOpenChange={(open) => {
+          if (!open && !updateSystem.isPending) setEditingSystem(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-[640px]">
+          <DialogHeader>
+            <DialogTitle>
+              {tr("编辑监控条件", "Edit monitoring conditions")}
+            </DialogTitle>
+            <DialogDescription>
+              {editingSystem?.solarSystemName}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-2 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>
+                {tr("连续击杀窗口（分钟）", "Burst window (minutes)")}
+              </Label>
+              <Input
+                type="number"
+                min={1}
+                max={60}
+                value={editDraft.burstWindowMinutes}
+                onChange={(event) =>
+                  setEditDraft((current) => ({
+                    ...current,
+                    burstWindowMinutes: event.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>{tr("触发条数", "Kill threshold")}</Label>
+              <Input
+                type="number"
+                min={2}
+                max={50}
+                value={editDraft.burstThreshold}
+                onChange={(event) =>
+                  setEditDraft((current) => ({
+                    ...current,
+                    burstThreshold: event.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>
+                {tr("高价值阈值（十亿）", "High-value threshold (billions)")}
+              </Label>
+              <Input
+                type="number"
+                min={0}
+                step={0.1}
+                value={editDraft.highValueBillions}
+                onChange={(event) =>
+                  setEditDraft((current) => ({
+                    ...current,
+                    highValueBillions: event.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>{tr("活动异常倍数", "Activity multiplier")}</Label>
+              <Input
+                type="number"
+                min={1}
+                max={20}
+                step={0.1}
+                value={editDraft.activityMultiplier}
+                onChange={(event) =>
+                  setEditDraft((current) => ({
+                    ...current,
+                    activityMultiplier: event.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label>{tr("监控备注", "Monitoring notes")}</Label>
+              <Textarea
+                value={editDraft.notes}
+                maxLength={2_000}
+                onChange={(event) =>
+                  setEditDraft((current) => ({
+                    ...current,
+                    notes: event.target.value,
+                  }))
+                }
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditingSystem(null)}
+              disabled={updateSystem.isPending}
+            >
+              {tr("取消", "Cancel")}
+            </Button>
+            <Button
+              onClick={saveEditedSystem}
+              disabled={!editIsValid || updateSystem.isPending}
+            >
+              {updateSystem.isPending
+                ? tr("保存中…", "Saving…")
+                : tr("保存条件", "Save conditions")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={removeTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleteSystem.isPending) setRemoveTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {tr("确认移除监控星系", "Remove monitored system?")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {tr(
+                `移除 ${removeTarget?.solarSystemName ?? ""} 后会立即停止采集并从监控列表隐藏。既有预警和活动历史会保留。`,
+                `Removing ${removeTarget?.solarSystemName ?? ""} immediately stops collection and hides it from this list. Existing alert and activity history is retained.`,
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteSystem.isPending}>
+              {tr("取消", "Cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteSystem.isPending}
+              onClick={confirmRemoveSystem}
+            >
+              {deleteSystem.isPending
+                ? tr("移除中…", "Removing…")
+                : tr("确认移除", "Remove")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

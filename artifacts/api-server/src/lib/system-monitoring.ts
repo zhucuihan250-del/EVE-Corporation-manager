@@ -205,7 +205,12 @@ export async function listMonitoredSystems(corporationId: number) {
     await db
       .select()
       .from(monitoredSystemsTable)
-      .where(eq(monitoredSystemsTable.corporationId, corporationId))
+      .where(
+        and(
+          eq(monitoredSystemsTable.corporationId, corporationId),
+          isNull(monitoredSystemsTable.removedAt),
+        ),
+      )
       .orderBy(monitoredSystemsTable.solarSystemName)
   ).map(formatMonitor);
 }
@@ -236,6 +241,7 @@ export async function createMonitoredSystem(input: {
       .set({
         solarSystemName: system.name,
         isActive: true,
+        removedAt: null,
         burstWindowMinutes: input.burstWindowMinutes,
         burstThreshold: input.burstThreshold,
         highValueThreshold: input.highValueThreshold,
@@ -677,10 +683,29 @@ export async function updateMonitoredSystem(
       and(
         eq(monitoredSystemsTable.corporationId, corporationId),
         eq(monitoredSystemsTable.id, monitorId),
+        isNull(monitoredSystemsTable.removedAt),
       ),
     )
     .returning();
   return updated ? formatMonitor(updated) : null;
+}
+
+export async function removeMonitoredSystem(
+  corporationId: number,
+  monitorId: number,
+) {
+  const [removed] = await db
+    .update(monitoredSystemsTable)
+    .set({ isActive: false, removedAt: new Date() })
+    .where(
+      and(
+        eq(monitoredSystemsTable.corporationId, corporationId),
+        eq(monitoredSystemsTable.id, monitorId),
+        isNull(monitoredSystemsTable.removedAt),
+      ),
+    )
+    .returning({ id: monitoredSystemsTable.id });
+  return removed ?? null;
 }
 
 export async function cleanupExpiredPairings() {

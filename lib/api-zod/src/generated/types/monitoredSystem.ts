@@ -19,6 +19,8 @@ export interface MonitoredSystem {
   /** @nullable */
   notes: string | null;
   /** @nullable */
+  removedAt: Date | null;
+  /** @nullable */
   createdBy: number | null;
   createdAt: Date;
   updatedAt: Date;

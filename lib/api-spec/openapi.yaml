@@ -1194,6 +1194,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MonitoredSystem"
+    delete:
+      operationId: deleteMonitoredSystem
+      tags: [system-monitoring]
+      summary: Remove a monitored system while retaining its history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Monitored system removed
 
   /system-monitoring/pairings:
     post:
@@ -3764,10 +3776,11 @@ components:
         highValueThreshold: { type: number }
         activityMultiplier: { type: number }
         notes: { type: [string, "null"] }
+        removedAt: { type: [string, "null"], format: date-time }
         createdBy: { type: [integer, "null"] }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
-      required: [id, corporationId, solarSystemId, solarSystemName, isActive, burstWindowMinutes, burstThreshold, highValueThreshold, activityMultiplier, notes, createdBy, createdAt, updatedAt]
+      required: [id, corporationId, solarSystemId, solarSystemName, isActive, burstWindowMinutes, burstThreshold, highValueThreshold, activityMultiplier, notes, removedAt, createdBy, createdAt, updatedAt]
 
     SolarSystemSearchResult:
       type: object

@@ -2264,6 +2264,7 @@ export const GetSystemMonitoringDashboardResponse = zod.object({
         highValueThreshold: zod.number(),
         activityMultiplier: zod.number(),
         notes: zod.string().nullable(),
+        removedAt: zod.coerce.date().nullable(),
         createdBy: zod.number().nullable(),
         createdAt: zod.coerce.date(),
         updatedAt: zod.coerce.date(),
@@ -2411,6 +2412,7 @@ export const ListMonitoredSystemsResponseItem = zod.object({
   highValueThreshold: zod.number(),
   activityMultiplier: zod.number(),
   notes: zod.string().nullable(),
+  removedAt: zod.coerce.date().nullable(),
   createdBy: zod.number().nullable(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -2524,9 +2526,17 @@ export const UpdateMonitoredSystemResponse = zod.object({
   highValueThreshold: zod.number(),
   activityMultiplier: zod.number(),
   notes: zod.string().nullable(),
+  removedAt: zod.coerce.date().nullable(),
   createdBy: zod.number().nullable(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Remove a monitored system while retaining its history
+ */
+export const DeleteMonitoredSystemParams = zod.object({
+  id: zod.coerce.number(),
 });
 
 /**

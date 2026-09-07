@@ -17,6 +17,7 @@ import {
   updateMonitoredSystem,
   type IncomingChatEvent,
 } from "../lib/system-monitoring";
+import { searchSolarSystems } from "../lib/solar-system-search";
 
 const router: IRouter = Router();
 
@@ -187,6 +188,22 @@ router.post(
       return;
     }
     res.status(201).json(created);
+  },
+);
+
+router.get(
+  "/system-monitoring/system-search",
+  async (req: Request, res: Response): Promise<void> => {
+    if (!managerAllowed(req)) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+    const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
+    if (query.length < 2 || query.length > 100) {
+      res.status(400).json({ error: "星系搜索词必须为2至100个字符" });
+      return;
+    }
+    res.json(searchSolarSystems(query));
   },
 );
 

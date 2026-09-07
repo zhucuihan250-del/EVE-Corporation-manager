@@ -1121,6 +1121,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/SystemIntelEvent"
 
+  /system-monitoring/system-search:
+    get:
+      operationId: searchSolarSystemsForMonitoring
+      tags: [system-monitoring]
+      summary: Search the official EVE solar-system catalog for monitoring
+      parameters:
+        - in: query
+          name: q
+          required: true
+          schema: { type: string, minLength: 2, maxLength: 100 }
+      responses:
+        "200":
+          description: Matching solar systems
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SolarSystemSearchResult" }
+
   /system-monitoring/systems:
     get:
       operationId: listMonitoredSystems
@@ -3749,6 +3768,13 @@ components:
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
       required: [id, corporationId, solarSystemId, solarSystemName, isActive, burstWindowMinutes, burstThreshold, highValueThreshold, activityMultiplier, notes, createdBy, createdAt, updatedAt]
+
+    SolarSystemSearchResult:
+      type: object
+      properties:
+        solarSystemId: { type: integer }
+        solarSystemName: { type: string }
+      required: [solarSystemId, solarSystemName]
 
     SystemActivitySample:
       type: object

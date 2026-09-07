@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   getListIntelBridgesQueryKey,
@@ -7,9 +7,11 @@ import {
   useCreateMonitoredSystem,
   useListIntelBridges,
   useListMonitoredSystems,
+  useSearchSolarSystemsForMonitoring,
   useUpdateIntelBridge,
   useUpdateMonitoredSystem,
   type IntelBridgePairing,
+  type SolarSystemSearchResult,
 } from "@workspace/api-client-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,14 +29,17 @@ import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/api-error";
 import { useTranslation } from "react-i18next";
 import {
+  Check,
   Copy,
   Download,
   Laptop,
+  Loader2,
   MapPin,
   Plus,
   Power,
   Radio,
   RefreshCw,
+  Search,
   ShieldCheck,
 } from "lucide-react";
 
@@ -63,6 +68,10 @@ export function AdminSystemMonitoring() {
   const createPairing = useCreateIntelBridgePairing();
   const updateBridge = useUpdateIntelBridge();
   const [solarSystemName, setSolarSystemName] = useState("");
+  const [debouncedSystemQuery, setDebouncedSystemQuery] = useState("");
+  const [selectedSystem, setSelectedSystem] =
+    useState<SolarSystemSearchResult | null>(null);
+  const [showSystemResults, setShowSystemResults] = useState(false);
   const [burstWindowMinutes, setBurstWindowMinutes] = useState("10");
   const [burstThreshold, setBurstThreshold] = useState("3");
   const [highValueBillions, setHighValueBillions] = useState("1");
@@ -72,6 +81,25 @@ export function AdminSystemMonitoring() {
   const [channelDrafts, setChannelDrafts] = useState<Record<number, string>>(
     {},
   );
+  const systemSearch = useSearchSolarSystemsForMonitoring(
+    { q: debouncedSystemQuery },
+    {
+      query: {
+        enabled: debouncedSystemQuery.length >= 2,
+        queryKey: ["monitoringSolarSystemSearch", debouncedSystemQuery],
+        staleTime: 60 * 60 * 1_000,
+      },
+    },
+  );
+
+  useEffect(() => {
+    const query = solarSystemName.trim();
+    const timer = window.setTimeout(
+      () => setDebouncedSystemQuery(query),
+      250,
+    );
+    return () => window.clearTimeout(timer);
+  }, [solarSystemName]);
 
   const invalidateSystems = () =>
     queryClient.invalidateQueries({
@@ -81,7 +109,8 @@ export function AdminSystemMonitoring() {
     queryClient.invalidateQueries({ queryKey: getListIntelBridgesQueryKey() });
 
   const addSystem = () => {
-    if (!solarSystemName.trim()) return;
+    if (!selectedSystem || selectedSystem.solarSystemName !== solarSystemName)
+      return;
     createSystem.mutate(
       {
         data: {
@@ -96,6 +125,8 @@ export function AdminSystemMonitoring() {
       {
         onSuccess: async () => {
           setSolarSystemName("");
+          setSelectedSystem(null);
+          setShowSystemResults(false);
           setNotes("");
           await invalidateSystems();
           toast({ title: tr("监控星系已启用", "System monitoring enabled") });
@@ -195,20 +226,81 @@ export function AdminSystemMonitoring() {
           </CardTitle>
           <CardDescription>
             {tr(
-              "必须使用游戏内完整英文星系名称；系统会通过EVE ESI进行验证。",
-              "Use the exact in-game system name; EVE ESI validates it.",
+              "输入部分星系名称后从搜索结果中选择；添加时仍会通过EVE ESI精确验证。",
+              "Type part of a system name and select a result; EVE ESI still validates the exact system when it is added.",
             )}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <div className="space-y-2 xl:col-span-2">
-              <Label>{tr("星系名称", "System name")}</Label>
-              <Input
-                value={solarSystemName}
-                onChange={(event) => setSolarSystemName(event.target.value)}
-                placeholder="1DQ1-A"
-              />
+              <Label>{tr("搜索星系", "Search system")}</Label>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={solarSystemName}
+                  onChange={(event) => {
+                    setSolarSystemName(event.target.value);
+                    setSelectedSystem(null);
+                    setShowSystemResults(true);
+                  }}
+                  onFocus={() => setShowSystemResults(true)}
+                  onBlur={() => setShowSystemResults(false)}
+                  placeholder="74L"
+                  className="pl-9"
+                  role="combobox"
+                  aria-autocomplete="list"
+                  aria-expanded={showSystemResults}
+                />
+                {showSystemResults && solarSystemName.trim().length >= 2 && (
+                  <div
+                    role="listbox"
+                    className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-xl"
+                  >
+                    {debouncedSystemQuery !== solarSystemName.trim() || systemSearch.isFetching ? (
+                      <div className="flex items-center gap-2 px-3 py-3 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        {tr("搜索中…", "Searching…")}
+                      </div>
+                    ) : systemSearch.isError ? (
+                      <div className="px-3 py-3 text-sm text-destructive">
+                        {tr("星系搜索暂时不可用", "System search is temporarily unavailable")}
+                      </div>
+                    ) : !systemSearch.data?.length ? (
+                      <div className="px-3 py-3 text-sm text-muted-foreground">
+                        {tr("没有匹配的星系", "No matching systems")}
+                      </div>
+                    ) : (
+                      systemSearch.data.map((system) => (
+                        <button
+                          key={system.solarSystemId}
+                          type="button"
+                          role="option"
+                          aria-selected={selectedSystem?.solarSystemId === system.solarSystemId}
+                          className="flex w-full items-center justify-between rounded-sm px-3 py-2 text-left text-sm hover:bg-accent"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => {
+                            setSelectedSystem(system);
+                            setSolarSystemName(system.solarSystemName);
+                            setShowSystemResults(false);
+                          }}
+                        >
+                          <span className="font-medium">{system.solarSystemName}</span>
+                          <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                            {system.solarSystemId}
+                            {selectedSystem?.solarSystemId === system.solarSystemId && <Check className="h-4 w-4 text-primary" />}
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {selectedSystem
+                  ? tr(`已选择：${selectedSystem.solarSystemName}`, `Selected: ${selectedSystem.solarSystemName}`)
+                  : tr("输入至少2个字符，例如74L。", "Enter at least 2 characters, for example 74L.")}
+              </p>
             </div>
             <div className="space-y-2">
               <Label>
@@ -270,7 +362,7 @@ export function AdminSystemMonitoring() {
             </div>
             <Button
               onClick={addSystem}
-              disabled={!solarSystemName.trim() || createSystem.isPending}
+              disabled={!selectedSystem || createSystem.isPending}
             >
               <Plus className="mr-2 h-4 w-4" />
               {createSystem.isPending

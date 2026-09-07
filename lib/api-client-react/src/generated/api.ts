@@ -105,9 +105,11 @@ import type {
   Reward,
   ScanFleetResponse,
   SearchFittingCatalogParams,
+  SearchSolarSystemsForMonitoringParams,
   SetIdentityGroupApplicationWindow200,
   SetIdentityGroupApplicationWindowBody,
   SkillAuditResult,
+  SolarSystemSearchResult,
   SuccessResponse,
   SyncCorporationWallet200,
   SystemIntelEvent,
@@ -4553,6 +4555,116 @@ export const useCreateManualIntelReport = <
 > => {
   return useMutation(getCreateManualIntelReportMutationOptions(options));
 };
+
+/**
+ * @summary Search the official EVE solar-system catalog for monitoring
+ */
+export const getSearchSolarSystemsForMonitoringUrl = (
+  params: SearchSolarSystemsForMonitoringParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/system-monitoring/system-search?${stringifiedParams}`
+    : `/api/system-monitoring/system-search`;
+};
+
+export const searchSolarSystemsForMonitoring = async (
+  params: SearchSolarSystemsForMonitoringParams,
+  options?: RequestInit,
+): Promise<SolarSystemSearchResult[]> => {
+  return customFetch<SolarSystemSearchResult[]>(
+    getSearchSolarSystemsForMonitoringUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getSearchSolarSystemsForMonitoringQueryKey = (
+  params?: SearchSolarSystemsForMonitoringParams,
+) => {
+  return [
+    `/api/system-monitoring/system-search`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getSearchSolarSystemsForMonitoringQueryOptions = <
+  TData = Awaited<ReturnType<typeof searchSolarSystemsForMonitoring>>,
+  TError = ErrorType<unknown>,
+>(
+  params: SearchSolarSystemsForMonitoringParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof searchSolarSystemsForMonitoring>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getSearchSolarSystemsForMonitoringQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof searchSolarSystemsForMonitoring>>
+  > = ({ signal }) =>
+    searchSolarSystemsForMonitoring(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof searchSolarSystemsForMonitoring>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type SearchSolarSystemsForMonitoringQueryResult = NonNullable<
+  Awaited<ReturnType<typeof searchSolarSystemsForMonitoring>>
+>;
+export type SearchSolarSystemsForMonitoringQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Search the official EVE solar-system catalog for monitoring
+ */
+
+export function useSearchSolarSystemsForMonitoring<
+  TData = Awaited<ReturnType<typeof searchSolarSystemsForMonitoring>>,
+  TError = ErrorType<unknown>,
+>(
+  params: SearchSolarSystemsForMonitoringParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof searchSolarSystemsForMonitoring>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getSearchSolarSystemsForMonitoringQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary List monitored-system configuration for fleet managers

@@ -2371,9 +2371,9 @@ export const CreateManualIntelReportBody = zod.object({
   ttlMinutes: zod.union([
     zod.literal(5),
     zod.literal(10),
+    zod.literal(15),
     zod.literal(20),
-    zod.literal(30),
-    zod.literal(60),
+    zod.literal(25),
   ]),
 });
 

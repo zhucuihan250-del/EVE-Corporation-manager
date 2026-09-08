@@ -12,7 +12,9 @@ import {
 } from "@workspace/db";
 import { and, desc, eq, gte, isNull, lt } from "drizzle-orm";
 import {
+  effectiveIntelExpiresAt,
   highestSeverity,
+  intelExpiresAt,
   intelDedupeKey,
   parseIntelMessage,
 } from "./system-monitoring-rules";
@@ -143,9 +145,12 @@ export async function loadSystemMonitoringDashboard(corporationId: number) {
       .where(eq(intelBridgesTable.corporationId, corporationId)),
   ]);
 
-  const activeEvents = events.filter(
-    (event) =>
-      event.expiresAt === null || event.expiresAt.getTime() > now.getTime(),
+  const cappedEvents = events.map((event) => ({
+    ...event,
+    expiresAt: effectiveIntelExpiresAt(event.occurredAt, event.expiresAt),
+  }));
+  const activeEvents = cappedEvents.filter(
+    (event) => event.expiresAt.getTime() > now.getTime(),
   );
   const latestSampleByMonitor = new Map<number, (typeof samples)[number]>();
   for (const sample of samples) {
@@ -158,7 +163,7 @@ export async function loadSystemMonitoringDashboard(corporationId: number) {
     const currentEvents = activeEvents.filter(
       (event) => event.monitorId === monitor.id,
     );
-    const recentKills = events.filter(
+    const recentKills = activeEvents.filter(
       (event) =>
         event.monitorId === monitor.id &&
         event.source === "killmail" &&
@@ -177,8 +182,8 @@ export async function loadSystemMonitoringDashboard(corporationId: number) {
       activeEventCount: currentEvents.length,
       recentKillCount: recentKills.length,
       lastEventAt:
-        events.find((event) => event.monitorId === monitor.id)?.occurredAt ??
-        null,
+        cappedEvents.find((event) => event.monitorId === monitor.id)
+          ?.occurredAt ?? null,
       latestActivity: latestSampleByMonitor.get(monitor.id) ?? null,
     };
   });
@@ -187,7 +192,7 @@ export async function loadSystemMonitoringDashboard(corporationId: number) {
   return {
     generatedAt: now,
     monitors: monitorSummaries,
-    events,
+    events: cappedEvents,
     bridgeStatus: {
       total: bridges.filter((bridge) => bridge.isActive).length,
       online: bridges.filter(
@@ -548,9 +553,7 @@ export async function ingestBridgeEvents(
         direction: parsed.direction,
         metadata: { channelName: item.channelName.trim(), relayCount: 1 },
         occurredAt,
-        expiresAt: new Date(
-          occurredAt.getTime() + parsed.ttlMinutes * 60 * 1_000,
-        ),
+        expiresAt: intelExpiresAt(occurredAt, parsed.ttlMinutes),
         dedupeKey,
       })
       .onConflictDoNothing()
@@ -623,10 +626,7 @@ export async function createManualIntelReport(input: {
       shipTags: (input.shipTags ?? []).slice(0, 20),
       direction: input.direction?.trim().slice(0, 120) || null,
       occurredAt,
-      expiresAt: new Date(
-        occurredAt.getTime() +
-          Math.min(60, Math.max(5, input.ttlMinutes)) * 60 * 1_000,
-      ),
+      expiresAt: intelExpiresAt(occurredAt, Math.max(5, input.ttlMinutes)),
       dedupeKey,
     })
     .onConflictDoNothing()

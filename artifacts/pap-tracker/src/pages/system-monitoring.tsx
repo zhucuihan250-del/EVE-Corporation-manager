@@ -129,7 +129,7 @@ export function SystemMonitoring() {
           shipTags,
           direction: direction.trim() || null,
           message: message.trim(),
-          ttlMinutes: Number(ttlMinutes) as 5 | 10 | 20 | 30 | 60,
+          ttlMinutes: Number(ttlMinutes) as 5 | 10 | 15 | 20 | 25,
         },
       },
       {
@@ -321,7 +321,7 @@ export function SystemMonitoring() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {[5, 10, 20, 30, 60].map((value) => (
+                    {[5, 10, 15, 20, 25].map((value) => (
                       <SelectItem key={value} value={String(value)}>
                         {value} {tr("分钟", "minutes")}
                       </SelectItem>

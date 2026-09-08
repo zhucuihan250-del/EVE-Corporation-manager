@@ -28,6 +28,38 @@ export type R2Z2Killmail = {
   zkb?: { totalValue?: number; npc?: boolean };
 };
 
+export const MAX_INTEL_TTL_MINUTES = 25;
+export const MANUAL_INTEL_TTL_OPTIONS = [5, 10, 15, 20, 25] as const;
+
+export function capIntelTtlMinutes(minutes: number): number {
+  if (!Number.isFinite(minutes)) return MAX_INTEL_TTL_MINUTES;
+  return Math.min(MAX_INTEL_TTL_MINUTES, Math.max(0, minutes));
+}
+
+export function intelExpiresAt(
+  occurredAt: Date,
+  requestedMinutes = MAX_INTEL_TTL_MINUTES,
+): Date {
+  return new Date(
+    occurredAt.getTime() + capIntelTtlMinutes(requestedMinutes) * 60 * 1_000,
+  );
+}
+
+export function effectiveIntelExpiresAt(
+  occurredAt: Date,
+  storedExpiresAt: Date | null,
+): Date {
+  const maximumExpiresAt = intelExpiresAt(occurredAt);
+  if (
+    !storedExpiresAt ||
+    !Number.isFinite(storedExpiresAt.getTime()) ||
+    storedExpiresAt.getTime() > maximumExpiresAt.getTime()
+  ) {
+    return maximumExpiresAt;
+  }
+  return storedExpiresAt;
+}
+
 export function killmailAffectsSystemRisk(
   killmail: Pick<R2Z2Killmail, "zkb">,
 ): boolean {
@@ -89,7 +121,7 @@ function parseDirection(message: string): string | null {
 function parseTtl(message: string): number {
   const match = message.match(/\bttl\s*[:=]?\s*(\d{1,3})\b/i);
   if (!match) return 10;
-  return Math.min(60, Math.max(5, Number(match[1])));
+  return Math.max(5, capIntelTtlMinutes(Number(match[1])));
 }
 
 export function parseIntelMessage(

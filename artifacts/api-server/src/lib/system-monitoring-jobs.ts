@@ -12,6 +12,7 @@ import {
   classifyShipGroups,
   countPlayerKills,
   extractR2Z2Killmail,
+  intelExpiresAt,
   intelDedupeKey,
   killmailAffectsSystemRisk,
   type R2Z2Killmail,
@@ -206,7 +207,7 @@ async function processKillmail(killmail: R2Z2Killmail) {
           friendlyLoss,
         },
         occurredAt,
-        expiresAt: new Date(occurredAt.getTime() + 60 * 60 * 1_000),
+        expiresAt: intelExpiresAt(occurredAt),
         dedupeKey: intelDedupeKey([
           "killmail",
           monitor.id,
@@ -248,9 +249,7 @@ async function processKillmail(killmail: R2Z2Killmail) {
           solarSystemName: monitor.solarSystemName,
           summary: `${monitor.solarSystemName} 在 ${monitor.burstWindowMinutes} 分钟内出现 ${count} 条玩家击杀`,
           occurredAt,
-          expiresAt: new Date(
-            occurredAt.getTime() + monitor.burstWindowMinutes * 60 * 1_000,
-          ),
+          expiresAt: intelExpiresAt(occurredAt, monitor.burstWindowMinutes),
           dedupeKey: intelDedupeKey(["kill-burst", monitor.id, bucket]),
         })
         .onConflictDoNothing();
@@ -506,7 +505,7 @@ export async function runSystemActivitySweep() {
             solarSystemName: monitor.solarSystemName,
             summary: `${monitor.solarSystemName} 的玩家击杀和跳跃活动同时高于近期基线`,
             occurredAt: sampledAt,
-            expiresAt: new Date(sampledAt.getTime() + 2 * 60 * 60 * 1_000),
+            expiresAt: intelExpiresAt(sampledAt),
             dedupeKey: intelDedupeKey([
               "activity-spike",
               monitor.id,

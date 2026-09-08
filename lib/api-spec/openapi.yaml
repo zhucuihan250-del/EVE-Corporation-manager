@@ -3886,7 +3886,7 @@ components:
           items: { type: string }
         direction: { type: [string, "null"], maxLength: 120 }
         message: { type: string, minLength: 1, maxLength: 2000 }
-        ttlMinutes: { type: integer, enum: [5, 10, 20, 30, 60] }
+        ttlMinutes: { type: integer, enum: [5, 10, 15, 20, 25] }
       required: [monitorId, message, ttlMinutes]
 
     CreateMonitoredSystemBody:

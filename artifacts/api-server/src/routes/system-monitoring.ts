@@ -18,6 +18,7 @@ import {
   updateMonitoredSystem,
   type IncomingChatEvent,
 } from "../lib/system-monitoring";
+import { MANUAL_INTEL_TTL_OPTIONS } from "../lib/system-monitoring-rules";
 import { searchSolarSystems } from "../lib/solar-system-search";
 
 const router: IRouter = Router();
@@ -164,7 +165,7 @@ router.post(
         (!Number.isInteger(enemyCount) ||
           enemyCount < 0 ||
           enemyCount > 1_000)) ||
-      ![5, 10, 20, 30, 60].includes(ttlMinutes) ||
+      !MANUAL_INTEL_TTL_OPTIONS.some((value) => value === ttlMinutes) ||
       !message ||
       message.length > 2_000 ||
       (direction && direction.length > 120) ||

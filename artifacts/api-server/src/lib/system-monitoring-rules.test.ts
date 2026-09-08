@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  capIntelTtlMinutes,
   classifyShipGroups,
   countPlayerKills,
+  effectiveIntelExpiresAt,
   extractR2Z2Killmail,
   highestSeverity,
   intelDedupeKey,
@@ -28,6 +30,32 @@ test("parses structured Chinese hostile intel", () => {
   assert.equal(parsed.direction, "T5ZI-S");
   assert.equal(parsed.ttlMinutes, 20);
   assert.equal(parsed.severity, "danger");
+});
+
+test("caps all intelligence lifetimes at 25 minutes", () => {
+  assert.equal(capIntelTtlMinutes(60), 25);
+  assert.equal(capIntelTtlMinutes(10), 10);
+
+  const longTtl = parseIntelMessage("Jita +3 ttl=60", monitors);
+  const shortTtl = parseIntelMessage("Jita +3 ttl=1", monitors);
+  assert.equal(longTtl?.ttlMinutes, 25);
+  assert.equal(shortTtl?.ttlMinutes, 5);
+
+  const occurredAt = new Date("2026-09-08T00:00:00.000Z");
+  assert.equal(
+    effectiveIntelExpiresAt(
+      occurredAt,
+      new Date("2026-09-08T02:00:00.000Z"),
+    ).toISOString(),
+    "2026-09-08T00:25:00.000Z",
+  );
+  assert.equal(
+    effectiveIntelExpiresAt(
+      occurredAt,
+      new Date("2026-09-08T00:10:00.000Z"),
+    ).toISOString(),
+    "2026-09-08T00:10:00.000Z",
+  );
 });
 
 test("does not match a solar system inside a longer token", () => {

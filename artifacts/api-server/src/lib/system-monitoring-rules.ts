@@ -28,6 +28,20 @@ export type R2Z2Killmail = {
   zkb?: { totalValue?: number; npc?: boolean };
 };
 
+export function killmailAffectsSystemRisk(
+  killmail: Pick<R2Z2Killmail, "zkb">,
+): boolean {
+  return killmail.zkb?.npc !== true;
+}
+
+export function countPlayerKills(activity: {
+  shipKills: number;
+  podKills: number;
+  npcKills?: number;
+}): number {
+  return activity.shipKills + activity.podKills;
+}
+
 const SHIP_TAGS: Array<[string, RegExp]> = [
   [
     "旗舰",

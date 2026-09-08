@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   classifyShipGroups,
+  countPlayerKills,
   extractR2Z2Killmail,
   highestSeverity,
   intelDedupeKey,
+  killmailAffectsSystemRisk,
   messageContainsSystem,
   parseIntelMessage,
 } from "./system-monitoring-rules";
@@ -87,5 +89,24 @@ test("extracts the current R2Z2 esi payload and keeps zKillboard value", () => {
       attackers: [{ ship_type_id: 22436 }],
       zkb: { totalValue: 1_250_000_000, npc: false },
     },
+  );
+});
+
+test("NPC kills never affect monitored-system risk", () => {
+  assert.equal(
+    killmailAffectsSystemRisk({
+      zkb: { npc: true, totalValue: 5_000_000_000 },
+    }),
+    false,
+  );
+  assert.equal(killmailAffectsSystemRisk({ zkb: { npc: false } }), true);
+  assert.equal(killmailAffectsSystemRisk({}), true);
+  assert.equal(
+    countPlayerKills({ shipKills: 2, podKills: 1, npcKills: 100_000 }),
+    3,
+  );
+  assert.equal(
+    countPlayerKills({ shipKills: 0, podKills: 0, npcKills: 100_000 }),
+    0,
   );
 });

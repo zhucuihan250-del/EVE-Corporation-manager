@@ -10,8 +10,10 @@ import {
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import {
   classifyShipGroups,
+  countPlayerKills,
   extractR2Z2Killmail,
   intelDedupeKey,
+  killmailAffectsSystemRisk,
   type R2Z2Killmail,
 } from "./system-monitoring-rules";
 import { cleanupExpiredPairings } from "./system-monitoring";
@@ -100,6 +102,8 @@ function formatIsk(value: number): string {
 }
 
 async function processKillmail(killmail: R2Z2Killmail) {
+  if (!killmailAffectsSystemRisk(killmail)) return;
+
   const monitorRows = await db
     .select({ monitor: monitoredSystemsTable })
     .from(monitoredSystemsTable)
@@ -149,7 +153,6 @@ async function processKillmail(killmail: R2Z2Killmail) {
   for (const monitor of monitors) {
     const friendlyLoss =
       killmail.victim.corporation_id === monitor.corporationId;
-    if (killmail.zkb?.npc === true && !friendlyLoss) continue;
     const highValue = totalValue >= Number(monitor.highValueThreshold);
     const special =
       classification.capital ||
@@ -437,10 +440,8 @@ export async function runSystemActivitySweep() {
           : null;
       const killBaseline =
         prior.length >= 6
-          ? prior.reduce(
-              (total, row) => total + row.shipKills + row.podKills,
-              0,
-            ) / prior.length
+          ? prior.reduce((total, row) => total + countPlayerKills(row), 0) /
+            prior.length
           : null;
       const currentJumps = jumps.get(monitor.solarSystemId) ?? 0;
       const currentKills = kills.get(monitor.solarSystemId) ?? {
@@ -448,8 +449,11 @@ export async function runSystemActivitySweep() {
         pod_kills: 0,
         ship_kills: 0,
       };
-      const currentPlayerKills =
-        currentKills.ship_kills + currentKills.pod_kills;
+      const currentPlayerKills = countPlayerKills({
+        shipKills: currentKills.ship_kills,
+        podKills: currentKills.pod_kills,
+        npcKills: currentKills.npc_kills,
+      });
       const isAnomalous =
         jumpBaseline !== null &&
         killBaseline !== null &&

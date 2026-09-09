@@ -43,20 +43,32 @@ function nonNegativeInteger(value: number | null | undefined): number {
   return Math.max(0, Math.floor(value ?? 0));
 }
 
+function lifetimeTier(
+  value: number | null | undefined,
+  tierSize: number,
+): number {
+  const normalized = nonNegativeInteger(value);
+  return normalized === 0
+    ? MIN_DYNAMIC_INTEL_TTL_MINUTES
+    : Math.min(
+        MAX_INTEL_TTL_MINUTES,
+        MIN_DYNAMIC_INTEL_TTL_MINUTES + Math.ceil(normalized / tierSize) * 5,
+      );
+}
+
 /**
- * Base 5 minutes, plus 2 minutes per player kill, plus 1 minute per 3
- * reported hostiles or observed player participants, capped at 25.
+ * Killmail and hostile-count lifetimes use independent five-minute tiers so
+ * the same people are not counted twice. The stronger signal wins:
+ *
+ * - kills: 0/1/2/3/4+ => 5/10/15/20/25 minutes
+ * - people: 0/1-10/11-20/21-30/31+ => 5/10/15/20/25 minutes
  */
 export function calculateDynamicIntelTtlMinutes(
   input: DynamicIntelLifetimeInput,
 ): number {
-  const killMinutes = nonNegativeInteger(input.killCount) * 2;
-  const participantMinutes = Math.ceil(
-    nonNegativeInteger(input.participantCount ?? input.hostileCount) / 3,
-  );
-  return Math.min(
-    MAX_INTEL_TTL_MINUTES,
-    MIN_DYNAMIC_INTEL_TTL_MINUTES + killMinutes + participantMinutes,
+  return Math.max(
+    lifetimeTier(input.killCount, 1),
+    lifetimeTier(input.participantCount ?? input.hostileCount, 10),
   );
 }
 

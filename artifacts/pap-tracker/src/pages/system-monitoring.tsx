@@ -363,8 +363,8 @@ export function SystemMonitoring() {
                 <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                 <span>
                   {tr(
-                    "自动时长＝5分钟＋每条玩家击杀2分钟＋每3人1分钟（击杀邮件按参与者，人工/频道按报告敌对），合计最长25分钟。",
-                    "Automatic duration = 5 minutes + 2 per player kill + 1 per 3 people (killmail participants or reported hostiles), capped at 25 minutes.",
+                    "预警按5分钟档位自动计算：击杀数0/1/2/3/4+对应5/10/15/20/25分钟；人数0/1–10/11–20/21–30/31+同样对应5/10/15/20/25分钟（击杀邮件按参与者，人工/频道按报告敌对），取两者较高档。每次新击杀都从最新击杀时间按新档位完整重启，最长25分钟。",
+                    "Alerts use 5-minute tiers. Kill counts 0/1/2/3/4+ map to 5/10/15/20/25 minutes; population counts 0/1–10/11–20/21–30/31+ map to the same tiers (killmail participants or manually reported hostiles), and the higher tier wins. Each new kill restarts the full countdown at the new tier from its latest kill time, capped at 25 minutes.",
                   )}
                 </span>
               </div>

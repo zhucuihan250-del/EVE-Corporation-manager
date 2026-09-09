@@ -7,7 +7,7 @@ import {
   systemMonitorFeedStateTable,
   pool,
 } from "@workspace/db";
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 import {
   calculateDynamicIntelTtlMinutes,
   classifyShipGroups,
@@ -154,10 +154,6 @@ async function processKillmail(killmail: R2Z2Killmail) {
   const totalValue = Number(killmail.zkb?.totalValue ?? 0);
   const playerAttackerIds = getPlayerAttackerIds(killmail);
   const playerParticipantCount = countPlayerParticipants(killmail);
-  const killTtlMinutes = calculateDynamicIntelTtlMinutes({
-    killCount: 1,
-    participantCount: playerParticipantCount,
-  });
   const occurredAt = new Date(killmail.killmail_time);
   if (Number.isNaN(occurredAt.getTime())) return;
 
@@ -191,6 +187,33 @@ async function processKillmail(killmail: R2Z2Killmail) {
     const summary = friendlyLoss
       ? `本军团成员在 ${monitor.solarSystemName} 损失 ${victimShip ?? "舰船"}${totalValue > 0 ? `（${formatIsk(totalValue)}）` : ""}`
       : `${monitor.solarSystemName} 出现玩家击杀：${victimLabel} / ${victimShip ?? "未知舰船"}${totalValue > 0 ? ` / ${formatIsk(totalValue)}` : ""}`;
+    const windowStart = new Date(
+      occurredAt.getTime() - monitor.burstWindowMinutes * 60 * 1_000,
+    );
+    const earlierRecentKills = await db
+      .select({ metadata: systemIntelEventsTable.metadata })
+      .from(systemIntelEventsTable)
+      .where(
+        and(
+          eq(systemIntelEventsTable.corporationId, monitor.corporationId),
+          eq(systemIntelEventsTable.monitorId, monitor.id),
+          eq(systemIntelEventsTable.source, "killmail"),
+          gte(systemIntelEventsTable.occurredAt, windowStart),
+          lte(systemIntelEventsTable.occurredAt, occurredAt),
+        ),
+      );
+    const recentKills = [
+      ...earlierRecentKills,
+      { metadata: { playerAttackerIds } },
+    ];
+    const count = recentKills.length;
+    const burstParticipantCount = countUniquePlayerParticipants(
+      recentKills.map((event) => event.metadata),
+    );
+    const killTtlMinutes = calculateDynamicIntelTtlMinutes({
+      killCount: count,
+      participantCount: burstParticipantCount,
+    });
     const [created] = await db
       .insert(systemIntelEventsTable)
       .values({
@@ -230,25 +253,7 @@ async function processKillmail(killmail: R2Z2Killmail) {
       .returning({ id: systemIntelEventsTable.id });
     if (!created) continue;
 
-    const windowStart = new Date(
-      occurredAt.getTime() - monitor.burstWindowMinutes * 60 * 1_000,
-    );
-    const recentKills = await db
-      .select({ metadata: systemIntelEventsTable.metadata })
-      .from(systemIntelEventsTable)
-      .where(
-        and(
-          eq(systemIntelEventsTable.corporationId, monitor.corporationId),
-          eq(systemIntelEventsTable.monitorId, monitor.id),
-          eq(systemIntelEventsTable.source, "killmail"),
-          gte(systemIntelEventsTable.occurredAt, windowStart),
-        ),
-      );
-    const count = recentKills.length;
     if (count >= monitor.burstThreshold) {
-      const burstParticipantCount = countUniquePlayerParticipants(
-        recentKills.map((event) => event.metadata),
-      );
       const burstTtlMinutes = calculateDynamicIntelTtlMinutes({
         killCount: count,
         participantCount: burstParticipantCount,

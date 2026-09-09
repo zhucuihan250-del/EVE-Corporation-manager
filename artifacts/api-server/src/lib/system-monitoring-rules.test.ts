@@ -12,6 +12,7 @@ import {
   getPlayerAttackerIds,
   highestSeverity,
   intelDedupeKey,
+  intelExpiresAt,
   killmailAffectsSystemRisk,
   messageContainsSystem,
   parseIntelMessage,
@@ -62,46 +63,62 @@ test("caps all intelligence lifetimes at 25 minutes", () => {
   );
 });
 
-test("extends intelligence lifetime deterministically with kills and hostiles", () => {
+test("uses independent five-minute tiers for kills and population counts", () => {
   assert.equal(
     calculateDynamicIntelTtlMinutes({ killCount: 0, hostileCount: 0 }),
     5,
   );
   assert.equal(
     calculateDynamicIntelTtlMinutes({ killCount: 1, hostileCount: 1 }),
-    8,
+    10,
   );
   assert.equal(
-    calculateDynamicIntelTtlMinutes({ killCount: 3, hostileCount: 7 }),
-    14,
+    calculateDynamicIntelTtlMinutes({ killCount: 2, hostileCount: 1 }),
+    15,
   );
   assert.equal(
-    calculateDynamicIntelTtlMinutes({ killCount: 3, participantCount: 7 }),
-    14,
+    calculateDynamicIntelTtlMinutes({ killCount: 3, participantCount: 1 }),
+    20,
   );
   assert.equal(
-    calculateDynamicIntelTtlMinutes({ killCount: 100, hostileCount: 100 }),
+    calculateDynamicIntelTtlMinutes({ killCount: 4, participantCount: 1 }),
     25,
   );
+  assert.equal(calculateDynamicIntelTtlMinutes({ hostileCount: 10 }), 10);
+  assert.equal(calculateDynamicIntelTtlMinutes({ hostileCount: 11 }), 15);
+  assert.equal(calculateDynamicIntelTtlMinutes({ hostileCount: 21 }), 20);
+  assert.equal(calculateDynamicIntelTtlMinutes({ hostileCount: 31 }), 25);
   assert.equal(
-    calculateDynamicIntelTtlMinutes({ killCount: 10, hostileCount: 0 }),
-    25,
-  );
-  assert.equal(
-    calculateDynamicIntelTtlMinutes({ killCount: 0, hostileCount: 60 }),
-    25,
-  );
-  assert.ok(
-    calculateDynamicIntelTtlMinutes({ killCount: 2, hostileCount: 1 }) >
-      calculateDynamicIntelTtlMinutes({ killCount: 1, hostileCount: 1 }),
-  );
-  assert.ok(
-    calculateDynamicIntelTtlMinutes({ killCount: 1, hostileCount: 4 }) >
-      calculateDynamicIntelTtlMinutes({ killCount: 1, hostileCount: 1 }),
+    calculateDynamicIntelTtlMinutes({
+      killCount: 1,
+      participantCount: 21,
+      hostileCount: 100,
+    }),
+    20,
   );
   assert.equal(
     calculateDynamicIntelTtlMinutes({ killCount: -1, hostileCount: -10 }),
     5,
+  );
+});
+
+test("restarts the full tier lifetime from each latest kill", () => {
+  const firstKillAt = new Date("2026-09-10T00:00:00.000Z");
+  const secondKillAt = new Date("2026-09-10T00:08:00.000Z");
+
+  assert.equal(
+    intelExpiresAt(
+      firstKillAt,
+      calculateDynamicIntelTtlMinutes({ killCount: 1, participantCount: 1 }),
+    ).toISOString(),
+    "2026-09-10T00:10:00.000Z",
+  );
+  assert.equal(
+    intelExpiresAt(
+      secondKillAt,
+      calculateDynamicIntelTtlMinutes({ killCount: 2, participantCount: 1 }),
+    ).toISOString(),
+    "2026-09-10T00:23:00.000Z",
   );
 });
 

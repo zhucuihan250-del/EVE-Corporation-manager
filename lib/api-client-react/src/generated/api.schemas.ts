@@ -1181,7 +1181,20 @@ export const SystemMonitorSummaryRisk = {
   critical: "critical",
 } as const;
 
+export interface SystemMapPosition {
+  x: number;
+  y: number;
+  z: number;
+}
+
+export interface SystemMapPosition2D {
+  x: number;
+  y: number;
+}
+
 export type SystemMonitorSummary = MonitoredSystem & {
+  position: SystemMapPosition | null;
+  mapPosition: SystemMapPosition2D | null;
   risk: SystemMonitorSummaryRisk;
   activeEventCount: number;
   recentKillCount: number;
@@ -1189,6 +1202,20 @@ export type SystemMonitorSummary = MonitoredSystem & {
   lastEventAt: string | null;
   latestActivity: SystemActivitySample | null;
 };
+
+export interface SystemMapNode {
+  solarSystemId: number;
+  solarSystemName: string;
+  isMonitored: boolean;
+  position: SystemMapPosition;
+  mapPosition: SystemMapPosition2D;
+  securityStatus: number;
+}
+
+export interface SystemMapConnection {
+  fromSolarSystemId: number;
+  toSolarSystemId: number;
+}
 
 export type SystemMonitoringDashboardBridgeStatus = {
   total: number;
@@ -1199,9 +1226,15 @@ export interface SystemMonitoringDashboard {
   generatedAt: string;
   monitors: SystemMonitorSummary[];
   events: SystemIntelEvent[];
+  mapNodes: SystemMapNode[];
+  connections: SystemMapConnection[];
   bridgeStatus: SystemMonitoringDashboardBridgeStatus;
 }
 
+/**
+ * Retained for older clients; the server calculates lifetime from player kills and either observed killmail participants or reported hostile count.
+ * @deprecated
+ */
 export type CreateManualIntelReportBodyTtlMinutes =
   (typeof CreateManualIntelReportBodyTtlMinutes)[keyof typeof CreateManualIntelReportBodyTtlMinutes];
 
@@ -1233,7 +1266,11 @@ export interface CreateManualIntelReportBody {
    * @maxLength 2000
    */
   message: string;
-  ttlMinutes: CreateManualIntelReportBodyTtlMinutes;
+  /**
+   * Retained for older clients; the server calculates lifetime from player kills and either observed killmail participants or reported hostile count.
+   * @deprecated
+   */
+  ttlMinutes?: CreateManualIntelReportBodyTtlMinutes;
 }
 
 export interface CreateMonitoredSystemBody {

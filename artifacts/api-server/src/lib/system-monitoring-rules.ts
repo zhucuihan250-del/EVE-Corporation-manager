@@ -24,12 +24,41 @@ export type R2Z2Killmail = {
     corporation_id?: number;
     ship_type_id?: number;
   };
-  attackers?: Array<{ ship_type_id?: number }>;
+  attackers?: Array<{ character_id?: number; ship_type_id?: number }>;
   zkb?: { totalValue?: number; npc?: boolean };
 };
 
 export const MAX_INTEL_TTL_MINUTES = 25;
+export const MIN_DYNAMIC_INTEL_TTL_MINUTES = 5;
 export const MANUAL_INTEL_TTL_OPTIONS = [5, 10, 15, 20, 25] as const;
+
+export type DynamicIntelLifetimeInput = {
+  killCount?: number | null;
+  participantCount?: number | null;
+  hostileCount?: number | null;
+};
+
+function nonNegativeInteger(value: number | null | undefined): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.floor(value ?? 0));
+}
+
+/**
+ * Base 5 minutes, plus 2 minutes per player kill, plus 1 minute per 3
+ * reported hostiles or observed player participants, capped at 25.
+ */
+export function calculateDynamicIntelTtlMinutes(
+  input: DynamicIntelLifetimeInput,
+): number {
+  const killMinutes = nonNegativeInteger(input.killCount) * 2;
+  const participantMinutes = Math.ceil(
+    nonNegativeInteger(input.participantCount ?? input.hostileCount) / 3,
+  );
+  return Math.min(
+    MAX_INTEL_TTL_MINUTES,
+    MIN_DYNAMIC_INTEL_TTL_MINUTES + killMinutes + participantMinutes,
+  );
+}
 
 export function capIntelTtlMinutes(minutes: number): number {
   if (!Number.isFinite(minutes)) return MAX_INTEL_TTL_MINUTES;
@@ -64,6 +93,38 @@ export function killmailAffectsSystemRisk(
   killmail: Pick<R2Z2Killmail, "zkb">,
 ): boolean {
   return killmail.zkb?.npc !== true;
+}
+
+export function getPlayerAttackerIds(
+  killmail: Pick<R2Z2Killmail, "attackers">,
+): number[] {
+  return [
+    ...new Set(
+      (killmail.attackers ?? []).flatMap((attacker) =>
+        Number.isInteger(attacker.character_id) ? [attacker.character_id!] : [],
+      ),
+    ),
+  ];
+}
+
+export function countPlayerParticipants(
+  killmail: Pick<R2Z2Killmail, "attackers">,
+): number {
+  return getPlayerAttackerIds(killmail).length;
+}
+
+export function countUniquePlayerParticipants(
+  events: Array<{ playerAttackerIds?: unknown }>,
+): number {
+  return new Set(
+    events.flatMap((event) =>
+      Array.isArray(event.playerAttackerIds)
+        ? event.playerAttackerIds.filter((characterId): characterId is number =>
+            Number.isInteger(characterId),
+          )
+        : [],
+    ),
+  ).size;
 }
 
 export function countPlayerKills(activity: {

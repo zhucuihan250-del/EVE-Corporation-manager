@@ -28,6 +28,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/api-error";
+import { SystemIntelMap } from "@/components/system-intel-map";
 import { useTranslation } from "react-i18next";
 import {
   Activity,
@@ -35,6 +36,7 @@ import {
   Clock3,
   ExternalLink,
   MapPin,
+  Orbit,
   Radio,
   Send,
   ShieldCheck,
@@ -92,6 +94,25 @@ function confidenceLabel(confidence: string, zh: boolean): string {
   return labels[confidence]?.[zh ? 0 : 1] ?? confidence;
 }
 
+function eventPopulation(event: SystemIntelEvent): {
+  count: number;
+  isParticipantCount: boolean;
+} | null {
+  const isParticipantCount =
+    event.source === "killmail" || event.eventType === "kill_burst";
+  const metadataCount = event.metadata.playerParticipantCount;
+  const participantCount =
+    typeof metadataCount === "number" && Number.isFinite(metadataCount)
+      ? metadataCount
+      : null;
+  const count = isParticipantCount
+    ? (participantCount ?? event.enemyCount)
+    : event.enemyCount;
+  return count === null
+    ? null
+    : { count: Math.max(0, count), isParticipantCount };
+}
+
 export function SystemMonitoring() {
   const { i18n } = useTranslation();
   const zh = i18n.language.startsWith("zh");
@@ -109,7 +130,6 @@ export function SystemMonitoring() {
   const [enemyCount, setEnemyCount] = useState("");
   const [direction, setDirection] = useState("");
   const [message, setMessage] = useState("");
-  const [ttlMinutes, setTtlMinutes] = useState("10");
   const [shipTags, setShipTags] = useState<string[]>([]);
 
   const activeEvents = useMemo(() => {
@@ -129,7 +149,6 @@ export function SystemMonitoring() {
           shipTags,
           direction: direction.trim() || null,
           message: message.trim(),
-          ttlMinutes: Number(ttlMinutes) as 5 | 10 | 15 | 20 | 25,
         },
       },
       {
@@ -217,11 +236,37 @@ export function SystemMonitoring() {
           </CardHeader>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {data.monitors.map((monitor) => (
-            <MonitorCard key={monitor.id} monitor={monitor} zh={zh} />
-          ))}
-        </div>
+        <>
+          <Card className="overflow-hidden border-sky-500/25">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Orbit className="h-5 w-5 text-sky-400" />
+                {tr("实时战术星图", "LIVE TACTICAL MAP")}
+              </CardTitle>
+              <CardDescription>
+                {tr(
+                  "依据游戏二维星图坐标等比反映实际相对位置；节点大小反映报告敌对或击杀参与人数，风险颜色随有效情报自动更新。",
+                  "Uses a proportional in-game 2D map projection to preserve actual relative positions; node size reflects reported hostiles or killmail participants, while risk colors update with active intelligence.",
+                )}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <SystemIntelMap
+                monitors={data.monitors}
+                events={data.events}
+                dashboardData={data}
+                zh={zh}
+                onSelectMonitor={(id) => setMonitorId(String(id))}
+              />
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {data.monitors.map((monitor) => (
+              <MonitorCard key={monitor.id} monitor={monitor} zh={zh} />
+            ))}
+          </div>
+        </>
       )}
 
       {data?.monitors.length ? (
@@ -313,21 +358,15 @@ export function SystemMonitoring() {
                 )}
               />
             </div>
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div className="space-y-2">
-                <Label>{tr("有效时间", "Time to live")}</Label>
-                <Select value={ttlMinutes} onValueChange={setTtlMinutes}>
-                  <SelectTrigger className="w-40">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[5, 10, 15, 20, 25].map((value) => (
-                      <SelectItem key={value} value={String(value)}>
-                        {value} {tr("分钟", "minutes")}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex max-w-xl items-start gap-2 text-xs text-muted-foreground">
+                <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                <span>
+                  {tr(
+                    "自动时长＝5分钟＋每条玩家击杀2分钟＋每3人1分钟（击杀邮件按参与者，人工/频道按报告敌对），合计最长25分钟。",
+                    "Automatic duration = 5 minutes + 2 per player kill + 1 per 3 people (killmail participants or reported hostiles), capped at 25 minutes.",
+                  )}
+                </span>
               </div>
               <Button
                 onClick={submit}
@@ -460,6 +499,7 @@ function MonitorCard({
 
 function EventRow({ event, zh }: { event: SystemIntelEvent; zh: boolean }) {
   const tr = (cn: string, en: string) => (zh ? cn : en);
+  const population = eventPopulation(event);
   const expired = Boolean(
     event.expiresAt && new Date(event.expiresAt).getTime() <= Date.now(),
   );
@@ -482,10 +522,13 @@ function EventRow({ event, zh }: { event: SystemIntelEvent; zh: boolean }) {
           </div>
           <p className="text-sm text-foreground">{event.summary}</p>
           <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
-            {event.enemyCount !== null && (
+            {population && (
               <span className="flex items-center gap-1">
                 <Users className="h-3 w-3" />
-                {event.enemyCount}
+                {population.isParticipantCount
+                  ? tr("参与", "Participants")
+                  : tr("敌对", "Hostiles")}{" "}
+                {population.count}
               </span>
             )}
             {event.direction && (

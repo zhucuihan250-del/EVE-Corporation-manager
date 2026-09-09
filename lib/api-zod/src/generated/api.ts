@@ -2271,6 +2271,21 @@ export const GetSystemMonitoringDashboardResponse = zod.object({
       })
       .and(
         zod.object({
+          position: zod.union([
+            zod.object({
+              x: zod.number(),
+              y: zod.number(),
+              z: zod.number(),
+            }),
+            zod.null(),
+          ]),
+          mapPosition: zod.union([
+            zod.object({
+              x: zod.number(),
+              y: zod.number(),
+            }),
+            zod.null(),
+          ]),
           risk: zod.enum(["safe", "info", "warning", "danger", "critical"]),
           activeEventCount: zod.number(),
           recentKillCount: zod.number(),
@@ -2334,6 +2349,29 @@ export const GetSystemMonitoringDashboardResponse = zod.object({
       createdAt: zod.coerce.date(),
     }),
   ),
+  mapNodes: zod.array(
+    zod.object({
+      solarSystemId: zod.number(),
+      solarSystemName: zod.string(),
+      isMonitored: zod.boolean(),
+      position: zod.object({
+        x: zod.number(),
+        y: zod.number(),
+        z: zod.number(),
+      }),
+      mapPosition: zod.object({
+        x: zod.number(),
+        y: zod.number(),
+      }),
+      securityStatus: zod.number(),
+    }),
+  ),
+  connections: zod.array(
+    zod.object({
+      fromSolarSystemId: zod.number(),
+      toSolarSystemId: zod.number(),
+    }),
+  ),
   bridgeStatus: zod.object({
     total: zod.number(),
     online: zod.number(),
@@ -2368,13 +2406,18 @@ export const CreateManualIntelReportBody = zod.object({
     .max(createManualIntelReportBodyDirectionMax)
     .nullish(),
   message: zod.string().min(1).max(createManualIntelReportBodyMessageMax),
-  ttlMinutes: zod.union([
-    zod.literal(5),
-    zod.literal(10),
-    zod.literal(15),
-    zod.literal(20),
-    zod.literal(25),
-  ]),
+  ttlMinutes: zod
+    .union([
+      zod.literal(5),
+      zod.literal(10),
+      zod.literal(15),
+      zod.literal(20),
+      zod.literal(25),
+    ])
+    .optional()
+    .describe(
+      "Retained for older clients; the server calculates lifetime from player kills and either observed killmail participants or reported hostile count.",
+    ),
 });
 
 /**

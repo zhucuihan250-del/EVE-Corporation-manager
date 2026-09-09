@@ -12,12 +12,14 @@ import {
 } from "@workspace/db";
 import { and, desc, eq, gte, isNull, lt } from "drizzle-orm";
 import {
+  calculateDynamicIntelTtlMinutes,
   effectiveIntelExpiresAt,
   highestSeverity,
   intelExpiresAt,
   intelDedupeKey,
   parseIntelMessage,
 } from "./system-monitoring-rules";
+import { loadSystemMonitoringMap } from "./system-monitoring-map";
 
 const PAIRING_LIFETIME_MS = 10 * 60 * 1_000;
 const BRIDGE_ONLINE_WINDOW_MS = 90 * 1_000;
@@ -158,6 +160,7 @@ export async function loadSystemMonitoringDashboard(corporationId: number) {
       latestSampleByMonitor.set(sample.monitorId, sample);
   }
 
+  const systemMap = loadSystemMonitoringMap({ monitors });
   const monitorSummaries = monitors.map((monitor) => {
     const windowStart = now.getTime() - monitor.burstWindowMinutes * 60 * 1_000;
     const currentEvents = activeEvents.filter(
@@ -178,6 +181,8 @@ export async function loadSystemMonitoringDashboard(corporationId: number) {
         : highestSeverity(currentEvents.map((event) => event.severity));
     return {
       ...formatMonitor(monitor),
+      position: systemMap.positions.get(monitor.solarSystemId) ?? null,
+      mapPosition: systemMap.mapPositions.get(monitor.solarSystemId) ?? null,
       risk,
       activeEventCount: currentEvents.length,
       recentKillCount: recentKills.length,
@@ -193,6 +198,8 @@ export async function loadSystemMonitoringDashboard(corporationId: number) {
     generatedAt: now,
     monitors: monitorSummaries,
     events: cappedEvents,
+    mapNodes: systemMap.mapNodes,
+    connections: systemMap.connections,
     bridgeStatus: {
       total: bridges.filter((bridge) => bridge.isActive).length,
       online: bridges.filter(
@@ -532,6 +539,9 @@ export async function ingestBridgeEvents(
       occurredAt.toISOString(),
       item.message,
     ]);
+    const dynamicTtlMinutes = calculateDynamicIntelTtlMinutes({
+      hostileCount: parsed.enemyCount,
+    });
     const [created] = await db
       .insert(systemIntelEventsTable)
       .values({
@@ -551,9 +561,12 @@ export async function ingestBridgeEvents(
         enemyCount: parsed.enemyCount,
         shipTags: parsed.shipTags,
         direction: parsed.direction,
-        metadata: { channelName: item.channelName.trim(), relayCount: 1 },
+        metadata: {
+          channelName: item.channelName.trim(),
+          relayCount: 1,
+        },
         occurredAt,
-        expiresAt: intelExpiresAt(occurredAt, parsed.ttlMinutes),
+        expiresAt: intelExpiresAt(occurredAt, dynamicTtlMinutes),
         dedupeKey,
       })
       .onConflictDoNothing()
@@ -607,6 +620,9 @@ export async function createManualIntelReport(input: {
     Math.floor(occurredAt.getTime() / 30_000),
     input.message,
   ]);
+  const dynamicTtlMinutes = calculateDynamicIntelTtlMinutes({
+    hostileCount: input.enemyCount,
+  });
   const [created] = await db
     .insert(systemIntelEventsTable)
     .values({
@@ -626,7 +642,7 @@ export async function createManualIntelReport(input: {
       shipTags: (input.shipTags ?? []).slice(0, 20),
       direction: input.direction?.trim().slice(0, 120) || null,
       occurredAt,
-      expiresAt: intelExpiresAt(occurredAt, Math.max(5, input.ttlMinutes)),
+      expiresAt: intelExpiresAt(occurredAt, dynamicTtlMinutes),
       dedupeKey,
     })
     .onConflictDoNothing()

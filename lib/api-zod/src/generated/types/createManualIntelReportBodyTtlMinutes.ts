@@ -6,6 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
+/**
+ * Retained for older clients; the server calculates lifetime from player kills and either observed killmail participants or reported hostile count.
+ * @deprecated
+ */
 export type CreateManualIntelReportBodyTtlMinutes =
   (typeof CreateManualIntelReportBodyTtlMinutes)[keyof typeof CreateManualIntelReportBodyTtlMinutes];
 

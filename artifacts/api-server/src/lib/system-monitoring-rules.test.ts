@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  calculateDynamicIntelTtlMinutes,
   capIntelTtlMinutes,
   classifyShipGroups,
+  countPlayerParticipants,
   countPlayerKills,
+  countUniquePlayerParticipants,
   effectiveIntelExpiresAt,
   extractR2Z2Killmail,
+  getPlayerAttackerIds,
   highestSeverity,
   intelDedupeKey,
   killmailAffectsSystemRisk,
@@ -55,6 +59,49 @@ test("caps all intelligence lifetimes at 25 minutes", () => {
       new Date("2026-09-08T00:10:00.000Z"),
     ).toISOString(),
     "2026-09-08T00:10:00.000Z",
+  );
+});
+
+test("extends intelligence lifetime deterministically with kills and hostiles", () => {
+  assert.equal(
+    calculateDynamicIntelTtlMinutes({ killCount: 0, hostileCount: 0 }),
+    5,
+  );
+  assert.equal(
+    calculateDynamicIntelTtlMinutes({ killCount: 1, hostileCount: 1 }),
+    8,
+  );
+  assert.equal(
+    calculateDynamicIntelTtlMinutes({ killCount: 3, hostileCount: 7 }),
+    14,
+  );
+  assert.equal(
+    calculateDynamicIntelTtlMinutes({ killCount: 3, participantCount: 7 }),
+    14,
+  );
+  assert.equal(
+    calculateDynamicIntelTtlMinutes({ killCount: 100, hostileCount: 100 }),
+    25,
+  );
+  assert.equal(
+    calculateDynamicIntelTtlMinutes({ killCount: 10, hostileCount: 0 }),
+    25,
+  );
+  assert.equal(
+    calculateDynamicIntelTtlMinutes({ killCount: 0, hostileCount: 60 }),
+    25,
+  );
+  assert.ok(
+    calculateDynamicIntelTtlMinutes({ killCount: 2, hostileCount: 1 }) >
+      calculateDynamicIntelTtlMinutes({ killCount: 1, hostileCount: 1 }),
+  );
+  assert.ok(
+    calculateDynamicIntelTtlMinutes({ killCount: 1, hostileCount: 4 }) >
+      calculateDynamicIntelTtlMinutes({ killCount: 1, hostileCount: 1 }),
+  );
+  assert.equal(
+    calculateDynamicIntelTtlMinutes({ killCount: -1, hostileCount: -10 }),
+    5,
   );
 });
 
@@ -136,5 +183,35 @@ test("NPC kills never affect monitored-system risk", () => {
   assert.equal(
     countPlayerKills({ shipKills: 0, podKills: 0, npcKills: 100_000 }),
     0,
+  );
+  assert.equal(
+    countPlayerParticipants({
+      attackers: [
+        { character_id: 1001 },
+        { character_id: 1002 },
+        { character_id: 1002 },
+        { ship_type_id: 123 },
+      ],
+    }),
+    2,
+  );
+  assert.deepEqual(
+    getPlayerAttackerIds({
+      attackers: [
+        { character_id: 1002 },
+        { character_id: 1001 },
+        { character_id: 1002 },
+        { ship_type_id: 123 },
+      ],
+    }),
+    [1002, 1001],
+  );
+  assert.equal(
+    countUniquePlayerParticipants([
+      { playerAttackerIds: [1001, 1002] },
+      { playerAttackerIds: [1002, 1003] },
+      { playerAttackerIds: "invalid" },
+    ]),
+    3,
   );
 });

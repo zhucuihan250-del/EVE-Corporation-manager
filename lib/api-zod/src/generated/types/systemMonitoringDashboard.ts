@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { SystemIntelEvent } from "./systemIntelEvent";
+import type { SystemMapConnection } from "./systemMapConnection";
+import type { SystemMapNode } from "./systemMapNode";
 import type { SystemMonitoringDashboardBridgeStatus } from "./systemMonitoringDashboardBridgeStatus";
 import type { SystemMonitorSummary } from "./systemMonitorSummary";
 
@@ -13,5 +15,7 @@ export interface SystemMonitoringDashboard {
   generatedAt: Date;
   monitors: SystemMonitorSummary[];
   events: SystemIntelEvent[];
+  mapNodes: SystemMapNode[];
+  connections: SystemMapConnection[];
   bridgeStatus: SystemMonitoringDashboardBridgeStatus;
 }

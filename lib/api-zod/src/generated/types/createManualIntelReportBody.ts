@@ -27,5 +27,9 @@ export interface CreateManualIntelReportBody {
    * @maxLength 2000
    */
   message: string;
-  ttlMinutes: CreateManualIntelReportBodyTtlMinutes;
+  /**
+   * Retained for older clients; the server calculates lifetime from player kills and either observed killmail participants or reported hostile count.
+   * @deprecated
+   */
+  ttlMinutes?: CreateManualIntelReportBodyTtlMinutes;
 }

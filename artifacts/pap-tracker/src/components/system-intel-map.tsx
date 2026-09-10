@@ -1,7 +1,9 @@
 import {
+  useEffect,
   useMemo,
   useRef,
   useState,
+  type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type WheelEvent as ReactWheelEvent,
 } from "react";
@@ -11,6 +13,7 @@ import type {
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Crosshair, LocateFixed, Network, ZoomIn, ZoomOut } from "lucide-react";
+import { layoutMapLabels } from "./system-intel-map-layout";
 
 const CANVAS_WIDTH = 1_000;
 const CANVAS_HEIGHT = 560;
@@ -406,6 +409,27 @@ function nodePeopleCount(node: MapNode): number {
   return Math.max(0, ...node.activeEvents.map(eventPeopleCount));
 }
 
+function nodeActivityRadius(node: MapNode): number {
+  const intensity =
+    (node.monitor?.recentKillCount ?? 0) +
+    node.activeEvents.length +
+    Math.sqrt(nodePeopleCount(node));
+  return Math.min(15, 6 + intensity * 0.9);
+}
+
+function nodeCircleRadius(node: MapNode): number {
+  return node.monitor ? nodeActivityRadius(node) : 3.25;
+}
+
+function nodeVisualRadius(node: MapNode, selected: boolean): number {
+  const activityRadius = nodeActivityRadius(node);
+  return Math.max(
+    nodeCircleRadius(node),
+    node.activeEvents.length > 0 ? activityRadius + 11 : 0,
+    selected ? activityRadius + 7 : 0,
+  );
+}
+
 function localizedRisk(risk: string, zh: boolean): string {
   const labels: Record<string, [string, string]> = {
     safe: ["安全", "SAFE"],
@@ -436,12 +460,22 @@ export function SystemIntelMap({
     height: CANVAS_HEIGHT,
   });
   const [selectedSystemId, setSelectedSystemId] = useState<number | null>(null);
+  const [hoveredSystemId, setHoveredSystemId] = useState<number | null>(null);
   const dragRef = useRef<{
     pointerId: number;
     clientX: number;
     clientY: number;
     view: ViewBox;
   } | null>(null);
+  const hoverClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (hoverClearTimerRef.current) {
+        clearTimeout(hoverClearTimerRef.current);
+      }
+    },
+    [],
+  );
   const nodeById = useMemo(
     () => new Map(map.nodes.map((node) => [node.solarSystemId, node])),
     [map.nodes],
@@ -450,12 +484,88 @@ export function SystemIntelMap({
     (selectedSystemId === null ? null : nodeById.get(selectedSystemId)) ??
     map.nodes.find((node) => node.monitor) ??
     map.nodes[0];
+  const labelPlacements = useMemo(
+    () =>
+      layoutMapLabels(
+        map.nodes.map((node) => {
+          const peopleCount = nodePeopleCount(node);
+          const snapshotParts: string[] = [];
+          if (
+            node.monitor &&
+            (node.monitor.recentKillCount > 0 ||
+              node.monitor.activeEventCount > 0)
+          ) {
+            snapshotParts.push(
+              `K${node.monitor.recentKillCount} · A${node.monitor.activeEventCount}`,
+            );
+          }
+          if (peopleCount > 0) {
+            snapshotParts.push(`${zh ? "人数" : "People"} ${peopleCount}`);
+          }
+          return {
+            id: node.solarSystemId,
+            name: node.solarSystemName,
+            position: node.position,
+            radius: nodeVisualRadius(
+              node,
+              node.solarSystemId === selectedSystemId,
+            ),
+            isMonitored: Boolean(node.monitor),
+            hasActiveAlert: node.activeEvents.length > 0,
+            isContextVisible:
+              node.solarSystemId === selectedSystemId ||
+              node.solarSystemId === hoveredSystemId,
+            detail: snapshotParts.join(" · ") || null,
+          };
+        }),
+        {
+          width: CANVAS_WIDTH,
+          height: CANVAS_HEIGHT,
+          scale: view.width / CANVAS_WIDTH,
+        },
+      ),
+    [hoveredSystemId, map.nodes, selectedSystemId, view.width, zh],
+  );
   const coordinateMode =
     map.coordinateCount === map.nodes.length
       ? "actual"
       : map.coordinateCount > 0
         ? "partial"
         : "fallback";
+
+  const startNodeHover = (solarSystemId: number) => {
+    if (hoverClearTimerRef.current) {
+      clearTimeout(hoverClearTimerRef.current);
+      hoverClearTimerRef.current = null;
+    }
+    setHoveredSystemId(solarSystemId);
+  };
+
+  const endNodeHover = (solarSystemId: number) => {
+    if (hoverClearTimerRef.current) {
+      clearTimeout(hoverClearTimerRef.current);
+    }
+    hoverClearTimerRef.current = setTimeout(() => {
+      setHoveredSystemId((current) =>
+        current === solarSystemId ? null : current,
+      );
+      hoverClearTimerRef.current = null;
+    }, 160);
+  };
+
+  const selectNode = (node: MapNode) => {
+    setSelectedSystemId(node.solarSystemId);
+    if (node.monitor) onSelectMonitor?.(node.monitor.id);
+  };
+
+  const handleNodeKeyDown = (
+    event: ReactKeyboardEvent<SVGGElement>,
+    node: MapNode,
+  ) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    selectNode(node);
+  };
 
   const resetView = () =>
     setView({ x: 0, y: 0, width: CANVAS_WIDTH, height: CANVAS_HEIGHT });
@@ -628,7 +738,7 @@ export function SystemIntelMap({
             height={view.height}
             fill="url(#system-intel-grid)"
           />
-          <g aria-hidden="true">
+          <g data-map-layer="edges" aria-hidden="true" pointerEvents="none">
             {map.edges.map((edge) => {
               const from = nodeById.get(edge.from);
               const to = nodeById.get(edge.to);
@@ -648,125 +758,173 @@ export function SystemIntelMap({
               );
             })}
           </g>
-          {map.nodes.map((node) => {
-            const risk = node.monitor?.risk ?? "safe";
-            const color = RISK_COLORS[risk] ?? RISK_COLORS.safe;
-            const peopleCount = nodePeopleCount(node);
-            const intensity =
-              (node.monitor?.recentKillCount ?? 0) +
-              node.activeEvents.length +
-              Math.sqrt(peopleCount);
-            const radius = Math.min(15, 6 + intensity * 0.9);
-            const selected = node.solarSystemId === selectedSystemId;
-            return (
-              <g
-                key={node.solarSystemId}
-                className={node.monitor ? "cursor-pointer" : "cursor-default"}
-                role={node.monitor ? "button" : undefined}
-                tabIndex={node.monitor ? 0 : undefined}
-                aria-label={`${node.solarSystemName} ${risk}`}
-                transform={`translate(${node.position.x} ${node.position.y})`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setSelectedSystemId(node.solarSystemId);
-                  if (node.monitor) onSelectMonitor?.(node.monitor.id);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key !== "Enter" && event.key !== " ") return;
-                  event.preventDefault();
-                  setSelectedSystemId(node.solarSystemId);
-                  if (node.monitor) onSelectMonitor?.(node.monitor.id);
-                }}
-              >
-                {node.activeEvents.length > 0 && (
-                  <circle
-                    r={radius + 11}
-                    fill="none"
-                    stroke={color}
-                    strokeOpacity="0.45"
-                    strokeWidth="2"
-                    className="animate-pulse"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                )}
-                {selected && (
-                  <circle
-                    r={radius + 7}
-                    fill="none"
-                    stroke="#e0f2fe"
-                    strokeOpacity="0.9"
-                    strokeWidth="1.5"
-                    strokeDasharray="3 3"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                )}
-                <circle
-                  r={node.monitor ? radius : 3.25}
-                  fill={color}
-                  fillOpacity={node.monitor ? 0.95 : 0.35}
-                  stroke={node.monitor ? "#e0f2fe" : color}
-                  strokeOpacity={node.monitor ? 0.55 : 0.25}
+          {/* Leaders are deliberately below every node and every label so a
+              later system can never draw a line across an earlier name. */}
+          <g data-map-layer="leaders" aria-hidden="true" pointerEvents="none">
+            {map.nodes.map((node) => {
+              const label = labelPlacements.get(node.solarSystemId);
+              if (!label) return null;
+              const risk = node.monitor?.risk ?? "safe";
+              const color = RISK_COLORS[risk] ?? RISK_COLORS.safe;
+              return (
+                <line
+                  key={node.solarSystemId}
+                  x1={label.leader.start.x}
+                  y1={label.leader.start.y}
+                  x2={label.leader.end.x}
+                  y2={label.leader.end.y}
+                  stroke={color}
+                  strokeOpacity={node.monitor ? 0.55 : 0.35}
                   strokeWidth="1"
-                  filter={
-                    RISK_RANK[risk] >= RISK_RANK.danger
-                      ? "url(#system-intel-glow)"
-                      : undefined
-                  }
                   vectorEffect="non-scaling-stroke"
                 />
-                <text
-                  x={radius + 7}
-                  y="4"
-                  fill={node.monitor ? "#e0f2fe" : "#94a3b8"}
-                  fillOpacity={node.monitor ? 0.95 : 0.65}
-                  fontSize={node.monitor ? 13 : 10}
-                  fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
-                  paintOrder="stroke"
-                  stroke="#020617"
-                  strokeWidth="4"
-                  strokeLinejoin="round"
+              );
+            })}
+          </g>
+          <g data-map-layer="nodes">
+            {map.nodes.map((node) => {
+              const risk = node.monitor?.risk ?? "safe";
+              const color = RISK_COLORS[risk] ?? RISK_COLORS.safe;
+              const peopleCount = nodePeopleCount(node);
+              const activityRadius = nodeActivityRadius(node);
+              const circleRadius = nodeCircleRadius(node);
+              const selected = node.solarSystemId === selectedSystemId;
+              return (
+                <g
+                  key={node.solarSystemId}
+                  className="cursor-pointer"
+                  role={node.monitor ? "button" : undefined}
+                  tabIndex={node.monitor ? 0 : undefined}
+                  aria-label={`${node.solarSystemName} ${risk}`}
+                  transform={`translate(${node.position.x} ${node.position.y})`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    selectNode(node);
+                  }}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => handleNodeKeyDown(event, node)}
+                  onPointerEnter={() => startNodeHover(node.solarSystemId)}
+                  onPointerLeave={() => endNodeHover(node.solarSystemId)}
+                  onFocus={() => startNodeHover(node.solarSystemId)}
+                  onBlur={() => endNodeHover(node.solarSystemId)}
                 >
-                  {node.solarSystemName}
-                </text>
-                {peopleCount > 0 && (
-                  <text
-                    x="0"
-                    y={-(radius + 10)}
-                    textAnchor="middle"
+                  {node.activeEvents.length > 0 && (
+                    <circle
+                      r={activityRadius + 11}
+                      fill="none"
+                      stroke={color}
+                      strokeOpacity="0.45"
+                      strokeWidth="2"
+                      className="animate-pulse"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  )}
+                  {selected && (
+                    <circle
+                      r={activityRadius + 7}
+                      fill="none"
+                      stroke="#e0f2fe"
+                      strokeOpacity="0.9"
+                      strokeWidth="1.5"
+                      strokeDasharray="3 3"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  )}
+                  <circle
+                    r={circleRadius}
                     fill={color}
-                    fontSize="11"
-                    fontWeight="700"
+                    fillOpacity={node.monitor ? 0.95 : 0.35}
+                    stroke={node.monitor ? "#e0f2fe" : color}
+                    strokeOpacity={node.monitor ? 0.55 : 0.25}
+                    strokeWidth="1"
+                    filter={
+                      RISK_RANK[risk] >= RISK_RANK.danger
+                        ? "url(#system-intel-glow)"
+                        : undefined
+                    }
+                    vectorEffect="non-scaling-stroke"
+                  />
+                  <title>
+                    {node.solarSystemName} · {localizedRisk(risk, zh)} ·{" "}
+                    {tr("击杀", "Kills")} {node.monitor?.recentKillCount ?? 0} ·{" "}
+                    {tr("人数", "People")} {peopleCount} ·{" "}
+                    {tr("警报", "Alerts")} {node.monitor?.activeEventCount ?? 0}
+                  </title>
+                </g>
+              );
+            })}
+          </g>
+          <g data-map-layer="labels">
+            {map.nodes.map((node) => {
+              const label = labelPlacements.get(node.solarSystemId);
+              if (!label) return null;
+              const risk = node.monitor?.risk ?? "safe";
+              const color = RISK_COLORS[risk] ?? RISK_COLORS.safe;
+              const selected = node.solarSystemId === selectedSystemId;
+              const labelScale = view.width / CANVAS_WIDTH;
+              const labelPaddingX = 5 * labelScale;
+              const labelPaddingY = 3.5 * labelScale;
+              return (
+                <g
+                  key={node.solarSystemId}
+                  className="cursor-pointer"
+                  aria-hidden="true"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    selectNode(node);
+                  }}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onPointerEnter={() => startNodeHover(node.solarSystemId)}
+                  onPointerLeave={() => endNodeHover(node.solarSystemId)}
+                >
+                  <rect
+                    x={label.box.x}
+                    y={label.box.y}
+                    width={label.box.width}
+                    height={label.box.height}
+                    rx={3 * labelScale}
+                    fill="#020617"
+                    fillOpacity="0.88"
+                    stroke={selected ? "#e0f2fe" : color}
+                    strokeOpacity={node.monitor ? 0.46 : 0.3}
+                    strokeWidth="1"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                  <text
+                    x={label.box.x + labelPaddingX}
+                    y={label.box.y + labelPaddingY + label.fontSize}
+                    fill={node.monitor ? "#e0f2fe" : "#cbd5e1"}
+                    fillOpacity={node.monitor ? 0.98 : 0.82}
+                    fontSize={label.fontSize}
+                    fontWeight={node.monitor ? "600" : "400"}
                     fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
                   >
-                    {peopleCount}
+                    {node.solarSystemName}
                   </text>
-                )}
-                {node.monitor &&
-                  (node.monitor.recentKillCount > 0 ||
-                    node.monitor.activeEventCount > 0) && (
+                  {label.detail && (
                     <text
-                      x={radius + 7}
-                      y="19"
-                      fill="#94a3b8"
-                      fontSize="9"
+                      x={label.box.x + labelPaddingX}
+                      y={
+                        label.box.y +
+                        labelPaddingY +
+                        label.fontSize +
+                        2 * labelScale +
+                        label.detailFontSize
+                      }
+                      fill={color}
+                      fillOpacity="0.85"
+                      fontSize={label.detailFontSize}
+                      fontWeight="600"
                       fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
-                      paintOrder="stroke"
-                      stroke="#020617"
-                      strokeWidth="3"
                     >
-                      K{node.monitor.recentKillCount} · A
-                      {node.monitor.activeEventCount}
+                      {label.detail}
                     </text>
                   )}
-                <title>
-                  {node.solarSystemName} · {localizedRisk(risk, zh)} ·{" "}
-                  {tr("击杀", "Kills")} {node.monitor?.recentKillCount ?? 0} ·{" "}
-                  {tr("人数", "People")} {peopleCount} · {tr("警报", "Alerts")}{" "}
-                  {node.monitor?.activeEventCount ?? 0}
-                </title>
-              </g>
-            );
-          })}
+                  <title>{node.solarSystemName}</title>
+                </g>
+              );
+            })}
+          </g>
         </svg>
 
         {selectedNode && (

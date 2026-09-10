@@ -6,6 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
+/**
+ * Retained for older clients but ignored by the server. Kill counts 0/1/2/3/4+ and population counts 0/1-10/11-20/21-30/31+ independently map to 5/10/15/20/25-minute tiers; population means killmail participants or manually reported hostiles. The higher tier wins, and each new player kill restarts the full countdown from its latest kill time. Lifetime is capped at 25 minutes.
+ * @deprecated
+ */
 export type CreateManualIntelReportBodyTtlMinutes =
   (typeof CreateManualIntelReportBodyTtlMinutes)[keyof typeof CreateManualIntelReportBodyTtlMinutes];
 

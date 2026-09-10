@@ -145,6 +145,9 @@ export type SystemIntelMetadata = {
   friendlyLoss?: boolean;
   channelName?: string;
   relayCount?: number;
+  playerAttackerIds?: number[];
+  playerParticipantCount?: number;
+  playerKillCount?: number;
 };
 
 export const systemIntelEventsTable = pgTable(

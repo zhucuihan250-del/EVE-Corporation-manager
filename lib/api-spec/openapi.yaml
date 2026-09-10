@@ -3847,6 +3847,14 @@ components:
         - $ref: "#/components/schemas/MonitoredSystem"
         - type: object
           properties:
+            position:
+              oneOf:
+                - $ref: "#/components/schemas/SystemMapPosition"
+                - type: "null"
+            mapPosition:
+              oneOf:
+                - $ref: "#/components/schemas/SystemMapPosition2D"
+                - type: "null"
             risk: { type: string, enum: [safe, info, warning, danger, critical] }
             activeEventCount: { type: integer }
             recentKillCount: { type: integer }
@@ -3855,7 +3863,40 @@ components:
               oneOf:
                 - $ref: "#/components/schemas/SystemActivitySample"
                 - type: "null"
-          required: [risk, activeEventCount, recentKillCount, lastEventAt, latestActivity]
+          required: [position, mapPosition, risk, activeEventCount, recentKillCount, lastEventAt, latestActivity]
+
+    SystemMapPosition:
+      type: object
+      properties:
+        x: { type: number }
+        y: { type: number }
+        z: { type: number }
+      required: [x, y, z]
+
+    SystemMapPosition2D:
+      type: object
+      properties:
+        x: { type: number }
+        y: { type: number }
+      required: [x, y]
+
+    SystemMapNode:
+      type: object
+      properties:
+        solarSystemId: { type: integer }
+        solarSystemName: { type: string }
+        isMonitored: { type: boolean }
+        position: { $ref: "#/components/schemas/SystemMapPosition" }
+        mapPosition: { $ref: "#/components/schemas/SystemMapPosition2D" }
+        securityStatus: { type: number }
+      required: [solarSystemId, solarSystemName, isMonitored, position, mapPosition, securityStatus]
+
+    SystemMapConnection:
+      type: object
+      properties:
+        fromSolarSystemId: { type: integer }
+        toSolarSystemId: { type: integer }
+      required: [fromSolarSystemId, toSolarSystemId]
 
     SystemMonitoringDashboard:
       type: object
@@ -3867,13 +3908,19 @@ components:
         events:
           type: array
           items: { $ref: "#/components/schemas/SystemIntelEvent" }
+        mapNodes:
+          type: array
+          items: { $ref: "#/components/schemas/SystemMapNode" }
+        connections:
+          type: array
+          items: { $ref: "#/components/schemas/SystemMapConnection" }
         bridgeStatus:
           type: object
           properties:
             total: { type: integer }
             online: { type: integer }
           required: [total, online]
-      required: [generatedAt, monitors, events, bridgeStatus]
+      required: [generatedAt, monitors, events, mapNodes, connections, bridgeStatus]
 
     CreateManualIntelReportBody:
       type: object
@@ -3886,8 +3933,12 @@ components:
           items: { type: string }
         direction: { type: [string, "null"], maxLength: 120 }
         message: { type: string, minLength: 1, maxLength: 2000 }
-        ttlMinutes: { type: integer, enum: [5, 10, 15, 20, 25] }
-      required: [monitorId, message, ttlMinutes]
+        ttlMinutes:
+          type: integer
+          enum: [5, 10, 15, 20, 25]
+          deprecated: true
+          description: Retained for older clients but ignored by the server. Kill counts 0/1/2/3/4+ and population counts 0/1-10/11-20/21-30/31+ independently map to 5/10/15/20/25-minute tiers; population means killmail participants or manually reported hostiles. The higher tier wins, and each new player kill restarts the full countdown from its latest kill time. Lifetime is capped at 25 minutes.
+      required: [monitorId, message]
 
     CreateMonitoredSystemBody:
       type: object

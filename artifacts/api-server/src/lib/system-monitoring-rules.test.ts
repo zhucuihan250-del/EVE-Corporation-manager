@@ -1,13 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  calculateDynamicIntelTtlMinutes,
   capIntelTtlMinutes,
   classifyShipGroups,
+  countPlayerParticipants,
   countPlayerKills,
+  countUniquePlayerParticipants,
   effectiveIntelExpiresAt,
   extractR2Z2Killmail,
+  getPlayerAttackerIds,
   highestSeverity,
   intelDedupeKey,
+  intelExpiresAt,
   killmailAffectsSystemRisk,
   messageContainsSystem,
   parseIntelMessage,
@@ -55,6 +60,65 @@ test("caps all intelligence lifetimes at 25 minutes", () => {
       new Date("2026-09-08T00:10:00.000Z"),
     ).toISOString(),
     "2026-09-08T00:10:00.000Z",
+  );
+});
+
+test("uses independent five-minute tiers for kills and population counts", () => {
+  assert.equal(
+    calculateDynamicIntelTtlMinutes({ killCount: 0, hostileCount: 0 }),
+    5,
+  );
+  assert.equal(
+    calculateDynamicIntelTtlMinutes({ killCount: 1, hostileCount: 1 }),
+    10,
+  );
+  assert.equal(
+    calculateDynamicIntelTtlMinutes({ killCount: 2, hostileCount: 1 }),
+    15,
+  );
+  assert.equal(
+    calculateDynamicIntelTtlMinutes({ killCount: 3, participantCount: 1 }),
+    20,
+  );
+  assert.equal(
+    calculateDynamicIntelTtlMinutes({ killCount: 4, participantCount: 1 }),
+    25,
+  );
+  assert.equal(calculateDynamicIntelTtlMinutes({ hostileCount: 10 }), 10);
+  assert.equal(calculateDynamicIntelTtlMinutes({ hostileCount: 11 }), 15);
+  assert.equal(calculateDynamicIntelTtlMinutes({ hostileCount: 21 }), 20);
+  assert.equal(calculateDynamicIntelTtlMinutes({ hostileCount: 31 }), 25);
+  assert.equal(
+    calculateDynamicIntelTtlMinutes({
+      killCount: 1,
+      participantCount: 21,
+      hostileCount: 100,
+    }),
+    20,
+  );
+  assert.equal(
+    calculateDynamicIntelTtlMinutes({ killCount: -1, hostileCount: -10 }),
+    5,
+  );
+});
+
+test("restarts the full tier lifetime from each latest kill", () => {
+  const firstKillAt = new Date("2026-09-10T00:00:00.000Z");
+  const secondKillAt = new Date("2026-09-10T00:08:00.000Z");
+
+  assert.equal(
+    intelExpiresAt(
+      firstKillAt,
+      calculateDynamicIntelTtlMinutes({ killCount: 1, participantCount: 1 }),
+    ).toISOString(),
+    "2026-09-10T00:10:00.000Z",
+  );
+  assert.equal(
+    intelExpiresAt(
+      secondKillAt,
+      calculateDynamicIntelTtlMinutes({ killCount: 2, participantCount: 1 }),
+    ).toISOString(),
+    "2026-09-10T00:23:00.000Z",
   );
 });
 
@@ -136,5 +200,35 @@ test("NPC kills never affect monitored-system risk", () => {
   assert.equal(
     countPlayerKills({ shipKills: 0, podKills: 0, npcKills: 100_000 }),
     0,
+  );
+  assert.equal(
+    countPlayerParticipants({
+      attackers: [
+        { character_id: 1001 },
+        { character_id: 1002 },
+        { character_id: 1002 },
+        { ship_type_id: 123 },
+      ],
+    }),
+    2,
+  );
+  assert.deepEqual(
+    getPlayerAttackerIds({
+      attackers: [
+        { character_id: 1002 },
+        { character_id: 1001 },
+        { character_id: 1002 },
+        { ship_type_id: 123 },
+      ],
+    }),
+    [1002, 1001],
+  );
+  assert.equal(
+    countUniquePlayerParticipants([
+      { playerAttackerIds: [1001, 1002] },
+      { playerAttackerIds: [1002, 1003] },
+      { playerAttackerIds: "invalid" },
+    ]),
+    3,
   );
 });

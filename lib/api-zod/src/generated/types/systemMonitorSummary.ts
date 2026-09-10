@@ -7,9 +7,13 @@
  */
 import type { MonitoredSystem } from "./monitoredSystem";
 import type { SystemActivitySample } from "./systemActivitySample";
+import type { SystemMapPosition } from "./systemMapPosition";
+import type { SystemMapPosition2D } from "./systemMapPosition2D";
 import type { SystemMonitorSummaryRisk } from "./systemMonitorSummaryRisk";
 
 export type SystemMonitorSummary = MonitoredSystem & {
+  position: SystemMapPosition | null;
+  mapPosition: SystemMapPosition2D | null;
   risk: SystemMonitorSummaryRisk;
   activeEventCount: number;
   recentKillCount: number;

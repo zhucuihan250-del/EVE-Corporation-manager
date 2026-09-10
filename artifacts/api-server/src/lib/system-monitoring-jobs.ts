@@ -7,11 +7,15 @@ import {
   systemMonitorFeedStateTable,
   pool,
 } from "@workspace/db";
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 import {
+  calculateDynamicIntelTtlMinutes,
   classifyShipGroups,
+  countPlayerParticipants,
   countPlayerKills,
+  countUniquePlayerParticipants,
   extractR2Z2Killmail,
+  getPlayerAttackerIds,
   intelExpiresAt,
   intelDedupeKey,
   killmailAffectsSystemRisk,
@@ -148,6 +152,8 @@ async function processKillmail(killmail: R2Z2Killmail) {
     ? await resolveCharacterName(killmail.victim.character_id)
     : null;
   const totalValue = Number(killmail.zkb?.totalValue ?? 0);
+  const playerAttackerIds = getPlayerAttackerIds(killmail);
+  const playerParticipantCount = countPlayerParticipants(killmail);
   const occurredAt = new Date(killmail.killmail_time);
   if (Number.isNaN(occurredAt.getTime())) return;
 
@@ -181,6 +187,33 @@ async function processKillmail(killmail: R2Z2Killmail) {
     const summary = friendlyLoss
       ? `本军团成员在 ${monitor.solarSystemName} 损失 ${victimShip ?? "舰船"}${totalValue > 0 ? `（${formatIsk(totalValue)}）` : ""}`
       : `${monitor.solarSystemName} 出现玩家击杀：${victimLabel} / ${victimShip ?? "未知舰船"}${totalValue > 0 ? ` / ${formatIsk(totalValue)}` : ""}`;
+    const windowStart = new Date(
+      occurredAt.getTime() - monitor.burstWindowMinutes * 60 * 1_000,
+    );
+    const earlierRecentKills = await db
+      .select({ metadata: systemIntelEventsTable.metadata })
+      .from(systemIntelEventsTable)
+      .where(
+        and(
+          eq(systemIntelEventsTable.corporationId, monitor.corporationId),
+          eq(systemIntelEventsTable.monitorId, monitor.id),
+          eq(systemIntelEventsTable.source, "killmail"),
+          gte(systemIntelEventsTable.occurredAt, windowStart),
+          lte(systemIntelEventsTable.occurredAt, occurredAt),
+        ),
+      );
+    const recentKills = [
+      ...earlierRecentKills,
+      { metadata: { playerAttackerIds } },
+    ];
+    const count = recentKills.length;
+    const burstParticipantCount = countUniquePlayerParticipants(
+      recentKills.map((event) => event.metadata),
+    );
+    const killTtlMinutes = calculateDynamicIntelTtlMinutes({
+      killCount: count,
+      participantCount: burstParticipantCount,
+    });
     const [created] = await db
       .insert(systemIntelEventsTable)
       .values({
@@ -205,9 +238,11 @@ async function processKillmail(killmail: R2Z2Killmail) {
           victimShipName: victimShip,
           ...classification,
           friendlyLoss,
+          playerAttackerIds,
+          playerParticipantCount,
         },
         occurredAt,
-        expiresAt: intelExpiresAt(occurredAt),
+        expiresAt: intelExpiresAt(occurredAt, killTtlMinutes),
         dedupeKey: intelDedupeKey([
           "killmail",
           monitor.id,
@@ -218,24 +253,20 @@ async function processKillmail(killmail: R2Z2Killmail) {
       .returning({ id: systemIntelEventsTable.id });
     if (!created) continue;
 
-    const windowStart = new Date(
-      occurredAt.getTime() - monitor.burstWindowMinutes * 60 * 1_000,
-    );
-    const [{ count }] = await db
-      .select({ count: sql<number>`COUNT(*)::int` })
-      .from(systemIntelEventsTable)
-      .where(
-        and(
-          eq(systemIntelEventsTable.corporationId, monitor.corporationId),
-          eq(systemIntelEventsTable.monitorId, monitor.id),
-          eq(systemIntelEventsTable.source, "killmail"),
-          gte(systemIntelEventsTable.occurredAt, windowStart),
-        ),
-      );
     if (count >= monitor.burstThreshold) {
+      const burstTtlMinutes = calculateDynamicIntelTtlMinutes({
+        killCount: count,
+        participantCount: burstParticipantCount,
+      });
       const bucket = Math.floor(
         occurredAt.getTime() / (monitor.burstWindowMinutes * 60 * 1_000),
       );
+      const burstSummary = `${monitor.solarSystemName} 在 ${monitor.burstWindowMinutes} 分钟内出现 ${count} 条玩家击杀`;
+      const burstExpiresAt = intelExpiresAt(occurredAt, burstTtlMinutes);
+      const burstMetadata = {
+        playerKillCount: count,
+        playerParticipantCount: burstParticipantCount,
+      };
       await db
         .insert(systemIntelEventsTable)
         .values({
@@ -247,12 +278,25 @@ async function processKillmail(killmail: R2Z2Killmail) {
           confidence: "confirmed",
           solarSystemId: monitor.solarSystemId,
           solarSystemName: monitor.solarSystemName,
-          summary: `${monitor.solarSystemName} 在 ${monitor.burstWindowMinutes} 分钟内出现 ${count} 条玩家击杀`,
+          summary: burstSummary,
+          metadata: burstMetadata,
           occurredAt,
-          expiresAt: intelExpiresAt(occurredAt, monitor.burstWindowMinutes),
+          expiresAt: burstExpiresAt,
           dedupeKey: intelDedupeKey(["kill-burst", monitor.id, bucket]),
         })
-        .onConflictDoNothing();
+        .onConflictDoUpdate({
+          target: [
+            systemIntelEventsTable.corporationId,
+            systemIntelEventsTable.dedupeKey,
+          ],
+          set: {
+            summary: burstSummary,
+            enemyCount: null,
+            metadata: burstMetadata,
+            occurredAt,
+            expiresAt: sql`GREATEST(${systemIntelEventsTable.expiresAt}, ${burstExpiresAt})`,
+          },
+        });
     }
   }
 }
@@ -492,6 +536,10 @@ export async function runSystemActivitySweep() {
           },
         });
       if (isAnomalous) {
+        const detectedAt = new Date();
+        const activityTtlMinutes = calculateDynamicIntelTtlMinutes({
+          killCount: currentPlayerKills,
+        });
         await db
           .insert(systemIntelEventsTable)
           .values({
@@ -504,8 +552,8 @@ export async function runSystemActivitySweep() {
             solarSystemId: monitor.solarSystemId,
             solarSystemName: monitor.solarSystemName,
             summary: `${monitor.solarSystemName} 的玩家击杀和跳跃活动同时高于近期基线`,
-            occurredAt: sampledAt,
-            expiresAt: intelExpiresAt(sampledAt),
+            occurredAt: detectedAt,
+            expiresAt: intelExpiresAt(detectedAt, activityTtlMinutes),
             dedupeKey: intelDedupeKey([
               "activity-spike",
               monitor.id,

@@ -2271,6 +2271,21 @@ export const GetSystemMonitoringDashboardResponse = zod.object({
       })
       .and(
         zod.object({
+          position: zod.union([
+            zod.object({
+              x: zod.number(),
+              y: zod.number(),
+              z: zod.number(),
+            }),
+            zod.null(),
+          ]),
+          mapPosition: zod.union([
+            zod.object({
+              x: zod.number(),
+              y: zod.number(),
+            }),
+            zod.null(),
+          ]),
           risk: zod.enum(["safe", "info", "warning", "danger", "critical"]),
           activeEventCount: zod.number(),
           recentKillCount: zod.number(),
@@ -2334,6 +2349,29 @@ export const GetSystemMonitoringDashboardResponse = zod.object({
       createdAt: zod.coerce.date(),
     }),
   ),
+  mapNodes: zod.array(
+    zod.object({
+      solarSystemId: zod.number(),
+      solarSystemName: zod.string(),
+      isMonitored: zod.boolean(),
+      position: zod.object({
+        x: zod.number(),
+        y: zod.number(),
+        z: zod.number(),
+      }),
+      mapPosition: zod.object({
+        x: zod.number(),
+        y: zod.number(),
+      }),
+      securityStatus: zod.number(),
+    }),
+  ),
+  connections: zod.array(
+    zod.object({
+      fromSolarSystemId: zod.number(),
+      toSolarSystemId: zod.number(),
+    }),
+  ),
   bridgeStatus: zod.object({
     total: zod.number(),
     online: zod.number(),
@@ -2368,13 +2406,18 @@ export const CreateManualIntelReportBody = zod.object({
     .max(createManualIntelReportBodyDirectionMax)
     .nullish(),
   message: zod.string().min(1).max(createManualIntelReportBodyMessageMax),
-  ttlMinutes: zod.union([
-    zod.literal(5),
-    zod.literal(10),
-    zod.literal(15),
-    zod.literal(20),
-    zod.literal(25),
-  ]),
+  ttlMinutes: zod
+    .union([
+      zod.literal(5),
+      zod.literal(10),
+      zod.literal(15),
+      zod.literal(20),
+      zod.literal(25),
+    ])
+    .optional()
+    .describe(
+      "Retained for older clients but ignored by the server. Kill counts 0\/1\/2\/3\/4+ and population counts 0\/1-10\/11-20\/21-30\/31+ independently map to 5\/10\/15\/20\/25-minute tiers; population means killmail participants or manually reported hostiles. The higher tier wins, and each new player kill restarts the full countdown from its latest kill time. Lifetime is capped at 25 minutes.",
+    ),
 });
 
 /**

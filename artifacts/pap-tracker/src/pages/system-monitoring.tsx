@@ -245,8 +245,8 @@ export function SystemMonitoring() {
               </CardTitle>
               <CardDescription>
                 {tr(
-                  "依据游戏二维星图坐标等比反映实际相对位置；节点大小反映报告敌对或击杀参与人数，风险颜色随有效情报自动更新。",
-                  "Uses a proportional in-game 2D map projection to preserve actual relative positions; node size reflects reported hostiles or killmail participants, while risk colors update with active intelligence.",
+                  "游戏式二维星图：总览查看星门网络与预警，移到星系附近或放大后展开名称，点击查看详细情报。",
+                  "Game-style 2D map: scan the gate network and alerts, reveal names nearby or by zooming in, and select a system for intelligence.",
                 )}
               </CardDescription>
             </CardHeader>

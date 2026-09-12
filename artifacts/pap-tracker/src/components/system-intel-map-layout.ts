@@ -17,6 +17,10 @@ export type MapLabelNode = {
   hasActiveAlert: boolean;
   isContextVisible: boolean;
   detail: string | null;
+  /** Explicit visibility overrides the legacy monitored/alert/context rules. */
+  showLabel?: boolean;
+  /** Higher values place first, so focused systems get the nearest clear slot. */
+  priority?: number;
 };
 
 export type MapLabelPlacement = {
@@ -30,10 +34,14 @@ export type MapLabelPlacement = {
   };
 };
 
-type LayoutOptions = {
+export type MapLabelLayoutOptions = {
   width: number;
   height: number;
   scale: number;
+  /** Visible SVG/map-coordinate rectangle, including the current pan offset. */
+  bounds?: MapLabelBox;
+  /** Maximum node-to-nearest-label-edge distance, in SVG/map coordinates. */
+  maxDistance?: number;
 };
 
 const BOX_GAP = 3;
@@ -60,15 +68,32 @@ function overlapArea(left: MapLabelBox, right: MapLabelBox, gap: number) {
 
 function clampBox(
   box: MapLabelBox,
-  canvasWidth: number,
-  canvasHeight: number,
+  bounds: MapLabelBox,
   margin: number,
-): MapLabelBox {
+): MapLabelBox | null {
+  if (
+    box.width > bounds.width - margin * 2 ||
+    box.height > bounds.height - margin * 2
+  ) {
+    return null;
+  }
   return {
     ...box,
-    x: Math.min(canvasWidth - margin - box.width, Math.max(margin, box.x)),
-    y: Math.min(canvasHeight - margin - box.height, Math.max(margin, box.y)),
+    x: Math.min(
+      bounds.x + bounds.width - margin - box.width,
+      Math.max(bounds.x + margin, box.x),
+    ),
+    y: Math.min(
+      bounds.y + bounds.height - margin - box.height,
+      Math.max(bounds.y + margin, box.y),
+    ),
   };
+}
+
+function distanceToBox(point: MapLabelCoordinate, box: MapLabelBox): number {
+  const dx = Math.max(box.x - point.x, 0, point.x - box.x - box.width);
+  const dy = Math.max(box.y - point.y, 0, point.y - box.y - box.height);
+  return Math.hypot(dx, dy);
 }
 
 function candidateBoxes(
@@ -76,8 +101,8 @@ function candidateBoxes(
   width: number,
   height: number,
   scale: number,
-  canvasWidth: number,
-  canvasHeight: number,
+  bounds: MapLabelBox,
+  maxDistance: number,
 ): MapLabelBox[] {
   const candidates: MapLabelBox[] = [];
   const baseGap = 7 * scale;
@@ -86,12 +111,8 @@ function candidateBoxes(
   const dedupe = new Set<string>();
 
   const add = (x: number, y: number) => {
-    const box = clampBox(
-      { x, y, width, height },
-      canvasWidth,
-      canvasHeight,
-      margin,
-    );
+    const box = clampBox({ x, y, width, height }, bounds, margin);
+    if (!box || distanceToBox(node.position, box) > maxDistance) return;
     const key = `${box.x.toFixed(3)}:${box.y.toFixed(3)}`;
     if (dedupe.has(key)) return;
     dedupe.add(key);
@@ -145,17 +166,35 @@ function fallbackGridBoxes(
   width: number,
   height: number,
   scale: number,
-  canvasWidth: number,
-  canvasHeight: number,
+  bounds: MapLabelBox,
+  maxDistance: number,
 ): MapLabelBox[] {
   const margin = EDGE_MARGIN * scale;
   const xStep = Math.max(5 * scale, Math.min(width / 4, 16 * scale));
   const yStep = Math.max(5 * scale, Math.min(height / 2, 12 * scale));
   const boxes: MapLabelBox[] = [];
 
-  for (let y = margin; y <= canvasHeight - margin - height; y += yStep) {
-    for (let x = margin; x <= canvasWidth - margin - width; x += xStep) {
-      boxes.push({ x, y, width, height });
+  const minX = Math.max(
+    bounds.x + margin,
+    node.position.x - maxDistance - width,
+  );
+  const minY = Math.max(
+    bounds.y + margin,
+    node.position.y - maxDistance - height,
+  );
+  const maxX = Math.min(
+    bounds.x + bounds.width - margin - width,
+    node.position.x + maxDistance,
+  );
+  const maxY = Math.min(
+    bounds.y + bounds.height - margin - height,
+    node.position.y + maxDistance,
+  );
+
+  for (let y = minY; y <= maxY; y += yStep) {
+    for (let x = minX; x <= maxX; x += xStep) {
+      const box = { x, y, width, height };
+      if (distanceToBox(node.position, box) <= maxDistance) boxes.push(box);
     }
   }
 
@@ -196,8 +235,8 @@ function leaderFor(
 }
 
 function labelRank(node: MapLabelNode): number {
-  // Monitored systems always retain their names. Alert-only nodes precede
-  // transient hover/selection context without depending on live risk values.
+  if (node.priority !== undefined) return node.priority;
+  // Preserve legacy order when the caller has not supplied focus priorities.
   if (node.isMonitored) return 3;
   if (node.hasActiveAlert) return 2;
   return 1;
@@ -205,10 +244,19 @@ function labelRank(node: MapLabelNode): number {
 
 export function layoutMapLabels(
   nodes: MapLabelNode[],
-  options: LayoutOptions,
+  options: MapLabelLayoutOptions,
 ): Map<number, MapLabelPlacement> {
-  const scale = Math.max(0.2, options.scale);
+  const scale =
+    Number.isFinite(options.scale) && options.scale > 0 ? options.scale : 1;
+  const bounds = options.bounds ?? {
+    x: 0,
+    y: 0,
+    width: options.width,
+    height: options.height,
+  };
+  const maxDistance = Math.max(0, options.maxDistance ?? Infinity);
   const placed = new Map<number, MapLabelPlacement>();
+  if (bounds.width <= 0 || bounds.height <= 0) return placed;
   const occupied: MapLabelBox[] = [];
   const nodeObstacles = nodes.map((node) => {
     const radius = node.radius + 3 * scale;
@@ -222,7 +270,12 @@ export function layoutMapLabels(
   const eligible = nodes
     .filter(
       (node) =>
-        node.isMonitored || node.hasActiveAlert || node.isContextVisible,
+        (node.showLabel ??
+          (node.isMonitored || node.hasActiveAlert || node.isContextVisible)) &&
+        node.position.x >= bounds.x &&
+        node.position.x <= bounds.x + bounds.width &&
+        node.position.y >= bounds.y &&
+        node.position.y <= bounds.y + bounds.height,
     )
     .sort(
       (left, right) =>
@@ -251,8 +304,8 @@ export function layoutMapLabels(
       width,
       height,
       scale,
-      options.width,
-      options.height,
+      bounds,
+      maxDistance,
     );
     const isLabelClear = (box: MapLabelBox) =>
       occupied.every((other) => overlapArea(box, other, BOX_GAP * scale) === 0);
@@ -271,34 +324,12 @@ export function layoutMapLabels(
         width,
         height,
         scale,
-        options.width,
-        options.height,
+        bounds,
+        maxDistance,
       );
       bestBox = fallback.find(
         (box) => isLabelClear(box) && nodeOverlap(box) === 0,
       );
-
-      // A label may cross a node only when the canvas has no fully clear slot.
-      // It still never covers another name.
-      if (!bestBox) {
-        bestBox = [...candidates, ...fallback]
-          .filter(isLabelClear)
-          .map((box) => ({ box, nodeOverlap: nodeOverlap(box) }))
-          .sort(
-            (left, right) =>
-              left.nodeOverlap - right.nodeOverlap ||
-              Math.hypot(
-                left.box.x + left.box.width / 2 - node.position.x,
-                left.box.y + left.box.height / 2 - node.position.y,
-              ) -
-                Math.hypot(
-                  right.box.x + right.box.width / 2 - node.position.x,
-                  right.box.y + right.box.height / 2 - node.position.y,
-                ) ||
-              left.box.y - right.box.y ||
-              left.box.x - right.box.x,
-          )[0]?.box;
-      }
     }
 
     if (!bestBox) continue;

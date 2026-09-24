@@ -10,6 +10,7 @@ import {
   type BattleReportAttacker,
 } from "@workspace/db";
 import { logger } from "./logger";
+import { requireSiteCorporation } from "./single-corporation";
 
 const ESI_BASE = "https://esi.evetech.net/latest";
 const ZKILL_BASE = "https://zkillboard.com/api";
@@ -768,6 +769,8 @@ export function queueBattleReportGeneration(reportId: number, force = false): vo
  * older reports are deliberately left untouched for manual review.
  */
 export async function resumeRecentBattleReportGeneration(): Promise<number> {
+  const site = await requireSiteCorporation();
+  if (!site.fleetEnabled) return 0;
   const now = Date.now();
   const automaticWindowStart = new Date(
     now - MAX_AUTOMATIC_LOOKBACK_SECONDS * 1_000,
@@ -782,6 +785,7 @@ export async function resumeRecentBattleReportGeneration(): Promise<number> {
     .from(battleReportsTable)
     .where(
       and(
+        eq(battleReportsTable.corporationId, site.id),
         gte(battleReportsTable.endedAt, automaticWindowStart),
         or(
           eq(battleReportsTable.status, "pending"),

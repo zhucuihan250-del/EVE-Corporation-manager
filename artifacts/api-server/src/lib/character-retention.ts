@@ -1,5 +1,6 @@
-import { and, isNotNull, isNull, lte, or } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { charactersTable, db } from "@workspace/db";
+import { requireSiteCorporation } from "./single-corporation";
 
 export const CHARACTER_RETENTION_MONTHS = 3;
 export const CHARACTER_RETENTION_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
@@ -22,9 +23,11 @@ export function getCharacterRetentionDeadline(deletedAt: Date): Date {
 }
 
 export async function purgeExpiredDeletedCharacters(now = new Date()): Promise<number> {
+  const site = await requireSiteCorporation();
   const deleted = await db
     .delete(charactersTable)
     .where(and(
+      eq(charactersTable.corporationId, site.id),
       isNotNull(charactersTable.deletedAt),
       or(
         isNull(charactersTable.retainedUntil),

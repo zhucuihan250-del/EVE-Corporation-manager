@@ -15,7 +15,7 @@ import {
   identityGroupMembershipsTable,
   identityGroupsTable,
 } from "@workspace/db";
-import { and, desc, eq, gt, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { generateOauthState, getAuthorizationUrl, getLinkAltAuthorizationUrl, exchangeCode, getCharacterInfo, getCorporationName } from "../lib/eve-sso";
 import { hasRole, requireAuth } from "../middlewares/auth";
 import { logger } from "../lib/logger";
@@ -27,6 +27,8 @@ import {
 } from "../lib/tenant";
 import { timingSafeEqual } from "node:crypto";
 import { availablePap, incrementPapBalance } from "../lib/pap-balance";
+import { ensureCharacterCorporationReference, recordNonSiteLoginAffiliation, requireSiteCorporation } from "../lib/single-corporation";
+import { siteAllowsLogin } from "../lib/single-corporation-rules";
 
 const router: IRouter = Router();
 
@@ -37,17 +39,9 @@ async function mergeOrphanUser(
   log: { info: (obj: object, msg: string) => void },
 ): Promise<void> {
   if (!orphan) return;
-  const memberships = await db
-    .select()
-    .from(corporationMembershipsTable)
-    .where(eq(corporationMembershipsTable.userId, orphan.id));
-  if (memberships.length > 0) {
-    await db.insert(corporationMembershipsTable).values(memberships.map((membership) => ({
-      corporationId: membership.corporationId,
-      userId: mainUserId,
-      role: membership.role,
-    }))).onConflictDoNothing();
-  }
+  await assertOrphanBelongsToSite(orphan);
+  // The authenticated target already has its own site membership. Never copy
+  // another account's roles or historical foreign-corporation memberships.
   // Move all PAP records to main user
   await db.execute(sql`UPDATE pap_records SET user_id = ${mainUserId} WHERE user_id = ${orphan.id}`);
   // The spendable balance is canonical; totalPap is only a mirrored legacy field.
@@ -77,6 +71,18 @@ async function mergeOrphanUser(
   // Delete orphan user row
   await db.delete(usersTable).where(eq(usersTable.id, orphan.id));
   log.info({ orphanId: orphan.id, mainUserId, orphanPap: orphan.redeemablePap }, "Orphan user merged into main account");
+}
+
+async function assertOrphanBelongsToSite(orphan: typeof usersTable.$inferSelect): Promise<void> {
+  const site = await requireSiteCorporation();
+  const [foreignMembership] = await db.select({ id: corporationMembershipsTable.id })
+    .from(corporationMembershipsTable).where(and(
+      eq(corporationMembershipsTable.userId, orphan.id),
+      ne(corporationMembershipsTable.corporationId, site.id),
+    )).limit(1);
+  if (orphan.corporationId !== site.id || foreignMembership) {
+    throw new Error("Historical external accounts cannot be merged into this site");
+  }
 }
 
 async function findActiveCharacterByEveId(characterId: number) {
@@ -209,38 +215,6 @@ async function establishTenantSession(
   req.session.eveCharacterId = eveCharacterId;
 }
 
-async function removeUnusedCorporationMembership(
-  userId: number,
-  previousCorporationId: number | null,
-  currentCorporationId: number,
-): Promise<void> {
-  if (!previousCorporationId || previousCorporationId === currentCorporationId) return;
-
-  const [remainingCharacter] = await db
-    .select({ id: charactersTable.id })
-    .from(charactersTable)
-    .where(and(
-      eq(charactersTable.userId, userId),
-      eq(charactersTable.corporationId, previousCorporationId),
-      isNull(charactersTable.deletedAt),
-    ))
-    .limit(1);
-  if (remainingCharacter) return;
-
-  const removedMemberships = await db
-    .delete(corporationMembershipsTable)
-    .where(and(
-      eq(corporationMembershipsTable.userId, userId),
-      eq(corporationMembershipsTable.corporationId, previousCorporationId),
-    ))
-    .returning({ id: corporationMembershipsTable.id });
-  if (removedMemberships.length > 0) {
-    logger.info(
-      { userId, previousCorporationId, currentCorporationId },
-      "Removed corporation membership no longer backed by an active character",
-    );
-  }
-}
 
 function getCallbackUrl(req: Request): string {
   // Use the forwarded host so the callback URL always matches the domain
@@ -371,6 +345,14 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
   try {
     const { accessToken, refreshToken, expiresIn } = await exchangeCode(code, callbackUrl);
     const { characterId, characterName, corporationId } = await getCharacterInfo(accessToken);
+    const site = await requireSiteCorporation();
+    // A linked external alt may be refreshed by an already-authorized account,
+    // but it is never a credential for entering this single-corporation site.
+    if (oauthFlow === "login" && !siteAllowsLogin(site.id, corporationId)) {
+      await recordNonSiteLoginAffiliation(characterId, corporationId);
+      req.session.destroy(() => redirectToFrontend(res, "/?error=corporation_required"));
+      return;
+    }
 
     let corporationName = "";
     if (corporationId) {
@@ -517,12 +499,17 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
     if (oauthFlow === "link_alt" && req.session.linkingUserId) {
       const mainUserId = req.session.linkingUserId;
       req.session.linkingUserId = undefined;
-      const [mainUser] = await db.select().from(usersTable).where(eq(usersTable.id, mainUserId));
-      if (corporationId) {
-        await ensureCorporation(corporationId, corporationName);
-        await ensureCorporationMembership(mainUserId, corporationId, "member");
+      const tenant = await getTenantContext(req);
+      if (!tenant || req.session.userId !== mainUserId || tenant.user.id !== mainUserId) {
+        redirectToFrontend(res, "/?error=corporation_required");
+        return;
       }
-      const shouldBecomeMain = await accountNeedsMainCharacter(mainUserId, mainUser ?? null);
+      const mainUser = tenant.user;
+      if (corporationId) {
+        await ensureCharacterCorporationReference(corporationId, corporationName);
+      }
+      const shouldBecomeMain = siteAllowsLogin(site.id, corporationId)
+        && await accountNeedsMainCharacter(mainUserId, mainUser);
 
       // Check if this character is already actively linked.
       const existingChar = await findActiveCharacterByEveId(characterId);
@@ -627,6 +614,7 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
           redirectToFrontend(res, "/characters?error=already_linked");
           return;
         }
+        await assertOrphanBelongsToSite(orphanByMain);
         // Orphan in usersTable — create the characters record first, then merge
         await db.insert(charactersTable).values({
           userId: orphanByMain.id,
@@ -683,10 +671,8 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    // Character rows are scoped to a corporation and protected by a foreign
-    // key. Ensure a newly encountered EVE corporation exists before creating
-    // or restoring the login character; establishTenantSession used to do
-    // this only after the character write, which made first-time logins fail.
+    // Login can refresh only the existing home corporation's name. It cannot
+    // provision a new corporation, enable modules, or import foreign roles.
     await ensureCorporation(corporationId, corporationName);
 
     // Find or create user by EVE character ID.
@@ -725,11 +711,6 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
           }
           req.session.userId = mainUser.id;
           await establishTenantSession(req, mainUser, corporationId, corporationName, characterId);
-          await removeUnusedCorporationMembership(
-            mainUser.id,
-            linkedChar.corporationId,
-            corporationId,
-          );
           req.session.save((err) => {
             if (err) {
               req.log.error({ err }, "Session save error (alt-as-main login)");
@@ -744,13 +725,7 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
       }
     }
 
-    let previousCorporationId: number | null = null;
-
     if (!user) {
-      // Check if there are any users (first user becomes admin)
-      const allUsers = await db.select().from(usersTable);
-      const isFirstUser = allUsers.length === 0;
-
       [user] = await db
         .insert(usersTable)
         .values({
@@ -762,7 +737,7 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
           accessToken,
           refreshToken,
           tokenExpiry,
-          role: isFirstUser ? "admin" : "member",
+          role: "member",
           totalPap: 0,
           redeemablePap: 0,
         })
@@ -841,7 +816,6 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
           });
         }
       } else {
-        previousCorporationId = existingChar.corporationId;
         await db
           .update(charactersTable)
           .set({
@@ -857,7 +831,6 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
     }
 
     await establishTenantSession(req, user, corporationId, corporationName, characterId);
-    await removeUnusedCorporationMembership(user.id, previousCorporationId, corporationId);
     req.session.userId = user.id;
     req.session.save((err) => {
       if (err) {

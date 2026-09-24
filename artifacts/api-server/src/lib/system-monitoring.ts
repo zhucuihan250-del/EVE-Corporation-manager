@@ -20,6 +20,7 @@ import {
   parseIntelMessage,
 } from "./system-monitoring-rules";
 import { loadSystemMonitoringMap } from "./system-monitoring-map";
+import { getSiteCorporation, requireSiteCorporation } from "./single-corporation";
 
 const PAIRING_LIFETIME_MS = 10 * 60 * 1_000;
 const BRIDGE_ONLINE_WINDOW_MS = 90 * 1_000;
@@ -307,16 +308,19 @@ export async function pairBridge(input: {
   platform?: string | null;
   channelNames?: unknown;
 }) {
+  const site = await getSiteCorporation();
+  if (!site?.fleetEnabled) return null;
   return db.transaction(async (tx) => {
     const [pairing] = await tx
       .select()
       .from(intelBridgePairingsTable)
-      .where(
+      .where(and(
+        eq(intelBridgePairingsTable.corporationId, site.id),
         eq(
           intelBridgePairingsTable.codeHash,
           hashSecret(input.code.trim().toLocaleUpperCase()),
         ),
-      )
+      ))
       .for("update");
     if (
       !pairing ||
@@ -350,6 +354,8 @@ export async function authenticateBridge(
   authorization: string | undefined,
 ): Promise<BridgeAuth | null> {
   if (!authorization?.startsWith("Bearer eib_")) return null;
+  const site = await getSiteCorporation();
+  if (!site) return null;
   const token = authorization.slice("Bearer ".length).trim();
   const [row] = await db
     .select({ bridge: intelBridgesTable, corporation: corporationsTable })
@@ -361,6 +367,7 @@ export async function authenticateBridge(
     .where(
       and(
         eq(intelBridgesTable.tokenHash, hashSecret(token)),
+        eq(intelBridgesTable.corporationId, site.id),
         eq(intelBridgesTable.isActive, true),
         eq(corporationsTable.isActive, true),
         eq(corporationsTable.fleetEnabled, true),
@@ -725,10 +732,12 @@ export async function removeMonitoredSystem(
 }
 
 export async function cleanupExpiredPairings() {
+  const site = await requireSiteCorporation();
   await db
     .delete(intelBridgePairingsTable)
     .where(
       and(
+        eq(intelBridgePairingsTable.corporationId, site.id),
         isNull(intelBridgePairingsTable.usedAt),
         lt(intelBridgePairingsTable.expiresAt, new Date()),
       ),

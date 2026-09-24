@@ -1,6 +1,4 @@
 import { type Request, type Response, type NextFunction } from "express";
-import { db, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
 import { getTenantContext } from "../lib/tenant";
 
 declare module "express-session" {
@@ -24,16 +22,24 @@ export function hasRole(userRole: string, minRole: Role): boolean {
   return ROLE_LEVELS.indexOf(userRole as Role) >= ROLE_LEVELS.indexOf(minRole);
 }
 
-export function requireAuth(
+export async function requireAuth(
   req: Request,
   res: Response,
   next: NextFunction,
-): void {
+): Promise<void> {
   if (!req.session.userId) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
-  next();
+  try {
+    if (!await getTenantContext(req)) {
+      res.status(403).json({ error: "This website is available only to the home corporation", code: "SITE_CORPORATION_REQUIRED" });
+      return;
+    }
+    next();
+  } catch (error) {
+    next(error);
+  }
 }
 
 export function requireRole(minRole: Role) {

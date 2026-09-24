@@ -110,6 +110,9 @@ app.use((req, res, next) => {
   }
   res.status(403).json({ error: "Request origin is not allowed" });
 });
+// The calculator accepts up to 100,000 UTF-16 characters; Chinese inventory
+// lists require more UTF-8 bytes. Keep the larger allowance scoped to quotes.
+app.use("/api/buyback/quotes", express.json({ limit: "400kb" }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

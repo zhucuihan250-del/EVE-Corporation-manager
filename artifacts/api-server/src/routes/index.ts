@@ -22,6 +22,7 @@ import courierRouter from "./courier";
 import structuresRouter from "./structures";
 import papMarketRouter from "./pap-market";
 import systemMonitoringRouter from "./system-monitoring";
+import buybackRouter from "./buyback";
 
 const router: IRouter = Router();
 
@@ -48,5 +49,6 @@ router.use(courierRouter);
 router.use(structuresRouter);
 router.use(papMarketRouter);
 router.use(systemMonitoringRouter);
+router.use(buybackRouter);
 
 export default router;

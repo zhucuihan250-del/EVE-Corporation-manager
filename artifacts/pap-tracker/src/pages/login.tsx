@@ -9,7 +9,8 @@ import { getErrorMessage, isUnauthorizedError } from "@/lib/api-error";
 import { defaultLanding } from "@/lib/navigation";
 
 export function Login() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const corporationRequired = new URLSearchParams(window.location.search).get("error") === "corporation_required";
   const { data: user, isLoading, isError, error } = useGetMe();
   const [, setLocation] = useLocation();
   const hasApiError = isError && !isUnauthorizedError(error);
@@ -41,6 +42,13 @@ export function Login() {
             <p className="font-mono text-xs text-destructive">
               {getErrorMessage(error)}
             </p>
+          </div>
+        )}
+        {corporationRequired && (
+          <div role="alert" className="mb-4 w-full rounded-sm border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200">
+            {i18n.language.startsWith("zh")
+              ? "本站仅供本军团成员使用。请使用本军团角色登录；外军小号需要先用本军团角色登录，再从角色管理中绑定，不能用于直接登录本站。"
+              : "This site is for corporation members only. Sign in with your corporation character first, then link out-of-corporation alts in Character Management. Those alts cannot sign in directly."}
           </div>
         )}
         

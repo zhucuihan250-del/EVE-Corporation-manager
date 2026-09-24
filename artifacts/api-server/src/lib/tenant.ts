@@ -8,8 +8,10 @@ import {
   identityGroupsTable,
   usersTable,
 } from "@workspace/db";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type { Role } from "../middlewares/auth";
+import { getSiteCorporation, requireSiteCorporation } from "./single-corporation";
+import { siteSessionAllowsActor } from "./single-corporation-rules";
 
 export type TenantContext = {
   user: typeof usersTable.$inferSelect;
@@ -31,121 +33,39 @@ export async function ensureCorporation(
   corporationId: number,
   corporationName: string,
 ): Promise<typeof corporationsTable.$inferSelect> {
-  if (!Number.isInteger(corporationId) || corporationId <= 0) {
-    throw new Error("A verified EVE corporation is required");
+  const site = await requireSiteCorporation();
+  if (corporationId !== site.id) throw new Error("This corporation cannot use this website");
+  // Login may refresh a verified name, but never rewrites administrator settings.
+  if (corporationName && corporationName !== site.name) {
+    const [updated] = await db.update(corporationsTable).set({ name: corporationName })
+      .where(eq(corporationsTable.id, site.id)).returning();
+    return updated;
   }
-
-  return db.transaction(async (tx) => {
-    const configuredPrimaryId = Number(process.env.PRIMARY_CORPORATION_ID);
-    const hasConfiguredPrimary = Number.isInteger(configuredPrimaryId) && configuredPrimaryId > 0;
-    const [existing] = await tx
-      .select()
-      .from(corporationsTable)
-      .where(eq(corporationsTable.id, corporationId));
-    if (existing) {
-      if (hasConfiguredPrimary && corporationId === configuredPrimaryId && !existing.isPrimary) {
-        await tx.update(corporationsTable).set({
-          isPrimary: false,
-          papEnabled: false,
-          identityEnabled: false,
-          economyEnabled: false,
-          fleetEnabled: false,
-          reimbursementEnabled: true,
-          diplomacyEnabled: true,
-          courierEnabled: false,
-          structuresEnabled: false,
-        }).where(eq(corporationsTable.isPrimary, true));
-        const [promoted] = await tx.update(corporationsTable).set({
-          isPrimary: true,
-          papEnabled: true,
-          identityEnabled: true,
-          economyEnabled: true,
-          fleetEnabled: true,
-          reimbursementEnabled: true,
-          diplomacyEnabled: true,
-          courierEnabled: true,
-          structuresEnabled: true,
-        }).where(eq(corporationsTable.id, corporationId)).returning();
-        return promoted;
-      }
-      if (corporationName && existing.name !== corporationName) {
-        const [updated] = await tx
-          .update(corporationsTable)
-          .set({ name: corporationName })
-          .where(eq(corporationsTable.id, corporationId))
-          .returning();
-        return updated;
-      }
-      return existing;
-    }
-
-    const [primary] = await tx
-      .select({ id: corporationsTable.id })
-      .from(corporationsTable)
-      .where(eq(corporationsTable.isPrimary, true))
-      .limit(1);
-    const isPrimary = hasConfiguredPrimary
-      ? corporationId === configuredPrimaryId
-      : !primary;
-    if (isPrimary && primary) {
-      await tx.update(corporationsTable).set({
-        isPrimary: false,
-        papEnabled: false,
-        identityEnabled: false,
-        economyEnabled: false,
-        fleetEnabled: false,
-        reimbursementEnabled: true,
-        diplomacyEnabled: true,
-        courierEnabled: false,
-        structuresEnabled: false,
-      }).where(eq(corporationsTable.isPrimary, true));
-    }
-    const [created] = await tx
-      .insert(corporationsTable)
-      .values({
-        id: corporationId,
-        name: corporationName || `Corporation ${corporationId}`,
-        isPrimary,
-        papEnabled: isPrimary,
-        identityEnabled: isPrimary,
-        economyEnabled: isPrimary,
-        fleetEnabled: isPrimary,
-        reimbursementEnabled: true,
-        diplomacyEnabled: true,
-        courierEnabled: isPrimary,
-        structuresEnabled: isPrimary,
-      })
-      .returning();
-    return created;
-  });
+  return site;
 }
 
 export async function ensureCorporationMembership(
   userId: number,
   corporationId: number,
-  preferredRole: Role = "member",
+  _preferredRole: Role = "member",
 ): Promise<typeof corporationMembershipsTable.$inferSelect> {
+  const site = await requireSiteCorporation();
+  if (corporationId !== site.id) throw new Error("This corporation cannot use this website");
   return db.transaction(async (tx) => {
-    const [existing] = await tx
-      .select()
-      .from(corporationMembershipsTable)
-      .where(
-        and(
-          eq(corporationMembershipsTable.corporationId, corporationId),
-          eq(corporationMembershipsTable.userId, userId),
-        ),
-      );
+    const [existing] = await tx.select().from(corporationMembershipsTable).where(and(
+      eq(corporationMembershipsTable.corporationId, site.id),
+      eq(corporationMembershipsTable.userId, userId),
+    ));
     if (existing) return existing;
-
-    const [{ count }] = await tx
-      .select({ count: sql<number>`COUNT(*)::int` })
-      .from(corporationMembershipsTable)
-      .where(eq(corporationMembershipsTable.corporationId, corporationId));
-    const role: Role = count === 0 ? "admin" : preferredRole;
-    const [created] = await tx
-      .insert(corporationMembershipsTable)
-      .values({ corporationId, userId, role })
-      .returning();
+    // Provisioning never imports a legacy global/foreign-corporation role and
+    // never turns the first visitor into an administrator.
+    await tx.insert(corporationMembershipsTable)
+      .values({ corporationId: site.id, userId, role: "member" })
+      .onConflictDoNothing();
+    const [created] = await tx.select().from(corporationMembershipsTable).where(and(
+      eq(corporationMembershipsTable.corporationId, site.id),
+      eq(corporationMembershipsTable.userId, userId),
+    ));
     return created;
   });
 }
@@ -174,8 +94,28 @@ async function loadPermissions(
   return [...new Set(rows.flatMap((row) => row.permissions))];
 }
 
+// Cache only contexts validated here, and only while the request's identity is
+// unchanged. Merely assigning req.tenant or switching a session must not bypass
+// the site/actor eligibility checks at subsequent permission middleware.
+const validatedTenantContexts = new WeakMap<Request, {
+  tenant: TenantContext;
+  userId: number;
+  corporationId: number | undefined;
+  eveCharacterId: number | undefined;
+  configuredCorporationId: string | undefined;
+}>();
+
 export async function getTenantContext(req: Request): Promise<TenantContext | null> {
-  if (req.tenant) return req.tenant;
+  const cached = validatedTenantContexts.get(req);
+  if (cached
+    && req.tenant === cached.tenant
+    && req.session.userId === cached.userId
+    && req.session.corporationId === cached.corporationId
+    && req.session.eveCharacterId === cached.eveCharacterId
+    && process.env.PRIMARY_CORPORATION_ID === cached.configuredCorporationId
+  ) return cached.tenant;
+  validatedTenantContexts.delete(req);
+  req.tenant = undefined;
   if (!req.session.userId) return null;
 
   const [user] = await db
@@ -184,19 +124,10 @@ export async function getTenantContext(req: Request): Promise<TenantContext | nu
     .where(eq(usersTable.id, req.session.userId));
   if (!user) return null;
 
-  const corporationId = req.session.corporationId ?? user.corporationId;
-  if (!corporationId) return null;
-
-  const [corporation] = await db
-    .select()
-    .from(corporationsTable)
-    .where(
-      and(
-        eq(corporationsTable.id, corporationId),
-        eq(corporationsTable.isActive, true),
-      ),
-    );
+  const corporation = await getSiteCorporation();
   if (!corporation) return null;
+  const corporationId = corporation.id;
+  if (req.session.corporationId !== undefined && req.session.corporationId !== corporationId) return null;
 
   const [membership] = await db
     .select()
@@ -214,25 +145,21 @@ export async function getTenantContext(req: Request): Promise<TenantContext | nu
     eq(charactersTable.corporationId, corporationId),
     isNull(charactersTable.deletedAt),
   ];
-  if (req.session.eveCharacterId) {
-    actorConditions.push(eq(charactersTable.eveCharacterId, req.session.eveCharacterId));
-  }
-  let [actorCharacter] = await db
+  const sessionCharacterId = req.session.eveCharacterId ?? user.eveCharacterId;
+  if (!sessionCharacterId) return null;
+  actorConditions.push(eq(charactersTable.eveCharacterId, sessionCharacterId));
+  const [actorCharacter] = await db
     .select()
     .from(charactersTable)
     .where(and(...actorConditions))
     .limit(1);
-  if (!actorCharacter && req.session.eveCharacterId) {
-    [actorCharacter] = await db
-      .select()
-      .from(charactersTable)
-      .where(and(
-        eq(charactersTable.userId, user.id),
-        eq(charactersTable.corporationId, corporationId),
-        isNull(charactersTable.deletedAt),
-      ))
-      .limit(1);
-  }
+  if (!siteSessionAllowsActor({
+    siteCorporationId: corporationId,
+    sessionCorporationId: req.session.corporationId,
+    sessionCharacterId,
+    userId: user.id,
+    actor: actorCharacter ?? null,
+  })) return null;
 
   const permissions = await loadPermissions(user.id, corporationId);
   if (membership.role === "controller") {
@@ -244,6 +171,13 @@ export async function getTenantContext(req: Request): Promise<TenantContext | nu
   }
   const scopedPermissions = [...new Set(permissions)];
   req.tenant = { user, corporation, membership, actorCharacter: actorCharacter ?? null, permissions: scopedPermissions };
+  validatedTenantContexts.set(req, {
+    tenant: req.tenant,
+    userId: req.session.userId,
+    corporationId: req.session.corporationId,
+    eveCharacterId: req.session.eveCharacterId,
+    configuredCorporationId: process.env.PRIMARY_CORPORATION_ID,
+  });
   return req.tenant;
 }
 

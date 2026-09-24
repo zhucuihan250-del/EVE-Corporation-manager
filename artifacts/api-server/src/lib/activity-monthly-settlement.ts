@@ -11,6 +11,7 @@ import { and, eq, isNotNull, lte, sql } from "drizzle-orm";
 import { availablePap, canonicalPapBalance, normalizePap, setPapBalance } from "./pap-balance";
 import { writePapLedger } from "./pap-ledger";
 import { ACTIVITY_MONTHLY_PAP_DEDUCTION, calculateActivityPapDeduction } from "./activity-rules";
+import { requireSiteCorporation } from "./single-corporation";
 
 export const ACTIVITY_ELIGIBILITY_DAYS = 60;
 export { ACTIVITY_MONTHLY_PAP_DEDUCTION } from "./activity-rules";
@@ -195,6 +196,7 @@ async function settleCorporationMonth(
 }
 
 export async function settleDueActivityMonths(now = new Date()): Promise<ActivitySettlementSweepResult> {
+  const site = await requireSiteCorporation();
   const corporations = await db
     .select({
       id: corporationsTable.id,
@@ -202,6 +204,7 @@ export async function settleDueActivityMonths(now = new Date()): Promise<Activit
     })
     .from(corporationsTable)
     .where(and(
+      eq(corporationsTable.id, site.id),
       eq(corporationsTable.isActive, true),
       eq(corporationsTable.papEnabled, true),
     ));

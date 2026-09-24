@@ -43,6 +43,7 @@ const BattleReplays = lazy(() => import("@/pages/battle-replays").then((module) 
 const IdentityGroups = lazy(() => import("@/pages/identity-groups").then((module) => ({ default: module.IdentityGroups })));
 const Diplomacy = lazy(() => import("@/pages/diplomacy").then((module) => ({ default: module.Diplomacy })));
 const Courier = lazy(() => import("@/pages/courier").then((module) => ({ default: module.Courier })));
+const Buyback = lazy(() => import("@/pages/buyback").then((module) => ({ default: module.Buyback })));
 const Reimbursements = lazy(() => import("@/pages/reimbursements").then((module) => ({ default: module.Reimbursements })));
 const TacticalReimbursements = lazy(() => import("@/pages/reimbursements").then((module) => ({ default: module.TacticalReimbursements })));
 const TacticalDashboard = lazy(() => import("@/pages/tactical-dashboard").then((module) => ({ default: module.TacticalDashboard })));
@@ -61,6 +62,7 @@ const AdminActivity = lazy(() => import("@/pages/admin/activity").then((module) 
 const AdminIdentity = lazy(() => import("@/pages/admin/identity").then((module) => ({ default: module.AdminIdentity })));
 const AdminDiplomacy = lazy(() => import("@/pages/admin/diplomacy").then((module) => ({ default: module.AdminDiplomacy })));
 const AdminCourier = lazy(() => import("@/pages/admin/courier").then((module) => ({ default: module.AdminCourier })));
+const AdminBuyback = lazy(() => import("@/pages/admin/buyback").then((module) => ({ default: module.AdminBuyback })));
 const AdminSystemMonitoring = lazy(() => import("@/pages/admin/system-monitoring").then((module) => ({ default: module.AdminSystemMonitoring })));
 
 const queryClient = new QueryClient({
@@ -213,6 +215,9 @@ function Router() {
       <Route path="/courier">
         {() => <ProtectedRoute component={Courier} module="courier" />}
       </Route>
+      <Route path="/buyback">
+        {() => <ProtectedRoute component={Buyback} />}
+      </Route>
       <Route path="/reimbursements">
         {() => <ProtectedRoute component={Reimbursements} module="reimbursement" requiresReimbursementOpen />}
       </Route>
@@ -273,6 +278,9 @@ function Router() {
       </Route>
       <Route path="/admin/courier">
         {() => <ProtectedRoute component={AdminCourier} minRole="admin" module="courier" />}
+      </Route>
+      <Route path="/admin/buyback">
+        {() => <ProtectedRoute component={AdminBuyback} minRole="admin" />}
       </Route>
       {/* FC Routes - fc, admin & controller */}
       <Route path="/admin/fleets">

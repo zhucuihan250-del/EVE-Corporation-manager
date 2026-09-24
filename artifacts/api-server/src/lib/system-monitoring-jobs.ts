@@ -23,6 +23,7 @@ import {
 } from "./system-monitoring-rules";
 import { cleanupExpiredPairings } from "./system-monitoring";
 import { logger } from "./logger";
+import { requireSiteCorporation } from "./single-corporation";
 
 const R2Z2_SEQUENCE_URL = "https://r2z2.zkillboard.com/ephemeral/sequence.json";
 const R2Z2_POLL_INTERVAL_MS = 6_000;
@@ -108,6 +109,7 @@ function formatIsk(value: number): string {
 
 async function processKillmail(killmail: R2Z2Killmail) {
   if (!killmailAffectsSystemRisk(killmail)) return;
+  const site = await requireSiteCorporation();
 
   const monitorRows = await db
     .select({ monitor: monitoredSystemsTable })
@@ -116,6 +118,7 @@ async function processKillmail(killmail: R2Z2Killmail) {
       corporationsTable,
       and(
         eq(corporationsTable.id, monitoredSystemsTable.corporationId),
+        eq(corporationsTable.id, site.id),
         eq(corporationsTable.isActive, true),
         eq(corporationsTable.fleetEnabled, true),
       ),
@@ -315,6 +318,10 @@ export async function runKillmailSweep() {
     );
     hasLock = Boolean(lockResult.rows[0]?.locked);
     if (!hasLock) return;
+    // Do not advance the shared feed cursor when this installation has no
+    // enabled home-corporation monitoring service.
+    const site = await requireSiteCorporation();
+    if (!site.fleetEnabled) return;
     let [state] = await db
       .select()
       .from(systemMonitorFeedStateTable)
@@ -422,6 +429,7 @@ export async function runSystemActivitySweep() {
     );
     hasLock = Boolean(lockResult.rows[0]?.locked);
     if (!hasLock) return;
+    const site = await requireSiteCorporation();
     await cleanupExpiredPairings();
     const monitorRows = await db
       .select({ monitor: monitoredSystemsTable })
@@ -430,6 +438,7 @@ export async function runSystemActivitySweep() {
         corporationsTable,
         and(
           eq(corporationsTable.id, monitoredSystemsTable.corporationId),
+          eq(corporationsTable.id, site.id),
           eq(corporationsTable.isActive, true),
           eq(corporationsTable.fleetEnabled, true),
         ),

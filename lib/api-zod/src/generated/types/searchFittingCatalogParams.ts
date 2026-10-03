@@ -15,4 +15,8 @@ export type SearchFittingCatalogParams = {
   slot?: SearchFittingCatalogSlot;
   language?: SearchFittingCatalogLanguage;
   limit?: number;
+  /**
+   * Comma-separated exact item IDs, maximum 100; bypasses text search.
+   */
+  typeIds?: string;
 };

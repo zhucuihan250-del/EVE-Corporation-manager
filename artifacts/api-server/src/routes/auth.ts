@@ -14,6 +14,7 @@ import {
   papMarketTransactionsTable,
   identityGroupMembershipsTable,
   identityGroupsTable,
+  fittingsTable,
 } from "@workspace/db";
 import { and, desc, eq, gt, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { generateOauthState, getAuthorizationUrl, getLinkAltAuthorizationUrl, exchangeCode, getCharacterInfo, getCorporationName } from "../lib/eve-sso";
@@ -54,6 +55,11 @@ async function mergeOrphanUser(
     await tx.update(papLedgerTable).set({ userId: mainUserId }).where(eq(papLedgerTable.userId, orphan.id));
     await tx.update(papLedgerTable).set({ adminId: mainUserId }).where(eq(papLedgerTable.adminId, orphan.id));
     await tx.update(papMarketAdminLogsTable).set({ adminId: mainUserId }).where(eq(papMarketAdminLogsTable.adminId, orphan.id));
+    // Personal fitting drafts belong to the account, not its former login character.
+    await tx.update(fittingsTable).set({ ownerUserId: mainUserId }).where(and(
+      eq(fittingsTable.ownerUserId, orphan.id),
+      eq(fittingsTable.corporationId, orphan.corporationId!),
+    ));
     await tx.update(charactersTable).set({
       userId: mainUserId,
       isMain: false,

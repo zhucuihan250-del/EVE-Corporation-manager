@@ -7,6 +7,7 @@
  */
 import type { FittingCatalogItem } from "./fittingCatalogItem";
 import type { FittingSimulatedModule } from "./fittingSimulatedModule";
+import type { FittingSimulationResultCalculationPrecision } from "./fittingSimulationResultCalculationPrecision";
 import type { FittingSimulationResultCapacitor } from "./fittingSimulationResultCapacitor";
 import type { FittingSimulationResultDefense } from "./fittingSimulationResultDefense";
 import type { FittingSimulationResultHardpoints } from "./fittingSimulationResultHardpoints";
@@ -17,7 +18,9 @@ import type { FittingSimulationResultResources } from "./fittingSimulationResult
 import type { FittingSimulationResultSlots } from "./fittingSimulationResultSlots";
 
 export interface FittingSimulationResult {
+  /** Retained for compatibility. Use calculationPrecision for the active calculation engine. */
   precision: FittingSimulationResultPrecision;
+  calculationPrecision?: FittingSimulationResultCalculationPrecision;
   /** @nullable */
   sdeBuildNumber: number | null;
   ship: FittingCatalogItem;

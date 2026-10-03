@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { pool } from "@workspace/db";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { fittingWorkbenchErrorHandler } from "./lib/fitting-workbench-router";
 
 const app: Express = express();
 
@@ -145,6 +146,7 @@ app.use("/api", (_req, res, next) => {
   next();
 });
 app.use("/api", router);
+app.use("/api/fitting", fittingWorkbenchErrorHandler);
 
 if (isProduction) {
   if (existsSync(frontendIndexFile)) {

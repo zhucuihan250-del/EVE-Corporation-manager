@@ -45,6 +45,7 @@ type SdeDogmaAttribute = {
 type SdeDogmaEffect = {
   _key: number;
   name: string;
+  effectCategoryID?: number;
 };
 
 type SdeTypeDogma = {
@@ -53,7 +54,7 @@ type SdeTypeDogma = {
   dogmaEffects?: Array<{ effectID: number; isDefault?: boolean }>;
 };
 
-type FittingSlot = "high" | "medium" | "low" | "rig" | "subsystem" | "charge" | "drone" | "other";
+type FittingSlot = "high" | "medium" | "low" | "rig" | "subsystem" | "service" | "charge" | "drone" | "fighter" | "implant" | "booster" | "other";
 
 type FittingType = {
   id: number;
@@ -72,13 +73,15 @@ type FittingType = {
   hardpoint?: "turret" | "launcher";
   attributes: Record<string, number>;
   effects: string[];
+  effectCategories: number[];
 };
 
 const LATEST_SDE_URL = "https://developers.eveonline.com/static-data/eve-online-static-data-latest-jsonl.zip";
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const workspaceDir = path.resolve(scriptDir, "../..");
 const DEFAULT_OUTPUT = path.resolve(workspaceDir, "artifacts/api-server/src/data/eve-fitting-data.json");
-const FITTING_CATEGORY_IDS = new Set([6, 7, 8, 18]);
+// Retain published cargo types as well: an EFT's cargo can contain minerals,
+// fuel, scripts, ammunition, paste, and any other item accepted by the game.
 const SELECTED_ATTRIBUTES = [
   "hiSlots",
   "medSlots",
@@ -132,11 +135,12 @@ const SELECTED_ATTRIBUTES = [
   "structureHPMultiplier",
 ] as const;
 
-function parseArgs(): { zipPath: string | null; outputPath: string; sourceUrl: string } {
+function parseArgs(): { zipPath: string | null; outputPath: string; sourceUrl: string; requiredBuild: number | null } {
   const args = process.argv.slice(2);
   let zipPath: string | null = null;
   let outputPath = DEFAULT_OUTPUT;
   let sourceUrl = LATEST_SDE_URL;
+  let requiredBuild: number | null = null;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -146,12 +150,14 @@ function parseArgs(): { zipPath: string | null; outputPath: string; sourceUrl: s
       outputPath = path.resolve(args[++i] ?? outputPath);
     } else if (arg === "--url") {
       sourceUrl = args[++i] ?? sourceUrl;
+    } else if (arg === "--require-build") {
+      requiredBuild = Number(args[++i]);
     } else if (!arg.startsWith("--") && !zipPath) {
       zipPath = arg;
     }
   }
 
-  return { zipPath, outputPath, sourceUrl };
+  return { zipPath, outputPath, sourceUrl, requiredBuild };
 }
 
 function localized(value: Partial<LocalizedString> | undefined, fallback: string): LocalizedString {
@@ -196,9 +202,13 @@ async function downloadSdeZip(sourceUrl: string): Promise<string> {
   return zipPath;
 }
 
-function slotFromEffects(categoryId: number, effects: string[]): FittingSlot {
+function slotFromEffects(categoryId: number, groupId: number, effects: string[]): FittingSlot {
   if (categoryId === 8) return "charge";
   if (categoryId === 18) return "drone";
+  if (categoryId === 87) return "fighter";
+  if (categoryId === 32) return "subsystem";
+  if (categoryId === 20) return groupId === 303 ? "booster" : "implant";
+  if (effects.includes("serviceSlot")) return "service";
   if (effects.includes("hiPower")) return "high";
   if (effects.includes("medPower")) return "medium";
   if (effects.includes("loPower")) return "low";
@@ -214,7 +224,7 @@ function hardpointFromEffects(effects: string[]): "turret" | "launcher" | undefi
 }
 
 async function main(): Promise<void> {
-  const { zipPath: inputZipPath, outputPath, sourceUrl } = parseArgs();
+  const { zipPath: inputZipPath, outputPath, sourceUrl, requiredBuild } = parseArgs();
   const zipPath = inputZipPath ?? await downloadSdeZip(sourceUrl);
 
   if (!existsSync(zipPath)) {
@@ -223,6 +233,9 @@ async function main(): Promise<void> {
 
   const meta = parseJsonl<{ _key: string; buildNumber?: number; releaseDate?: string }>(unzipFile(zipPath, "_sde.jsonl"));
   const build = meta.find((entry) => entry._key === "sde");
+  if (requiredBuild !== null && build?.buildNumber !== requiredBuild) {
+    throw new Error(`Expected SDE ${requiredBuild}; found ${build?.buildNumber ?? "unknown"}`);
+  }
   const categories = new Map(parseJsonl<SdeCategory>(unzipFile(zipPath, "categories.jsonl")).map((entry) => [entry._key, entry]));
   const groups = new Map(parseJsonl<SdeGroup>(unzipFile(zipPath, "groups.jsonl")).map((entry) => [entry._key, entry]));
   const attributeIdByName = new Map(
@@ -230,9 +243,10 @@ async function main(): Promise<void> {
       .map((entry) => [entry.name, entry._key] as const),
   );
   const attributeNameById = new Map([...attributeIdByName.entries()].map(([name, id]) => [id, name] as const));
-  const selectedAttributeIds = new Set(SELECTED_ATTRIBUTES.map((name) => attributeIdByName.get(name)).filter((id): id is number => typeof id === "number"));
+  const effectDefinitions = parseJsonl<SdeDogmaEffect>(unzipFile(zipPath, "dogmaEffects.jsonl"));
+  const effectCategories = new Map(effectDefinitions.map((entry) => [entry._key, entry.effectCategoryID ?? 0]));
   const effectNameById = new Map(
-    parseJsonl<SdeDogmaEffect>(unzipFile(zipPath, "dogmaEffects.jsonl"))
+    effectDefinitions
       .map((entry) => [entry._key, entry.name] as const),
   );
   const dogmaByTypeId = new Map(parseJsonl<SdeTypeDogma>(unzipFile(zipPath, "typeDogma.jsonl")).map((entry) => [entry._key, entry]));
@@ -240,8 +254,10 @@ async function main(): Promise<void> {
 
   for (const type of parseJsonl<SdeType>(unzipFile(zipPath, "types.jsonl"))) {
     const group = groups.get(type.groupID);
-    if (!group || !FITTING_CATEGORY_IDS.has(group.categoryID)) continue;
-    if (type.published === false) continue;
+    if (!group) continue;
+    // Tactical-destroyer modes are intentionally unpublished, but selectable
+    // through the fitting window rather than the market.
+    if (type.published === false && type.groupID !== 1306) continue;
 
     const category = categories.get(group.categoryID);
     const dogma = dogmaByTypeId.get(type._key);
@@ -251,7 +267,6 @@ async function main(): Promise<void> {
     const attributes: Record<string, number> = {};
 
     for (const attribute of dogma?.dogmaAttributes ?? []) {
-      if (!selectedAttributeIds.has(attribute.attributeID)) continue;
       const name = attributeNameById.get(attribute.attributeID);
       if (name) attributes[name] = attribute.value;
     }
@@ -264,16 +279,17 @@ async function main(): Promise<void> {
       name: localized(type.name, `Type ${type._key}`),
       groupName: localized(group.name, `Group ${type.groupID}`),
       categoryName: localized(category?.name, `Category ${group.categoryID}`),
-      published: true,
+      published: type.published !== false,
       ...(type.mass !== undefined ? { mass: type.mass } : {}),
       ...(type.volume !== undefined ? { volume: type.volume } : {}),
       ...(type.capacity !== undefined ? { capacity: type.capacity } : {}),
       ...(type.marketGroupID !== undefined ? { marketGroupId: type.marketGroupID } : {}),
       ...(type.metaGroupID !== undefined ? { metaGroupId: type.metaGroupID } : {}),
-      slot: slotFromEffects(group.categoryID, effects),
+      slot: slotFromEffects(group.categoryID, type.groupID, effects),
       ...(hardpoint ? { hardpoint } : {}),
       attributes,
       effects,
+      effectCategories: [...new Set((dogma?.dogmaEffects ?? []).map((effect) => effectCategories.get(effect.effectID) ?? 0))],
     });
   }
 
@@ -284,14 +300,17 @@ async function main(): Promise<void> {
     releaseDate: build?.releaseDate ?? null,
     generatedAt: new Date().toISOString(),
     source: inputZipPath ? path.basename(inputZipPath) : sourceUrl,
-    attributeIds: Object.fromEntries(
-      SELECTED_ATTRIBUTES.map((name) => [name, attributeIdByName.get(name) ?? null]),
-    ),
+    attributeIds: Object.fromEntries(attributeIdByName),
     counts: {
       ships: fittingTypes.filter((type) => type.categoryId === 6).length,
       modules: fittingTypes.filter((type) => type.categoryId === 7).length,
       charges: fittingTypes.filter((type) => type.categoryId === 8).length,
       drones: fittingTypes.filter((type) => type.categoryId === 18).length,
+      fighters: fittingTypes.filter((type) => type.categoryId === 87).length,
+      subsystems: fittingTypes.filter((type) => type.categoryId === 32).length,
+      implants: fittingTypes.filter((type) => type.categoryId === 20 && type.groupId !== 303).length,
+      boosters: fittingTypes.filter((type) => type.categoryId === 20 && type.groupId === 303).length,
+      skills: fittingTypes.filter((type) => type.categoryId === 16).length,
     },
     types: fittingTypes,
   };

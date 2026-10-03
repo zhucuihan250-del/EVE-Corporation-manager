@@ -12,4 +12,5 @@ export interface FittingCatalogResponse {
   sdeBuildNumber: number | null;
   generatedAt: Date;
   items: FittingCatalogItem[];
+  missingTypeIds?: number[];
 }

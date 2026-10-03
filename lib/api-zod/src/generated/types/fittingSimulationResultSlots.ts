@@ -13,4 +13,5 @@ export type FittingSimulationResultSlots = {
   low: FittingSlotMetric;
   rig: FittingSlotMetric;
   subsystem: FittingSlotMetric;
+  service?: FittingSlotMetric;
 };

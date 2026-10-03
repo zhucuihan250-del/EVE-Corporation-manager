@@ -9,6 +9,8 @@ import { requireAuth, requireRole, requireRoleOrPermission } from "../middleware
 import authRouter from "../routes/auth";
 import { purgeExpiredDeletedCharacters } from "./character-retention";
 import { settleDueActivityMonths } from "./activity-monthly-settlement";
+import { editablePapCurrenciesMigration } from "../../../../lib/db/src/migrations/0030-editable-pap-currencies";
+import { fittingWorkbenchMigration } from "../../../../lib/db/src/migrations/0032-fitting-workbench";
 
 // Bundle this test with @workspace/db aliased to single-corporation-test-db.ts.
 // It exercises the real middleware and OAuth routes against in-memory Postgres.
@@ -19,6 +21,7 @@ let server: Server;
 let origin = "";
 let currentSession: Record<string, unknown>;
 let destroyed = false;
+let lastOAuthError: unknown;
 let ssoCharacter = { characterId: 101, characterName: "Member", corporationId: 1001 };
 
 function session(values: Record<string, unknown> = {}) {
@@ -95,7 +98,7 @@ before(async () => {
       updated_at timestamptz NOT NULL DEFAULT now());
     CREATE TABLE corporation_memberships (
       id serial PRIMARY KEY, corporation_id integer NOT NULL REFERENCES corporations(id),
-      user_id integer NOT NULL REFERENCES users(id), role text NOT NULL DEFAULT 'member',
+      user_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE, role text NOT NULL DEFAULT 'member',
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
       UNIQUE (corporation_id, user_id));
     CREATE TABLE characters (
@@ -109,11 +112,19 @@ before(async () => {
     CREATE TABLE identity_group_memberships (id serial PRIMARY KEY, corporation_id integer NOT NULL,
       group_id integer NOT NULL, user_id integer NOT NULL);
     CREATE TABLE activity_monthly_settlements (id serial PRIMARY KEY, corporation_id integer NOT NULL, month text NOT NULL);
+    CREATE TABLE pap_records (user_id integer);
+    CREATE TABLE pap_market_orders (owner_id integer, updated_at timestamptz NOT NULL DEFAULT now());
+    CREATE TABLE pap_market_transactions (buyer_id integer, seller_id integer, reviewed_by integer, updated_at timestamptz NOT NULL DEFAULT now());
+    CREATE TABLE pap_ledger (user_id integer, admin_id integer, type text);
+    CREATE TABLE pap_market_admin_logs (admin_id integer);
   `);
+  const migrationClient = { query: (statement: string) => pg.exec(statement) } as unknown as Parameters<typeof fittingWorkbenchMigration.up>[0];
+  await editablePapCurrenciesMigration.up(migrationClient);
+  await fittingWorkbenchMigration.up(migrationClient);
   const app = express();
   app.use((req, _res, next) => {
     req.session = currentSession as unknown as Request["session"];
-    req.log = { info() {}, error() {}, warn() {} } as unknown as Request["log"];
+    req.log = { info() {}, error(value: unknown) { lastOAuthError = value; }, warn() {} } as unknown as Request["log"];
     next();
   });
   app.use(authRouter);
@@ -127,10 +138,13 @@ before(async () => {
 beforeEach(async () => {
   delete process.env.PRIMARY_CORPORATION_ID;
   destroyed = false;
+  lastOAuthError = undefined;
   currentSession = session();
   ssoCharacter = { characterId: 101, characterName: "Member", corporationId: 1001 };
   await pg.exec(`
-    TRUNCATE activity_monthly_settlements, identity_group_memberships, identity_groups, characters, corporation_memberships,
+    TRUNCATE fittings, pap_currency_ledger, pap_currency_wallets, pap_currencies,
+      pap_records, pap_market_orders, pap_market_transactions, pap_ledger, pap_market_admin_logs,
+      activity_monthly_settlements, identity_group_memberships, identity_groups, characters, corporation_memberships,
       users, corporations RESTART IDENTITY;
     INSERT INTO corporations (id, name, is_primary, pap_enabled, fleet_enabled, identity_enabled)
       VALUES (1001, 'Home', true, true, true, true), (2002, 'Historical foreign site', false, true, true, true);
@@ -325,6 +339,65 @@ test("linking does not merge or delete historical foreign orphan accounts", asyn
   assert.equal((await callback("link_alt")).headers.get("location"), "/?error=auth");
   assert.equal((await pg.query<{ redeemable_pap: number }>("SELECT redeemable_pap FROM users WHERE id=2")).rows[0].redeemable_pap, 42);
   assert.equal((await pg.query<{ user_id: number }>("SELECT user_id FROM characters WHERE eve_character_id=201")).rows[0].user_id, 2);
+});
+
+async function seedOrphanFittingHistory() {
+  await pg.exec(`
+    UPDATE users SET total_pap=8, redeemable_pap=8 WHERE id=1;
+    UPDATE users SET access_token=NULL, total_pap=4, redeemable_pap=4 WHERE id=3;
+    INSERT INTO fittings (corporation_id, visibility, owner_user_id, created_by, updated_by, author_name, name, fit, simulation, version) VALUES
+      (1001, 'personal', 3, 3, 3, 'FC', 'Orphan personal draft', '{"schemaVersion":2,"shipTypeId":593}', '{"valid":false,"violations":["overfit"]}', 7),
+      (1001, 'corporation', NULL, 3, 3, 'FC', 'Corporation doctrine', '{"schemaVersion":2,"shipTypeId":593}', '{"valid":true}', 4),
+      (1001, 'personal', 1, 1, 1, 'Member', 'Existing main draft', '{"schemaVersion":2,"shipTypeId":593}', '{"valid":true}', 2),
+      (2002, 'personal', 2, 2, 2, 'External', 'Historical foreign draft', '{"schemaVersion":2,"shipTypeId":593}', '{"valid":true}', 3);
+    INSERT INTO pap_records VALUES(3);
+    INSERT INTO pap_market_orders (owner_id) VALUES(3);
+    INSERT INTO pap_market_transactions (buyer_id,seller_id,reviewed_by) VALUES(3,3,3);
+    INSERT INTO pap_ledger VALUES(3,3,'pap_earned');
+    INSERT INTO pap_market_admin_logs VALUES(3);
+  `);
+  ssoCharacter = { characterId: 301, characterName: "FC", corporationId: 1001 };
+}
+
+test("real OAuth account merge preserves personal drafts, corporation snapshots and roles without duplicating balances", async () => {
+  await seedOrphanFittingHistory();
+  const before = (await pg.query<Record<string, unknown>>("SELECT * FROM fittings ORDER BY id")).rows;
+  assert.equal((await callback("link_alt")).headers.get("location"), "/characters?linked=true", JSON.stringify(lastOAuthError));
+  const after = (await pg.query<Record<string, unknown>>("SELECT * FROM fittings ORDER BY id")).rows;
+  assert.equal(after.length, 4);
+  assert.deepEqual(after[0], { ...before[0], owner_user_id: 1, created_by: null, updated_by: null });
+  assert.deepEqual(after[1], { ...before[1], created_by: null, updated_by: null });
+  assert.deepEqual(after.slice(2), before.slice(2));
+  assert.equal((await pg.query("SELECT id FROM users WHERE id=3")).rows.length, 0);
+  assert.deepEqual((await pg.query("SELECT user_id,is_main FROM characters WHERE eve_character_id=301")).rows[0], { user_id: 1, is_main: false });
+  assert.equal((await pg.query<{ role: string }>("SELECT role FROM corporation_memberships WHERE user_id=1 AND corporation_id=1001")).rows[0].role, "member");
+  assert.deepEqual((await pg.query("SELECT total_pap,redeemable_pap FROM users WHERE id=1")).rows[0], { total_pap: 12, redeemable_pap: 12 });
+  assert.equal((await callback("link_alt")).headers.get("location"), "/characters?linked=true");
+  assert.deepEqual((await pg.query("SELECT total_pap,redeemable_pap FROM users WHERE id=1")).rows[0], { total_pap: 12, redeemable_pap: 12 });
+  assert.deepEqual((await pg.query<Record<string, unknown>>("SELECT * FROM fittings ORDER BY id")).rows, after);
+});
+
+test("real OAuth account merge rolls fitting ownership and PAP history back when account deletion fails", async () => {
+  await seedOrphanFittingHistory();
+  const fittingBefore = (await pg.query("SELECT * FROM fittings ORDER BY id")).rows;
+  const usersBefore = (await pg.query("SELECT * FROM users ORDER BY id")).rows;
+  const charactersBefore = (await pg.query("SELECT * FROM characters ORDER BY id")).rows;
+  await pg.exec(`
+    CREATE FUNCTION fail_test_orphan_delete() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN IF OLD.id=3 THEN RAISE EXCEPTION 'Fixture account-delete failure'; END IF; RETURN OLD; END; $$;
+    CREATE TRIGGER fail_test_orphan_delete BEFORE DELETE ON users FOR EACH ROW EXECUTE FUNCTION fail_test_orphan_delete();
+  `);
+  try {
+    assert.equal((await callback("link_alt")).headers.get("location"), "/?error=auth");
+    assert.equal((lastOAuthError as { errorCode?: string })?.errorCode, "P0001", "Rollback must be caused by the injected DELETE trigger");
+    assert.deepEqual((await pg.query("SELECT * FROM fittings ORDER BY id")).rows, fittingBefore);
+    assert.deepEqual((await pg.query("SELECT * FROM users ORDER BY id")).rows, usersBefore);
+    assert.deepEqual((await pg.query("SELECT * FROM characters ORDER BY id")).rows, charactersBefore);
+    assert.deepEqual((await pg.query("SELECT user_id FROM pap_records")).rows, [{ user_id: 3 }]);
+    assert.deepEqual((await pg.query("SELECT owner_id FROM pap_market_orders")).rows, [{ owner_id: 3 }]);
+  } finally {
+    await pg.exec("DROP TRIGGER fail_test_orphan_delete ON users; DROP FUNCTION fail_test_orphan_delete()");
+  }
 });
 
 test("retention cleanup only affects expired home-corporation characters", async () => {

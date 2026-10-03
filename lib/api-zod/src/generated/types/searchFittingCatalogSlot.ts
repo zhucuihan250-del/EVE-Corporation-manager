@@ -16,7 +16,11 @@ export const SearchFittingCatalogSlot = {
   low: "low",
   rig: "rig",
   subsystem: "subsystem",
+  service: "service",
   charge: "charge",
   drone: "drone",
+  fighter: "fighter",
+  implant: "implant",
+  booster: "booster",
   other: "other",
 } as const;

@@ -14,4 +14,10 @@ export const FittingCategory = {
   module: "module",
   charge: "charge",
   drone: "drone",
+  subsystem: "subsystem",
+  fighter: "fighter",
+  implant: "implant",
+  booster: "booster",
+  skill: "skill",
+  cargo: "cargo",
 } as const;

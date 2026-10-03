@@ -397,6 +397,12 @@ export const FittingCategory = {
   module: "module",
   charge: "charge",
   drone: "drone",
+  subsystem: "subsystem",
+  fighter: "fighter",
+  implant: "implant",
+  booster: "booster",
+  skill: "skill",
+  cargo: "cargo",
 } as const;
 
 export type FittingSlot = (typeof FittingSlot)[keyof typeof FittingSlot];
@@ -407,8 +413,12 @@ export const FittingSlot = {
   low: "low",
   rig: "rig",
   subsystem: "subsystem",
+  service: "service",
   charge: "charge",
   drone: "drone",
+  fighter: "fighter",
+  implant: "implant",
+  booster: "booster",
   other: "other",
 } as const;
 
@@ -424,6 +434,26 @@ export const FittingCatalogItemHardpoint = {
   launcher: "launcher",
 } as const;
 
+export type FittingCatalogCapabilitiesMaxState =
+  (typeof FittingCatalogCapabilitiesMaxState)[keyof typeof FittingCatalogCapabilitiesMaxState];
+
+export const FittingCatalogCapabilitiesMaxState = {
+  online: "online",
+  active: "active",
+  overheated: "overheated",
+} as const;
+
+export interface FittingCatalogCapabilities {
+  volume: number;
+  capacity: number;
+  rigSize: number;
+  maxState: FittingCatalogCapabilitiesMaxState;
+  chargeGroups: number[];
+  chargeSize: number;
+  chargeCapacity: number;
+  modeTypeIds: number[];
+}
+
 export interface FittingCatalogItem {
   typeId: number;
   category: FittingCategory;
@@ -436,6 +466,7 @@ export interface FittingCatalogItem {
   nameZh: string;
   groupName: string;
   categoryName: string;
+  capabilities?: FittingCatalogCapabilities;
 }
 
 export interface FittingCatalogResponse {
@@ -443,6 +474,7 @@ export interface FittingCatalogResponse {
   sdeBuildNumber: number | null;
   generatedAt: string;
   items: FittingCatalogItem[];
+  missingTypeIds?: number[];
 }
 
 export interface FittingSimulationModuleInput {
@@ -487,17 +519,53 @@ export interface FittingResourceMetric {
   overloaded: boolean;
 }
 
+export type FittingWorkbenchRack =
+  (typeof FittingWorkbenchRack)[keyof typeof FittingWorkbenchRack];
+
+export const FittingWorkbenchRack = {
+  high: "high",
+  medium: "medium",
+  low: "low",
+  rig: "rig",
+  subsystem: "subsystem",
+  service: "service",
+} as const;
+
+export type FittingWorkbenchState =
+  (typeof FittingWorkbenchState)[keyof typeof FittingWorkbenchState];
+
+export const FittingWorkbenchState = {
+  offline: "offline",
+  online: "online",
+  active: "active",
+  overheated: "overheated",
+} as const;
+
 export type FittingSimulatedModule = FittingCatalogItem & {
   quantity: number;
   cpu: number;
   powergrid: number;
+  rack?: FittingWorkbenchRack;
+  index?: number;
+  state?: FittingWorkbenchState;
+  chargeTypeId?: number;
 };
 
+/**
+ * Retained for compatibility. Use calculationPrecision for the active calculation engine.
+ */
 export type FittingSimulationResultPrecision =
   (typeof FittingSimulationResultPrecision)[keyof typeof FittingSimulationResultPrecision];
 
 export const FittingSimulationResultPrecision = {
   approximate: "approximate",
+} as const;
+
+export type FittingSimulationResultCalculationPrecision =
+  (typeof FittingSimulationResultCalculationPrecision)[keyof typeof FittingSimulationResultCalculationPrecision];
+
+export const FittingSimulationResultCalculationPrecision = {
+  dogma: "dogma",
 } as const;
 
 export type FittingSimulationResultSlots = {
@@ -506,6 +574,7 @@ export type FittingSimulationResultSlots = {
   low: FittingSlotMetric;
   rig: FittingSlotMetric;
   subsystem: FittingSlotMetric;
+  service?: FittingSlotMetric;
 };
 
 export type FittingSimulationResultResources = {
@@ -546,7 +615,9 @@ export type FittingSimulationResultOffense = {
 };
 
 export interface FittingSimulationResult {
+  /** Retained for compatibility. Use calculationPrecision for the active calculation engine. */
   precision: FittingSimulationResultPrecision;
+  calculationPrecision?: FittingSimulationResultCalculationPrecision;
   /** @nullable */
   sdeBuildNumber: number | null;
   ship: FittingCatalogItem;
@@ -560,6 +631,437 @@ export interface FittingSimulationResult {
   offense: FittingSimulationResultOffense;
   recommendations: string[];
   limitations: string[];
+}
+
+export type FittingLanguage =
+  (typeof FittingLanguage)[keyof typeof FittingLanguage];
+
+export const FittingLanguage = {
+  en: "en",
+  zh: "zh",
+} as const;
+
+export interface FittingDamageProfile {
+  em: number;
+  thermal: number;
+  kinetic: number;
+  explosive: number;
+}
+
+export type FittingSkillProfileMode =
+  (typeof FittingSkillProfileMode)[keyof typeof FittingSkillProfileMode];
+
+export const FittingSkillProfileMode = {
+  all5: "all5",
+  none: "none",
+  character: "character",
+} as const;
+
+export interface FittingSkillProfile {
+  mode: FittingSkillProfileMode;
+  characterId?: number;
+}
+
+export interface FittingWorkbenchSlotInput {
+  rack: FittingWorkbenchRack;
+  /**
+   * @minimum 0
+   * @maximum 31
+   */
+  index: number;
+  typeId: number;
+  state: FittingWorkbenchState;
+  chargeTypeId?: number;
+  /**
+   * @minimum 1
+   * @maximum 1000000
+   */
+  chargeQuantity?: number;
+}
+
+export interface FittingWorkbenchDroneInput {
+  typeId: number;
+  /**
+   * @minimum 1
+   * @maximum 1000
+   */
+  quantity: number;
+  /**
+   * @minimum 0
+   * @maximum 1000
+   */
+  activeQuantity: number;
+}
+
+export interface FittingWorkbenchCargoInput {
+  typeId: number;
+  /**
+   * @minimum 1
+   * @maximum 1000000
+   */
+  quantity: number;
+}
+
+export interface FittingWorkbenchCharacterItem {
+  typeId: number;
+}
+
+export type CanonicalFittingSchemaVersion =
+  (typeof CanonicalFittingSchemaVersion)[keyof typeof CanonicalFittingSchemaVersion];
+
+export const CanonicalFittingSchemaVersion = {
+  NUMBER_2: 2,
+} as const;
+
+export interface CanonicalFitting {
+  schemaVersion: CanonicalFittingSchemaVersion;
+  shipTypeId: number;
+  /** @maxLength 100 */
+  name: string;
+  /** @maxItems 256 */
+  slots: FittingWorkbenchSlotInput[];
+  drones: FittingWorkbenchDroneInput[];
+  cargo: FittingWorkbenchCargoInput[];
+  implants?: FittingWorkbenchCharacterItem[];
+  boosters?: FittingWorkbenchCharacterItem[];
+  skillProfile: FittingSkillProfile;
+  damageProfile: FittingDamageProfile;
+  modeTypeId?: number;
+}
+
+export interface FittingWorkbenchBody {
+  fit: CanonicalFitting;
+  language?: FittingLanguage;
+}
+
+export type FittingWorkbenchViolationTargetType =
+  (typeof FittingWorkbenchViolationTargetType)[keyof typeof FittingWorkbenchViolationTargetType];
+
+export const FittingWorkbenchViolationTargetType = {
+  ship: "ship",
+  item: "item",
+  charge: "charge",
+} as const;
+
+export type FittingWorkbenchViolationTarget = {
+  type: FittingWorkbenchViolationTargetType;
+  index?: number;
+};
+
+export type FittingWorkbenchViolationRule = {
+  type: string;
+  [key: string]: unknown;
+};
+
+export interface FittingWorkbenchViolation {
+  target: FittingWorkbenchViolationTarget;
+  rule: FittingWorkbenchViolationRule;
+  message: string;
+}
+
+export interface FittingWorkbenchModuleState {
+  rack: FittingWorkbenchRack;
+  index: number;
+  typeId: number;
+  requestedState: FittingWorkbenchState;
+  state: FittingWorkbenchState;
+  maxState: FittingWorkbenchState;
+}
+
+export interface FittingWorkbenchLayer {
+  hp: number;
+  ehp: number;
+  resistances: FittingDamageProfile;
+}
+
+export interface FittingWorkbenchWeapon {
+  typeId: number;
+  rack: FittingWorkbenchRack;
+  index: number;
+  dps: number;
+  alpha: number;
+  cycleSeconds: number;
+  optimal: number;
+  falloff: number;
+  tracking: number;
+  missileRange: number;
+}
+
+export type FittingWorkbenchStatsCargo = {
+  used: number;
+  capacity: number;
+};
+
+export type FittingWorkbenchStatsDefense = {
+  shield: FittingWorkbenchLayer;
+  armor: FittingWorkbenchLayer;
+  hull: FittingWorkbenchLayer;
+  ehp: number;
+};
+
+export type FittingWorkbenchStatsOffense = {
+  dps: number;
+  sustainedDps: number;
+  alpha: number;
+  weaponDps: number;
+  droneDps: number;
+  fighterDps: number;
+  weapons: FittingWorkbenchWeapon[];
+};
+
+export type FittingWorkbenchStatsCapacitor = {
+  capacity: number;
+  rechargeSeconds: number;
+  peakRecharge: number;
+  usage: number;
+  delta: number;
+  stablePercent: number;
+  stable: boolean;
+  /** @nullable */
+  secondsToEmpty: number | null;
+};
+
+export type FittingWorkbenchStatsNavigation = {
+  speed: number;
+  mass: number;
+  agility: number;
+  alignSeconds: number;
+  warpSpeed: number;
+};
+
+export type FittingWorkbenchStatsTargeting = {
+  range: number;
+  maxTargets: number;
+  scanResolution: number;
+  signatureRadius: number;
+  sensorStrength: number;
+};
+
+export type FittingWorkbenchStatsDrones = {
+  bayUsed: number;
+  bayCapacity: number;
+  bandwidthUsed: number;
+  bandwidthCapacity: number;
+  active: number;
+  activeLimit: number;
+  controlRange: number;
+};
+
+export type FittingWorkbenchStatsRepair = {
+  shield: number;
+  armor: number;
+  hull: number;
+  passiveShield: number;
+  shieldEffective: number;
+  armorEffective: number;
+  hullEffective: number;
+};
+
+export interface FittingWorkbenchStats {
+  cargo: FittingWorkbenchStatsCargo;
+  defense: FittingWorkbenchStatsDefense;
+  offense: FittingWorkbenchStatsOffense;
+  capacitor: FittingWorkbenchStatsCapacitor;
+  navigation: FittingWorkbenchStatsNavigation;
+  targeting: FittingWorkbenchStatsTargeting;
+  drones: FittingWorkbenchStatsDrones;
+  repair: FittingWorkbenchStatsRepair;
+}
+
+export type FittingSkillSourceMode =
+  (typeof FittingSkillSourceMode)[keyof typeof FittingSkillSourceMode];
+
+export const FittingSkillSourceMode = {
+  all5: "all5",
+  none: "none",
+  character: "character",
+} as const;
+
+export interface FittingSkillSource {
+  mode: FittingSkillSourceMode;
+  characterId?: number;
+  characterName?: string;
+  checkedAt?: string;
+}
+
+export type FittingWorkbenchResultCalculationPrecision =
+  (typeof FittingWorkbenchResultCalculationPrecision)[keyof typeof FittingWorkbenchResultCalculationPrecision];
+
+export const FittingWorkbenchResultCalculationPrecision = {
+  dogma: "dogma",
+} as const;
+
+export type FittingWorkbenchResultEngine = {
+  name: string;
+  version: string;
+  /** @nullable */
+  sdeReleaseDate: string | null;
+  note: string;
+};
+
+export type FittingWorkbenchResult = FittingSimulationResult & {
+  calculationPrecision: FittingWorkbenchResultCalculationPrecision;
+  fit: CanonicalFitting;
+  engine: FittingWorkbenchResultEngine;
+  moduleStates: FittingWorkbenchModuleState[];
+  violations: FittingWorkbenchViolation[];
+  valid: boolean;
+  stats: FittingWorkbenchStats;
+  skillSource: FittingSkillSource;
+};
+
+export interface FittingImportBody {
+  /** @maxLength 65536 */
+  text: string;
+  language?: FittingLanguage;
+}
+
+export interface FittingImportResult {
+  fit: CanonicalFitting;
+  warnings: string[];
+}
+
+export interface FittingExportResult {
+  text: string;
+  warnings: string[];
+}
+
+export type FittingVisibility =
+  (typeof FittingVisibility)[keyof typeof FittingVisibility];
+
+export const FittingVisibility = {
+  personal: "personal",
+  corporation: "corporation",
+} as const;
+
+export interface SavedFitting {
+  id: number;
+  name: string;
+  description: string;
+  visibility: FittingVisibility;
+  /** @nullable */
+  ownerUserId: number | null;
+  authorName: string;
+  fit: CanonicalFitting;
+  simulation: FittingWorkbenchResult;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  canEdit: boolean;
+}
+
+export interface SavedFittingResponse {
+  fitting: SavedFitting;
+}
+
+export interface SavedFittingList {
+  fittings: SavedFitting[];
+  /** @nullable */
+  nextCursor: number | null;
+  canManageCorporation: boolean;
+}
+
+export interface CreateSavedFittingBody {
+  /**
+   * @minLength 1
+   * @maxLength 100
+   */
+  name: string;
+  /** @maxLength 2000 */
+  description?: string;
+  visibility: FittingVisibility;
+  fit: CanonicalFitting;
+  language?: FittingLanguage;
+}
+
+export interface UpdateSavedFittingBody {
+  /**
+   * @minLength 1
+   * @maxLength 100
+   */
+  name: string;
+  /** @maxLength 2000 */
+  description?: string;
+  fit: CanonicalFitting;
+  /** @minimum 1 */
+  version: number;
+  language?: FittingLanguage;
+}
+
+export interface DeleteSavedFittingBody {
+  /** @minimum 1 */
+  version: number;
+}
+
+export interface DeleteSavedFittingResult {
+  deleted: boolean;
+}
+
+export interface FittingCharacter {
+  id: number;
+  eveCharacterId: number;
+  name: string;
+  isMain: boolean;
+}
+
+export interface FittingCharacterList {
+  characters: FittingCharacter[];
+}
+
+export type FittingSkillSnapshotSource =
+  (typeof FittingSkillSnapshotSource)[keyof typeof FittingSkillSnapshotSource];
+
+export const FittingSkillSnapshotSource = {
+  esi: "esi",
+} as const;
+
+export type FittingSkillSnapshotSkillsItem = {
+  skillId: number;
+  /**
+   * @minimum 0
+   * @maximum 5
+   */
+  activeLevel: number;
+  /**
+   * @minimum 0
+   * @maximum 5
+   */
+  trainedLevel: number;
+};
+
+export interface FittingSkillSnapshot {
+  characterId: number;
+  eveCharacterId: number;
+  characterName: string;
+  checkedAt: string;
+  source: FittingSkillSnapshotSource;
+  skills: FittingSkillSnapshotSkillsItem[];
+}
+
+export interface FittingWorkbenchErrorResponse {
+  error: string;
+  code: string;
+}
+
+export interface FittingModelMetadata {
+  typeId: number;
+  graphicId: number;
+  /**
+   * Public CCP SOF hull, faction and race identity; may incorporate compatible strategic-cruiser subsystems.
+   * @nullable
+   */
+  dna: string | null;
+  /**
+   * Public res:/ model path when supplied by the pinned SDE.
+   * @nullable
+   */
+  resourcePath: string | null;
+  /** Build of the official static model metadata, separate from the currently available client assets. */
+  sdeBuildNumber: number;
+  /** Resolved public client resource build for this preview session. */
+  clientBuild: number;
+  /** Same-origin authenticated resource root ending with a slash, not an arbitrary upstream URL. */
+  resourceRoot: string;
 }
 
 export interface FleetReimbursementRule {
@@ -2831,6 +3333,10 @@ export type SearchFittingCatalogParams = {
   slot?: SearchFittingCatalogSlot;
   language?: SearchFittingCatalogLanguage;
   limit?: number;
+  /**
+   * Comma-separated exact item IDs, maximum 100; bypasses text search.
+   */
+  typeIds?: string;
 };
 
 export type SearchFittingCatalogCategory =
@@ -2842,6 +3348,12 @@ export const SearchFittingCatalogCategory = {
   module: "module",
   charge: "charge",
   drone: "drone",
+  subsystem: "subsystem",
+  fighter: "fighter",
+  implant: "implant",
+  booster: "booster",
+  skill: "skill",
+  cargo: "cargo",
 } as const;
 
 export type SearchFittingCatalogSlot =
@@ -2854,8 +3366,12 @@ export const SearchFittingCatalogSlot = {
   low: "low",
   rig: "rig",
   subsystem: "subsystem",
+  service: "service",
   charge: "charge",
   drone: "drone",
+  fighter: "fighter",
+  implant: "implant",
+  booster: "booster",
   other: "other",
 } as const;
 
@@ -2866,6 +3382,36 @@ export const SearchFittingCatalogLanguage = {
   en: "en",
   zh: "zh",
 } as const;
+
+export type ListSavedFittingsParams = {
+  /**
+   * @minimum 1
+   */
+  cursor?: number;
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  limit?: number;
+  visibility?: ListSavedFittingsVisibility;
+};
+
+export type ListSavedFittingsVisibility =
+  (typeof ListSavedFittingsVisibility)[keyof typeof ListSavedFittingsVisibility];
+
+export const ListSavedFittingsVisibility = {
+  all: "all",
+  personal: "personal",
+  corporation: "corporation",
+} as const;
+
+export type GetFittingModelMetadataParams = {
+  /**
+   * Optional comma-separated subsystem type IDs, up to five, for strategic-cruiser appearance.
+   * @maxLength 60
+   */
+  subsystems?: string;
+};
 
 export type RefreshBattleReport202 = {
   status: string;

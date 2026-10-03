@@ -5,6 +5,7 @@
  * EVE Online PAP Tracking System API
  * OpenAPI spec version: 0.1.0
  */
+import type { FittingCatalogCapabilities } from "./fittingCatalogCapabilities";
 import type { FittingCatalogItemHardpoint } from "./fittingCatalogItemHardpoint";
 import type { FittingCategory } from "./fittingCategory";
 import type { FittingSlot } from "./fittingSlot";
@@ -21,4 +22,5 @@ export interface FittingCatalogItem {
   nameZh: string;
   groupName: string;
   categoryName: string;
+  capabilities?: FittingCatalogCapabilities;
 }

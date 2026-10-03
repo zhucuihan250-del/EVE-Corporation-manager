@@ -3,8 +3,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export type FittingLanguage = "en" | "zh";
-export type FittingCategory = "ship" | "module" | "charge" | "drone";
-export type FittingSlot = "high" | "medium" | "low" | "rig" | "subsystem" | "charge" | "drone" | "other";
+export type FittingCategory = "ship" | "module" | "charge" | "drone" | "fighter" | "subsystem" | "implant" | "booster" | "skill" | "cargo";
+export type FittingSlot = "high" | "medium" | "low" | "rig" | "subsystem" | "service" | "charge" | "drone" | "fighter" | "implant" | "booster" | "other";
 export type FittingMode = "pvp" | "pve";
 
 type LocalizedString = {
@@ -29,13 +29,15 @@ export type FittingType = {
   hardpoint?: "turret" | "launcher";
   attributes: Record<string, number>;
   effects: string[];
+  effectCategories?: number[];
 };
 
-type FittingDataFile = {
+export type FittingDataFile = {
   buildNumber: number | null;
   releaseDate: string | null;
   generatedAt: string;
   source: string;
+  attributeIds: Record<string, number>;
   counts: {
     ships: number;
     modules: number;
@@ -45,7 +47,7 @@ type FittingDataFile = {
   types: FittingType[];
 };
 
-type CatalogItem = {
+export type CatalogItem = {
   typeId: number;
   category: FittingCategory;
   groupId: number;
@@ -56,6 +58,10 @@ type CatalogItem = {
   nameZh: string;
   groupName: string;
   categoryName: string;
+  capabilities?: {
+    volume: number; capacity: number; rigSize: number; maxState: "online" | "active" | "overheated";
+    chargeGroups: number[]; chargeSize: number; chargeCapacity: number; modeTypeIds: number[];
+  };
 };
 
 type SlotMetric = {
@@ -128,6 +134,11 @@ const CATEGORY_BY_ID: Record<number, FittingCategory> = {
   7: "module",
   8: "charge",
   18: "drone",
+  87: "fighter",
+  32: "subsystem",
+  16: "skill",
+  65: "ship",
+  66: "module",
 };
 
 const slotKeys = ["high", "medium", "low", "rig", "subsystem"] as const;
@@ -169,8 +180,9 @@ function text(value: LocalizedString, language: FittingLanguage): string {
   return language === "zh" ? value.zh : value.en;
 }
 
-function categoryOf(type: FittingType): FittingCategory {
-  return CATEGORY_BY_ID[type.categoryId] ?? "module";
+export function categoryOf(type: FittingType): FittingCategory {
+  if (type.categoryId === 20) return type.groupId === 303 ? "booster" : "implant";
+  return CATEGORY_BY_ID[type.categoryId] ?? "cargo";
 }
 
 function toCatalogItem(type: FittingType, language: FittingLanguage): CatalogItem {
@@ -185,7 +197,19 @@ function toCatalogItem(type: FittingType, language: FittingLanguage): CatalogIte
     nameZh: type.name.zh,
     groupName: text(type.groupName, language),
     categoryName: text(type.categoryName, language),
+    capabilities: {
+      volume: type.volume ?? 0, capacity: type.capacity ?? 0, rigSize: type.attributes.rigSize ?? 0,
+      maxState: type.effectCategories?.includes(5) ? "overheated" : type.effectCategories?.some((category) => category >= 1 && category <= 3) ? "active" : "online",
+      chargeGroups: [1, 2, 3, 4, 5].map((index) => type.attributes[`chargeGroup${index}`]).filter((id): id is number => typeof id === "number" && id > 0),
+      chargeSize: type.attributes.chargeSize ?? 0, chargeCapacity: type.capacity ?? type.attributes.capacity ?? 0,
+      modeTypeIds: type.categoryId === 6 ? getFittingData().types.filter((mode) => mode.groupId === 1306 && mode.name.en.startsWith(`${type.name.en} `)).map((mode) => mode.id) : [],
+    },
   };
+}
+
+export function getFittingCatalogItem(typeId: number, language: FittingLanguage): CatalogItem | null {
+  const type = getFittingType(typeId);
+  return type ? toCatalogItem(type, language) : null;
 }
 
 function normalizeSearch(value: string): string {
@@ -207,6 +231,7 @@ export function searchFittingCatalog(options: {
 
   const scored: Array<{ score: number; type: FittingType }> = [];
   for (const type of data.types) {
+    if (!type.published) continue;
     const typeCategory = categoryOf(type);
     if (category !== "all" && typeCategory !== category) continue;
     if (slot !== "all" && type.slot !== slot) continue;

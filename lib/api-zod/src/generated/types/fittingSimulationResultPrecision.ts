@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
+/**
+ * Retained for compatibility. Use calculationPrecision for the active calculation engine.
+ */
 export type FittingSimulationResultPrecision =
   (typeof FittingSimulationResultPrecision)[keyof typeof FittingSimulationResultPrecision];
 

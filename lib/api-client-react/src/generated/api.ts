@@ -56,18 +56,31 @@ import type {
   CreateRedemptionBody,
   CreateReimbursementBody,
   CreateRewardBody,
+  CreateSavedFittingBody,
   CurrentUser,
   DashboardSummary,
   DeleteCharacterResponse,
+  DeleteSavedFittingBody,
+  DeleteSavedFittingResult,
   DiplomacyCase,
   EconomyAnalysis,
   EconomySummary,
   ErrorResponse,
   FittingCatalogResponse,
+  FittingCharacterList,
+  FittingExportResult,
+  FittingImportBody,
+  FittingImportResult,
+  FittingModelMetadata,
   FittingSimulationBody,
   FittingSimulationResult,
+  FittingSkillSnapshot,
+  FittingWorkbenchBody,
+  FittingWorkbenchErrorResponse,
+  FittingWorkbenchResult,
   Fleet,
   GetActivityReportParams,
+  GetFittingModelMetadataParams,
   HealthStatus,
   HeartbeatIntelBridgeBody,
   IdentityApplication,
@@ -86,6 +99,7 @@ import type {
   ListIdentityGroupsParams,
   ListReimbursementLossesParams,
   ListRewardsParams,
+  ListSavedFittingsParams,
   MonitoredSystem,
   PairIntelBridgeBody,
   PairIntelBridgeResponse,
@@ -103,6 +117,8 @@ import type {
   ReviewIdentityApplicationBody,
   ReviewPapMarketTransactionBody,
   Reward,
+  SavedFittingList,
+  SavedFittingResponse,
   ScanFleetResponse,
   SearchFittingCatalogParams,
   SearchSolarSystemsForMonitoringParams,
@@ -128,6 +144,7 @@ import type {
   UpdateReimbursementBody,
   UpdateReimbursementWindowBody,
   UpdateRewardBody,
+  UpdateSavedFittingBody,
   UpdateUserRoleBody,
   User,
 } from "./api.schemas";
@@ -1185,7 +1202,7 @@ export function useSearchFittingCatalog<
 }
 
 /**
- * @summary Simulate a ship fitting and return approximate PVP/PVE guidance
+ * @summary Simulate a ship fitting with a backward-compatible result discriminator
  */
 export const getSimulateFittingUrl = () => {
   return `/api/fitting/simulate`;
@@ -1248,7 +1265,7 @@ export type SimulateFittingMutationBody = BodyType<FittingSimulationBody>;
 export type SimulateFittingMutationError = ErrorType<void>;
 
 /**
- * @summary Simulate a ship fitting and return approximate PVP/PVE guidance
+ * @summary Simulate a ship fitting with a backward-compatible result discriminator
  */
 export const useSimulateFitting = <
   TError = ErrorType<void>,
@@ -1269,6 +1286,1004 @@ export const useSimulateFitting = <
 > => {
   return useMutation(getSimulateFittingMutationOptions(options));
 };
+
+/**
+ * @summary Calculate a per-slot fitting with the selected skill and damage profiles
+ */
+export const getSimulateFittingWorkbenchUrl = () => {
+  return `/api/fitting/workbench`;
+};
+
+export const simulateFittingWorkbench = async (
+  fittingWorkbenchBody: FittingWorkbenchBody,
+  options?: RequestInit,
+): Promise<FittingWorkbenchResult> => {
+  return customFetch<FittingWorkbenchResult>(getSimulateFittingWorkbenchUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(fittingWorkbenchBody),
+  });
+};
+
+export const getSimulateFittingWorkbenchMutationOptions = <
+  TError = ErrorType<FittingWorkbenchErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof simulateFittingWorkbench>>,
+    TError,
+    { data: BodyType<FittingWorkbenchBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof simulateFittingWorkbench>>,
+  TError,
+  { data: BodyType<FittingWorkbenchBody> },
+  TContext
+> => {
+  const mutationKey = ["simulateFittingWorkbench"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof simulateFittingWorkbench>>,
+    { data: BodyType<FittingWorkbenchBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return simulateFittingWorkbench(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SimulateFittingWorkbenchMutationResult = NonNullable<
+  Awaited<ReturnType<typeof simulateFittingWorkbench>>
+>;
+export type SimulateFittingWorkbenchMutationBody =
+  BodyType<FittingWorkbenchBody>;
+export type SimulateFittingWorkbenchMutationError =
+  ErrorType<FittingWorkbenchErrorResponse>;
+
+/**
+ * @summary Calculate a per-slot fitting with the selected skill and damage profiles
+ */
+export const useSimulateFittingWorkbench = <
+  TError = ErrorType<FittingWorkbenchErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof simulateFittingWorkbench>>,
+    TError,
+    { data: BodyType<FittingWorkbenchBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof simulateFittingWorkbench>>,
+  TError,
+  { data: BodyType<FittingWorkbenchBody> },
+  TContext
+> => {
+  return useMutation(getSimulateFittingWorkbenchMutationOptions(options));
+};
+
+/**
+ * @summary Import an English or localized EVE clipboard EFT fitting
+ */
+export const getImportFittingEftUrl = () => {
+  return `/api/fitting/import`;
+};
+
+export const importFittingEft = async (
+  fittingImportBody: FittingImportBody,
+  options?: RequestInit,
+): Promise<FittingImportResult> => {
+  return customFetch<FittingImportResult>(getImportFittingEftUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(fittingImportBody),
+  });
+};
+
+export const getImportFittingEftMutationOptions = <
+  TError = ErrorType<FittingWorkbenchErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof importFittingEft>>,
+    TError,
+    { data: BodyType<FittingImportBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof importFittingEft>>,
+  TError,
+  { data: BodyType<FittingImportBody> },
+  TContext
+> => {
+  const mutationKey = ["importFittingEft"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof importFittingEft>>,
+    { data: BodyType<FittingImportBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return importFittingEft(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ImportFittingEftMutationResult = NonNullable<
+  Awaited<ReturnType<typeof importFittingEft>>
+>;
+export type ImportFittingEftMutationBody = BodyType<FittingImportBody>;
+export type ImportFittingEftMutationError =
+  ErrorType<FittingWorkbenchErrorResponse>;
+
+/**
+ * @summary Import an English or localized EVE clipboard EFT fitting
+ */
+export const useImportFittingEft = <
+  TError = ErrorType<FittingWorkbenchErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof importFittingEft>>,
+    TError,
+    { data: BodyType<FittingImportBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof importFittingEft>>,
+  TError,
+  { data: BodyType<FittingImportBody> },
+  TContext
+> => {
+  return useMutation(getImportFittingEftMutationOptions(options));
+};
+
+/**
+ * @summary Export a fitting to the canonical English EVE clipboard EFT format
+ */
+export const getExportFittingEftUrl = () => {
+  return `/api/fitting/export`;
+};
+
+export const exportFittingEft = async (
+  fittingWorkbenchBody: FittingWorkbenchBody,
+  options?: RequestInit,
+): Promise<FittingExportResult> => {
+  return customFetch<FittingExportResult>(getExportFittingEftUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(fittingWorkbenchBody),
+  });
+};
+
+export const getExportFittingEftMutationOptions = <
+  TError = ErrorType<FittingWorkbenchErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof exportFittingEft>>,
+    TError,
+    { data: BodyType<FittingWorkbenchBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof exportFittingEft>>,
+  TError,
+  { data: BodyType<FittingWorkbenchBody> },
+  TContext
+> => {
+  const mutationKey = ["exportFittingEft"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof exportFittingEft>>,
+    { data: BodyType<FittingWorkbenchBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return exportFittingEft(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ExportFittingEftMutationResult = NonNullable<
+  Awaited<ReturnType<typeof exportFittingEft>>
+>;
+export type ExportFittingEftMutationBody = BodyType<FittingWorkbenchBody>;
+export type ExportFittingEftMutationError =
+  ErrorType<FittingWorkbenchErrorResponse>;
+
+/**
+ * @summary Export a fitting to the canonical English EVE clipboard EFT format
+ */
+export const useExportFittingEft = <
+  TError = ErrorType<FittingWorkbenchErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof exportFittingEft>>,
+    TError,
+    { data: BodyType<FittingWorkbenchBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof exportFittingEft>>,
+  TError,
+  { data: BodyType<FittingWorkbenchBody> },
+  TContext
+> => {
+  return useMutation(getExportFittingEftMutationOptions(options));
+};
+
+/**
+ * @summary List readable personal and corporation fittings
+ */
+export const getListSavedFittingsUrl = (params?: ListSavedFittingsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/fitting/saved?${stringifiedParams}`
+    : `/api/fitting/saved`;
+};
+
+export const listSavedFittings = async (
+  params?: ListSavedFittingsParams,
+  options?: RequestInit,
+): Promise<SavedFittingList> => {
+  return customFetch<SavedFittingList>(getListSavedFittingsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListSavedFittingsQueryKey = (
+  params?: ListSavedFittingsParams,
+) => {
+  return [`/api/fitting/saved`, ...(params ? [params] : [])] as const;
+};
+
+export const getListSavedFittingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listSavedFittings>>,
+  TError = ErrorType<FittingWorkbenchErrorResponse>,
+>(
+  params?: ListSavedFittingsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listSavedFittings>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListSavedFittingsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listSavedFittings>>
+  > = ({ signal }) => listSavedFittings(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listSavedFittings>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListSavedFittingsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listSavedFittings>>
+>;
+export type ListSavedFittingsQueryError =
+  ErrorType<FittingWorkbenchErrorResponse>;
+
+/**
+ * @summary List readable personal and corporation fittings
+ */
+
+export function useListSavedFittings<
+  TData = Awaited<ReturnType<typeof listSavedFittings>>,
+  TError = ErrorType<FittingWorkbenchErrorResponse>,
+>(
+  params?: ListSavedFittingsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listSavedFittings>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListSavedFittingsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Save a personal fitting or an authorized corporation fitting
+ */
+export const getCreateSavedFittingUrl = () => {
+  return `/api/fitting/saved`;
+};
+
+export const createSavedFitting = async (
+  createSavedFittingBody: CreateSavedFittingBody,
+  options?: RequestInit,
+): Promise<SavedFittingResponse> => {
+  return customFetch<SavedFittingResponse>(getCreateSavedFittingUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createSavedFittingBody),
+  });
+};
+
+export const getCreateSavedFittingMutationOptions = <
+  TError = ErrorType<FittingWorkbenchErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createSavedFitting>>,
+    TError,
+    { data: BodyType<CreateSavedFittingBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createSavedFitting>>,
+  TError,
+  { data: BodyType<CreateSavedFittingBody> },
+  TContext
+> => {
+  const mutationKey = ["createSavedFitting"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createSavedFitting>>,
+    { data: BodyType<CreateSavedFittingBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createSavedFitting(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateSavedFittingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createSavedFitting>>
+>;
+export type CreateSavedFittingMutationBody = BodyType<CreateSavedFittingBody>;
+export type CreateSavedFittingMutationError =
+  ErrorType<FittingWorkbenchErrorResponse>;
+
+/**
+ * @summary Save a personal fitting or an authorized corporation fitting
+ */
+export const useCreateSavedFitting = <
+  TError = ErrorType<FittingWorkbenchErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createSavedFitting>>,
+    TError,
+    { data: BodyType<CreateSavedFittingBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createSavedFitting>>,
+  TError,
+  { data: BodyType<CreateSavedFittingBody> },
+  TContext
+> => {
+  return useMutation(getCreateSavedFittingMutationOptions(options));
+};
+
+/**
+ * @summary Read a fitting visible to this corporation member
+ */
+export const getGetSavedFittingUrl = (id: number) => {
+  return `/api/fitting/saved/${id}`;
+};
+
+export const getSavedFitting = async (
+  id: number,
+  options?: RequestInit,
+): Promise<SavedFittingResponse> => {
+  return customFetch<SavedFittingResponse>(getGetSavedFittingUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetSavedFittingQueryKey = (id: number) => {
+  return [`/api/fitting/saved/${id}`] as const;
+};
+
+export const getGetSavedFittingQueryOptions = <
+  TData = Awaited<ReturnType<typeof getSavedFitting>>,
+  TError = ErrorType<FittingWorkbenchErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSavedFitting>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetSavedFittingQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getSavedFitting>>> = ({
+    signal,
+  }) => getSavedFitting(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getSavedFitting>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetSavedFittingQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getSavedFitting>>
+>;
+export type GetSavedFittingQueryError =
+  ErrorType<FittingWorkbenchErrorResponse>;
+
+/**
+ * @summary Read a fitting visible to this corporation member
+ */
+
+export function useGetSavedFitting<
+  TData = Awaited<ReturnType<typeof getSavedFitting>>,
+  TError = ErrorType<FittingWorkbenchErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSavedFitting>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetSavedFittingQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update an editable fitting using its current version
+ */
+export const getUpdateSavedFittingUrl = (id: number) => {
+  return `/api/fitting/saved/${id}`;
+};
+
+export const updateSavedFitting = async (
+  id: number,
+  updateSavedFittingBody: UpdateSavedFittingBody,
+  options?: RequestInit,
+): Promise<SavedFittingResponse> => {
+  return customFetch<SavedFittingResponse>(getUpdateSavedFittingUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateSavedFittingBody),
+  });
+};
+
+export const getUpdateSavedFittingMutationOptions = <
+  TError = ErrorType<FittingWorkbenchErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateSavedFitting>>,
+    TError,
+    { id: number; data: BodyType<UpdateSavedFittingBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateSavedFitting>>,
+  TError,
+  { id: number; data: BodyType<UpdateSavedFittingBody> },
+  TContext
+> => {
+  const mutationKey = ["updateSavedFitting"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateSavedFitting>>,
+    { id: number; data: BodyType<UpdateSavedFittingBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateSavedFitting(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateSavedFittingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateSavedFitting>>
+>;
+export type UpdateSavedFittingMutationBody = BodyType<UpdateSavedFittingBody>;
+export type UpdateSavedFittingMutationError =
+  ErrorType<FittingWorkbenchErrorResponse>;
+
+/**
+ * @summary Update an editable fitting using its current version
+ */
+export const useUpdateSavedFitting = <
+  TError = ErrorType<FittingWorkbenchErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateSavedFitting>>,
+    TError,
+    { id: number; data: BodyType<UpdateSavedFittingBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateSavedFitting>>,
+  TError,
+  { id: number; data: BodyType<UpdateSavedFittingBody> },
+  TContext
+> => {
+  return useMutation(getUpdateSavedFittingMutationOptions(options));
+};
+
+/**
+ * @summary Delete an editable fitting using its current version
+ */
+export const getDeleteSavedFittingUrl = (id: number) => {
+  return `/api/fitting/saved/${id}`;
+};
+
+export const deleteSavedFitting = async (
+  id: number,
+  deleteSavedFittingBody: DeleteSavedFittingBody,
+  options?: RequestInit,
+): Promise<DeleteSavedFittingResult> => {
+  return customFetch<DeleteSavedFittingResult>(getDeleteSavedFittingUrl(id), {
+    ...options,
+    method: "DELETE",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(deleteSavedFittingBody),
+  });
+};
+
+export const getDeleteSavedFittingMutationOptions = <
+  TError = ErrorType<FittingWorkbenchErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteSavedFitting>>,
+    TError,
+    { id: number; data: BodyType<DeleteSavedFittingBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteSavedFitting>>,
+  TError,
+  { id: number; data: BodyType<DeleteSavedFittingBody> },
+  TContext
+> => {
+  const mutationKey = ["deleteSavedFitting"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteSavedFitting>>,
+    { id: number; data: BodyType<DeleteSavedFittingBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return deleteSavedFitting(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteSavedFittingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteSavedFitting>>
+>;
+export type DeleteSavedFittingMutationBody = BodyType<DeleteSavedFittingBody>;
+export type DeleteSavedFittingMutationError =
+  ErrorType<FittingWorkbenchErrorResponse>;
+
+/**
+ * @summary Delete an editable fitting using its current version
+ */
+export const useDeleteSavedFitting = <
+  TError = ErrorType<FittingWorkbenchErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteSavedFitting>>,
+    TError,
+    { id: number; data: BodyType<DeleteSavedFittingBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteSavedFitting>>,
+  TError,
+  { id: number; data: BodyType<DeleteSavedFittingBody> },
+  TContext
+> => {
+  return useMutation(getDeleteSavedFittingMutationOptions(options));
+};
+
+/**
+ * @summary List the caller's bound and active corporation characters
+ */
+export const getListFittingCharactersUrl = () => {
+  return `/api/fitting/characters`;
+};
+
+export const listFittingCharacters = async (
+  options?: RequestInit,
+): Promise<FittingCharacterList> => {
+  return customFetch<FittingCharacterList>(getListFittingCharactersUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListFittingCharactersQueryKey = () => {
+  return [`/api/fitting/characters`] as const;
+};
+
+export const getListFittingCharactersQueryOptions = <
+  TData = Awaited<ReturnType<typeof listFittingCharacters>>,
+  TError = ErrorType<FittingWorkbenchErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listFittingCharacters>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListFittingCharactersQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listFittingCharacters>>
+  > = ({ signal }) => listFittingCharacters({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listFittingCharacters>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListFittingCharactersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listFittingCharacters>>
+>;
+export type ListFittingCharactersQueryError =
+  ErrorType<FittingWorkbenchErrorResponse>;
+
+/**
+ * @summary List the caller's bound and active corporation characters
+ */
+
+export function useListFittingCharacters<
+  TData = Awaited<ReturnType<typeof listFittingCharacters>>,
+  TError = ErrorType<FittingWorkbenchErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listFittingCharacters>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListFittingCharactersQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Read the caller's character skills with effective active levels
+ */
+export const getGetFittingCharacterSkillsUrl = (id: number) => {
+  return `/api/fitting/characters/${id}/skills`;
+};
+
+export const getFittingCharacterSkills = async (
+  id: number,
+  options?: RequestInit,
+): Promise<FittingSkillSnapshot> => {
+  return customFetch<FittingSkillSnapshot>(
+    getGetFittingCharacterSkillsUrl(id),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetFittingCharacterSkillsQueryKey = (id: number) => {
+  return [`/api/fitting/characters/${id}/skills`] as const;
+};
+
+export const getGetFittingCharacterSkillsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getFittingCharacterSkills>>,
+  TError = ErrorType<FittingWorkbenchErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getFittingCharacterSkills>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetFittingCharacterSkillsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getFittingCharacterSkills>>
+  > = ({ signal }) =>
+    getFittingCharacterSkills(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getFittingCharacterSkills>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetFittingCharacterSkillsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getFittingCharacterSkills>>
+>;
+export type GetFittingCharacterSkillsQueryError =
+  ErrorType<FittingWorkbenchErrorResponse>;
+
+/**
+ * @summary Read the caller's character skills with effective active levels
+ */
+
+export function useGetFittingCharacterSkills<
+  TData = Awaited<ReturnType<typeof getFittingCharacterSkills>>,
+  TError = ErrorType<FittingWorkbenchErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getFittingCharacterSkills>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetFittingCharacterSkillsQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Uses the same fitting authorization as the workbench. Returns a pinned SDE model identity and the resolved public CCP client resource build; does not access game account or corporation files.
+ * @summary Read authenticated public-asset metadata for a ship 3D preview
+ */
+export const getGetFittingModelMetadataUrl = (
+  id: number,
+  params?: GetFittingModelMetadataParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/fitting/3d/model/${id}?${stringifiedParams}`
+    : `/api/fitting/3d/model/${id}`;
+};
+
+export const getFittingModelMetadata = async (
+  id: number,
+  params?: GetFittingModelMetadataParams,
+  options?: RequestInit,
+): Promise<FittingModelMetadata> => {
+  return customFetch<FittingModelMetadata>(
+    getGetFittingModelMetadataUrl(id, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetFittingModelMetadataQueryKey = (
+  id: number,
+  params?: GetFittingModelMetadataParams,
+) => {
+  return [`/api/fitting/3d/model/${id}`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetFittingModelMetadataQueryOptions = <
+  TData = Awaited<ReturnType<typeof getFittingModelMetadata>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  params?: GetFittingModelMetadataParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getFittingModelMetadata>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetFittingModelMetadataQueryKey(id, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getFittingModelMetadata>>
+  > = ({ signal }) =>
+    getFittingModelMetadata(id, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getFittingModelMetadata>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetFittingModelMetadataQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getFittingModelMetadata>>
+>;
+export type GetFittingModelMetadataQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Read authenticated public-asset metadata for a ship 3D preview
+ */
+
+export function useGetFittingModelMetadata<
+  TData = Awaited<ReturnType<typeof getFittingModelMetadata>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  params?: GetFittingModelMetadataParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getFittingModelMetadata>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetFittingModelMetadataQueryOptions(
+    id,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary List all fleets

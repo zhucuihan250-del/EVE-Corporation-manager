@@ -6,9 +6,15 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { FittingCatalogItem } from "./fittingCatalogItem";
+import type { FittingWorkbenchRack } from "./fittingWorkbenchRack";
+import type { FittingWorkbenchState } from "./fittingWorkbenchState";
 
 export type FittingSimulatedModule = FittingCatalogItem & {
   quantity: number;
   cpu: number;
   powergrid: number;
+  rack?: FittingWorkbenchRack;
+  index?: number;
+  state?: FittingWorkbenchState;
+  chargeTypeId?: number;
 };

@@ -19,3 +19,4 @@ export * from "./pap_market";
 export * from "./system_monitoring";
 export * from "./buyback";
 export * from "./pap_currencies";
+export * from "./fittings";

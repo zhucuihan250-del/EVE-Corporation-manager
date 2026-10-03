@@ -288,12 +288,12 @@ paths:
           name: category
           schema:
             type: string
-            enum: [all, ship, module, charge, drone]
+            enum: [all, ship, module, charge, drone, subsystem, fighter, implant, booster, skill, cargo]
         - in: query
           name: slot
           schema:
             type: string
-            enum: [all, high, medium, low, rig, subsystem, charge, drone, other]
+            enum: [all, high, medium, low, rig, subsystem, service, charge, drone, fighter, implant, booster, other]
         - in: query
           name: language
           schema:
@@ -303,6 +303,11 @@ paths:
           name: limit
           schema:
             type: integer
+        - in: query
+          name: typeIds
+          description: Comma-separated exact item IDs, maximum 100; bypasses text search.
+          schema:
+            type: string
       responses:
         "200":
           description: Matching fitting catalog items
@@ -315,7 +320,7 @@ paths:
     post:
       operationId: simulateFitting
       tags: [fitting]
-      summary: Simulate a ship fitting and return approximate PVP/PVE guidance
+      summary: Simulate a ship fitting with a backward-compatible result discriminator
       requestBody:
         required: true
         content:
@@ -333,6 +338,311 @@ paths:
           description: Invalid fitting
         "404":
           description: Ship not found
+
+  /fitting/workbench:
+    post:
+      operationId: "simulateFittingWorkbench"
+      tags: ["fitting"]
+      summary: "Calculate a per-slot fitting with the selected skill and damage profiles"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/components/schemas/FittingWorkbenchBody"
+      responses:
+        "200":
+          description: "Successful operation"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/FittingWorkbenchResult"
+        default:
+          description: "Authentication, permission, validation, conflict, rate-limit or service-unavailable error"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/FittingWorkbenchErrorResponse"
+
+  /fitting/import:
+    post:
+      operationId: "importFittingEft"
+      tags: ["fitting"]
+      summary: "Import an English or localized EVE clipboard EFT fitting"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/components/schemas/FittingImportBody"
+      responses:
+        "200":
+          description: "Successful operation"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/FittingImportResult"
+        default:
+          description: "Authentication, permission, validation, conflict, rate-limit or service-unavailable error"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/FittingWorkbenchErrorResponse"
+
+  /fitting/export:
+    post:
+      operationId: "exportFittingEft"
+      tags: ["fitting"]
+      summary: "Export a fitting to the canonical English EVE clipboard EFT format"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/components/schemas/FittingWorkbenchBody"
+      responses:
+        "200":
+          description: "Successful operation"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/FittingExportResult"
+        default:
+          description: "Authentication, permission, validation, conflict, rate-limit or service-unavailable error"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/FittingWorkbenchErrorResponse"
+
+  /fitting/saved:
+    get:
+      operationId: "listSavedFittings"
+      tags: ["fitting"]
+      summary: "List readable personal and corporation fittings"
+      parameters:
+        -
+          in: "query"
+          name: "cursor"
+          schema:
+            type: "integer"
+            minimum: 1
+        -
+          in: "query"
+          name: "limit"
+          schema:
+            type: "integer"
+            minimum: 1
+            maximum: 200
+        -
+          in: "query"
+          name: "visibility"
+          schema:
+            type: "string"
+            enum: ["all","personal","corporation"]
+      responses:
+        "200":
+          description: "Successful operation"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/SavedFittingList"
+        default:
+          description: "Authentication, permission, validation, conflict, rate-limit or service-unavailable error"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/FittingWorkbenchErrorResponse"
+    post:
+      operationId: "createSavedFitting"
+      tags: ["fitting"]
+      summary: "Save a personal fitting or an authorized corporation fitting"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/components/schemas/CreateSavedFittingBody"
+      responses:
+        "201":
+          description: "Successful operation"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/SavedFittingResponse"
+        default:
+          description: "Authentication, permission, validation, conflict, rate-limit or service-unavailable error"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/FittingWorkbenchErrorResponse"
+
+  /fitting/saved/{id}:
+    get:
+      operationId: "getSavedFitting"
+      tags: ["fitting"]
+      summary: "Read a fitting visible to this corporation member"
+      parameters:
+        -
+          in: "path"
+          name: "id"
+          required: true
+          schema:
+            type: "integer"
+            minimum: 1
+      responses:
+        "200":
+          description: "Successful operation"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/SavedFittingResponse"
+        default:
+          description: "Authentication, permission, validation, conflict, rate-limit or service-unavailable error"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/FittingWorkbenchErrorResponse"
+    put:
+      operationId: "updateSavedFitting"
+      tags: ["fitting"]
+      summary: "Update an editable fitting using its current version"
+      parameters:
+        -
+          in: "path"
+          name: "id"
+          required: true
+          schema:
+            type: "integer"
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/components/schemas/UpdateSavedFittingBody"
+      responses:
+        "200":
+          description: "Successful operation"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/SavedFittingResponse"
+        default:
+          description: "Authentication, permission, validation, conflict, rate-limit or service-unavailable error"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/FittingWorkbenchErrorResponse"
+    delete:
+      operationId: "deleteSavedFitting"
+      tags: ["fitting"]
+      summary: "Delete an editable fitting using its current version"
+      parameters:
+        -
+          in: "path"
+          name: "id"
+          required: true
+          schema:
+            type: "integer"
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/components/schemas/DeleteSavedFittingBody"
+      responses:
+        "200":
+          description: "Successful operation"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/DeleteSavedFittingResult"
+        default:
+          description: "Authentication, permission, validation, conflict, rate-limit or service-unavailable error"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/FittingWorkbenchErrorResponse"
+
+  /fitting/characters:
+    get:
+      operationId: "listFittingCharacters"
+      tags: ["fitting"]
+      summary: "List the caller's bound and active corporation characters"
+      responses:
+        "200":
+          description: "Successful operation"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/FittingCharacterList"
+        default:
+          description: "Authentication, permission, validation, conflict, rate-limit or service-unavailable error"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/FittingWorkbenchErrorResponse"
+
+  /fitting/characters/{id}/skills:
+    get:
+      operationId: "getFittingCharacterSkills"
+      tags: ["fitting"]
+      summary: "Read the caller's character skills with effective active levels"
+      parameters:
+        -
+          in: "path"
+          name: "id"
+          required: true
+          schema:
+            type: "integer"
+            minimum: 1
+      responses:
+        "200":
+          description: "Successful operation"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/FittingSkillSnapshot"
+        default:
+          description: "Authentication, permission, validation, conflict, rate-limit or service-unavailable error"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/FittingWorkbenchErrorResponse"
+
+  /fitting/3d/model/{id}:
+    get:
+      operationId: getFittingModelMetadata
+      tags: [fitting]
+      summary: Read authenticated public-asset metadata for a ship 3D preview
+      description: Uses the same fitting authorization as the workbench. Returns a pinned SDE model identity and the resolved public CCP client resource build; does not access game account or corporation files.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - in: query
+          name: subsystems
+          description: Optional comma-separated subsystem type IDs, up to five, for strategic-cruiser appearance.
+          schema:
+            type: string
+            maxLength: 60
+      responses:
+        "200":
+          description: Model identity and authenticated resource root for the renderer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FittingModelMetadata"
+        default:
+          description: Authentication, permission, invalid identity, unavailable model, rate-limit or upstream error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /fleets:
     get:
@@ -2751,11 +3061,11 @@ components:
 
     FittingCategory:
       type: string
-      enum: [ship, module, charge, drone]
+      enum: [ship, module, charge, drone, subsystem, fighter, implant, booster, skill, cargo]
 
     FittingSlot:
       type: string
-      enum: [high, medium, low, rig, subsystem, charge, drone, other]
+      enum: [high, medium, low, rig, subsystem, service, charge, drone, fighter, implant, booster, other]
 
     FittingCatalogItem:
       type: object
@@ -2781,6 +3091,8 @@ components:
           type: string
         categoryName:
           type: string
+        capabilities:
+          $ref: "#/components/schemas/FittingCatalogCapabilities"
       required:
         - typeId
         - category
@@ -2805,6 +3117,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/FittingCatalogItem"
+        missingTypeIds:
+          type: array
+          items:
+            type: integer
       required:
         - sdeBuildNumber
         - generatedAt
@@ -2884,6 +3200,14 @@ components:
               type: number
             powergrid:
               type: number
+            rack:
+              $ref: "#/components/schemas/FittingWorkbenchRack"
+            index:
+              type: integer
+            state:
+              $ref: "#/components/schemas/FittingWorkbenchState"
+            chargeTypeId:
+              type: integer
           required:
             - quantity
             - cpu
@@ -2895,6 +3219,10 @@ components:
         precision:
           type: string
           enum: [approximate]
+          description: Retained for compatibility. Use calculationPrecision for the active calculation engine.
+        calculationPrecision:
+          type: string
+          enum: [dogma]
         sdeBuildNumber:
           type: ["integer", "null"]
         ship:
@@ -2915,6 +3243,8 @@ components:
             rig:
               $ref: "#/components/schemas/FittingSlotMetric"
             subsystem:
+              $ref: "#/components/schemas/FittingSlotMetric"
+            service:
               $ref: "#/components/schemas/FittingSlotMetric"
           required:
             - high
@@ -3019,6 +3349,659 @@ components:
         - offense
         - recommendations
         - limitations
+
+    FittingWorkbenchRack:
+      type: "string"
+      enum: ["high","medium","low","rig","subsystem","service"]
+
+    FittingWorkbenchState:
+      type: "string"
+      enum: ["offline","online","active","overheated"]
+
+    FittingLanguage:
+      type: "string"
+      enum: ["en","zh"]
+
+    FittingCatalogCapabilities:
+      type: "object"
+      properties:
+        volume:
+          type: "number"
+        capacity:
+          type: "number"
+        rigSize:
+          type: "number"
+        maxState:
+          type: "string"
+          enum: ["online","active","overheated"]
+        chargeGroups:
+          type: "array"
+          items:
+            type: "integer"
+        chargeSize:
+          type: "number"
+        chargeCapacity:
+          type: "number"
+        modeTypeIds:
+          type: "array"
+          items:
+            type: "integer"
+      required: ["volume","capacity","rigSize","maxState","chargeGroups","chargeSize","chargeCapacity","modeTypeIds"]
+
+    FittingDamageProfile:
+      type: "object"
+      properties:
+        em:
+          type: "number"
+        thermal:
+          type: "number"
+        kinetic:
+          type: "number"
+        explosive:
+          type: "number"
+      required: ["em","thermal","kinetic","explosive"]
+
+    FittingSkillProfile:
+      type: "object"
+      properties:
+        mode:
+          type: "string"
+          enum: ["all5","none","character"]
+        characterId:
+          type: "integer"
+      required: ["mode"]
+
+    FittingWorkbenchSlotInput:
+      type: "object"
+      properties:
+        rack:
+          $ref: "#/components/schemas/FittingWorkbenchRack"
+        index:
+          type: "integer"
+          minimum: 0
+          maximum: 31
+        typeId:
+          type: "integer"
+        state:
+          $ref: "#/components/schemas/FittingWorkbenchState"
+        chargeTypeId:
+          type: "integer"
+        chargeQuantity:
+          type: "integer"
+          minimum: 1
+          maximum: 1000000
+      required: ["rack","index","typeId","state"]
+
+    FittingWorkbenchDroneInput:
+      type: "object"
+      properties:
+        typeId:
+          type: "integer"
+        quantity:
+          type: "integer"
+          minimum: 1
+          maximum: 1000
+        activeQuantity:
+          type: "integer"
+          minimum: 0
+          maximum: 1000
+      required: ["typeId","quantity","activeQuantity"]
+
+    FittingWorkbenchCargoInput:
+      type: "object"
+      properties:
+        typeId:
+          type: "integer"
+        quantity:
+          type: "integer"
+          minimum: 1
+          maximum: 1000000
+      required: ["typeId","quantity"]
+
+    FittingWorkbenchCharacterItem:
+      type: "object"
+      properties:
+        typeId:
+          type: "integer"
+      required: ["typeId"]
+
+    CanonicalFitting:
+      type: "object"
+      properties:
+        schemaVersion:
+          type: "integer"
+          enum: [2]
+        shipTypeId:
+          type: "integer"
+        name:
+          type: "string"
+          maxLength: 100
+        slots:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/FittingWorkbenchSlotInput"
+          maxItems: 256
+        drones:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/FittingWorkbenchDroneInput"
+        cargo:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/FittingWorkbenchCargoInput"
+        implants:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/FittingWorkbenchCharacterItem"
+        boosters:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/FittingWorkbenchCharacterItem"
+        skillProfile:
+          $ref: "#/components/schemas/FittingSkillProfile"
+        damageProfile:
+          $ref: "#/components/schemas/FittingDamageProfile"
+        modeTypeId:
+          type: "integer"
+      required: ["schemaVersion","shipTypeId","name","slots","drones","cargo","skillProfile","damageProfile"]
+
+    FittingWorkbenchBody:
+      type: "object"
+      properties:
+        fit:
+          $ref: "#/components/schemas/CanonicalFitting"
+        language:
+          $ref: "#/components/schemas/FittingLanguage"
+      required: ["fit"]
+
+    FittingWorkbenchViolation:
+      type: "object"
+      properties:
+        target:
+          type: "object"
+          properties:
+            type:
+              type: "string"
+              enum: ["ship","item","charge"]
+            index:
+              type: "integer"
+          required: ["type"]
+        rule:
+          type: "object"
+          properties:
+            type:
+              type: "string"
+          required: ["type"]
+          additionalProperties: true
+        message:
+          type: "string"
+      required: ["target","rule","message"]
+
+    FittingWorkbenchModuleState:
+      type: "object"
+      properties:
+        rack:
+          $ref: "#/components/schemas/FittingWorkbenchRack"
+        index:
+          type: "integer"
+        typeId:
+          type: "integer"
+        requestedState:
+          $ref: "#/components/schemas/FittingWorkbenchState"
+        state:
+          $ref: "#/components/schemas/FittingWorkbenchState"
+        maxState:
+          $ref: "#/components/schemas/FittingWorkbenchState"
+      required: ["rack","index","typeId","requestedState","state","maxState"]
+
+    FittingWorkbenchLayer:
+      type: "object"
+      properties:
+        hp:
+          type: "number"
+        ehp:
+          type: "number"
+        resistances:
+          $ref: "#/components/schemas/FittingDamageProfile"
+      required: ["hp","ehp","resistances"]
+
+    FittingWorkbenchWeapon:
+      type: "object"
+      properties:
+        typeId:
+          type: "integer"
+        rack:
+          $ref: "#/components/schemas/FittingWorkbenchRack"
+        index:
+          type: "integer"
+        dps:
+          type: "number"
+        alpha:
+          type: "number"
+        cycleSeconds:
+          type: "number"
+        optimal:
+          type: "number"
+        falloff:
+          type: "number"
+        tracking:
+          type: "number"
+        missileRange:
+          type: "number"
+      required: ["typeId","rack","index","dps","alpha","cycleSeconds","optimal","falloff","tracking","missileRange"]
+
+    FittingWorkbenchStats:
+      type: "object"
+      properties:
+        cargo:
+          type: "object"
+          properties:
+            used:
+              type: "number"
+            capacity:
+              type: "number"
+          required: ["used","capacity"]
+        defense:
+          type: "object"
+          properties:
+            shield:
+              $ref: "#/components/schemas/FittingWorkbenchLayer"
+            armor:
+              $ref: "#/components/schemas/FittingWorkbenchLayer"
+            hull:
+              $ref: "#/components/schemas/FittingWorkbenchLayer"
+            ehp:
+              type: "number"
+          required: ["shield","armor","hull","ehp"]
+        offense:
+          type: "object"
+          properties:
+            dps:
+              type: "number"
+            sustainedDps:
+              type: "number"
+            alpha:
+              type: "number"
+            weaponDps:
+              type: "number"
+            droneDps:
+              type: "number"
+            fighterDps:
+              type: "number"
+            weapons:
+              type: "array"
+              items:
+                $ref: "#/components/schemas/FittingWorkbenchWeapon"
+          required: ["dps","sustainedDps","alpha","weaponDps","droneDps","fighterDps","weapons"]
+        capacitor:
+          type: "object"
+          properties:
+            capacity:
+              type: "number"
+            rechargeSeconds:
+              type: "number"
+            peakRecharge:
+              type: "number"
+            usage:
+              type: "number"
+            delta:
+              type: "number"
+            stablePercent:
+              type: "number"
+            stable:
+              type: "boolean"
+            secondsToEmpty:
+              type: ["number","null"]
+          required: ["capacity","rechargeSeconds","peakRecharge","usage","delta","stablePercent","stable","secondsToEmpty"]
+        navigation:
+          type: "object"
+          properties:
+            speed:
+              type: "number"
+            mass:
+              type: "number"
+            agility:
+              type: "number"
+            alignSeconds:
+              type: "number"
+            warpSpeed:
+              type: "number"
+          required: ["speed","mass","agility","alignSeconds","warpSpeed"]
+        targeting:
+          type: "object"
+          properties:
+            range:
+              type: "number"
+            maxTargets:
+              type: "number"
+            scanResolution:
+              type: "number"
+            signatureRadius:
+              type: "number"
+            sensorStrength:
+              type: "number"
+          required: ["range","maxTargets","scanResolution","signatureRadius","sensorStrength"]
+        drones:
+          type: "object"
+          properties:
+            bayUsed:
+              type: "number"
+            bayCapacity:
+              type: "number"
+            bandwidthUsed:
+              type: "number"
+            bandwidthCapacity:
+              type: "number"
+            active:
+              type: "number"
+            activeLimit:
+              type: "number"
+            controlRange:
+              type: "number"
+          required: ["bayUsed","bayCapacity","bandwidthUsed","bandwidthCapacity","active","activeLimit","controlRange"]
+        repair:
+          type: "object"
+          properties:
+            shield:
+              type: "number"
+            armor:
+              type: "number"
+            hull:
+              type: "number"
+            passiveShield:
+              type: "number"
+            shieldEffective:
+              type: "number"
+            armorEffective:
+              type: "number"
+            hullEffective:
+              type: "number"
+          required: ["shield","armor","hull","passiveShield","shieldEffective","armorEffective","hullEffective"]
+      required: ["cargo","defense","offense","capacitor","navigation","targeting","drones","repair"]
+
+    FittingSkillSource:
+      type: "object"
+      properties:
+        mode:
+          type: "string"
+          enum: ["all5","none","character"]
+        characterId:
+          type: "integer"
+        characterName:
+          type: "string"
+        checkedAt:
+          type: "string"
+          format: "date-time"
+      required: ["mode"]
+
+    FittingWorkbenchResult:
+      allOf:
+        -
+          $ref: "#/components/schemas/FittingSimulationResult"
+        -
+          type: "object"
+          properties:
+            calculationPrecision:
+              type: "string"
+              enum: ["dogma"]
+            fit:
+              $ref: "#/components/schemas/CanonicalFitting"
+            engine:
+              type: "object"
+              properties:
+                name:
+                  type: "string"
+                version:
+                  type: "string"
+                sdeReleaseDate:
+                  type: ["string","null"]
+                  format: "date-time"
+                note:
+                  type: "string"
+              required: ["name","version","sdeReleaseDate","note"]
+            moduleStates:
+              type: "array"
+              items:
+                $ref: "#/components/schemas/FittingWorkbenchModuleState"
+            violations:
+              type: "array"
+              items:
+                $ref: "#/components/schemas/FittingWorkbenchViolation"
+            valid:
+              type: "boolean"
+            stats:
+              $ref: "#/components/schemas/FittingWorkbenchStats"
+            skillSource:
+              $ref: "#/components/schemas/FittingSkillSource"
+          required: ["calculationPrecision","fit","engine","moduleStates","violations","valid","stats","skillSource"]
+
+    FittingImportBody:
+      type: "object"
+      properties:
+        text:
+          type: "string"
+          maxLength: 65536
+        language:
+          $ref: "#/components/schemas/FittingLanguage"
+      required: ["text"]
+
+    FittingImportResult:
+      type: "object"
+      properties:
+        fit:
+          $ref: "#/components/schemas/CanonicalFitting"
+        warnings:
+          type: "array"
+          items:
+            type: "string"
+      required: ["fit","warnings"]
+
+    FittingExportResult:
+      type: "object"
+      properties:
+        text:
+          type: "string"
+        warnings:
+          type: "array"
+          items:
+            type: "string"
+      required: ["text","warnings"]
+
+    FittingVisibility:
+      type: "string"
+      enum: ["personal","corporation"]
+
+    SavedFitting:
+      type: "object"
+      properties:
+        id:
+          type: "integer"
+        name:
+          type: "string"
+        description:
+          type: "string"
+        visibility:
+          $ref: "#/components/schemas/FittingVisibility"
+        ownerUserId:
+          type: ["integer","null"]
+        authorName:
+          type: "string"
+        fit:
+          $ref: "#/components/schemas/CanonicalFitting"
+        simulation:
+          $ref: "#/components/schemas/FittingWorkbenchResult"
+        version:
+          type: "integer"
+        createdAt:
+          type: "string"
+          format: "date-time"
+        updatedAt:
+          type: "string"
+          format: "date-time"
+        canEdit:
+          type: "boolean"
+      required: ["id","name","description","visibility","ownerUserId","authorName","fit","simulation","version","createdAt","updatedAt","canEdit"]
+
+    SavedFittingResponse:
+      type: "object"
+      properties:
+        fitting:
+          $ref: "#/components/schemas/SavedFitting"
+      required: ["fitting"]
+
+    SavedFittingList:
+      type: "object"
+      properties:
+        fittings:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/SavedFitting"
+        nextCursor:
+          type: ["integer","null"]
+        canManageCorporation:
+          type: "boolean"
+      required: ["fittings","nextCursor","canManageCorporation"]
+
+    CreateSavedFittingBody:
+      type: "object"
+      properties:
+        name:
+          type: "string"
+          minLength: 1
+          maxLength: 100
+        description:
+          type: "string"
+          maxLength: 2000
+        visibility:
+          $ref: "#/components/schemas/FittingVisibility"
+        fit:
+          $ref: "#/components/schemas/CanonicalFitting"
+        language:
+          $ref: "#/components/schemas/FittingLanguage"
+      required: ["name","visibility","fit"]
+
+    UpdateSavedFittingBody:
+      type: "object"
+      properties:
+        name:
+          type: "string"
+          minLength: 1
+          maxLength: 100
+        description:
+          type: "string"
+          maxLength: 2000
+        fit:
+          $ref: "#/components/schemas/CanonicalFitting"
+        version:
+          type: "integer"
+          minimum: 1
+        language:
+          $ref: "#/components/schemas/FittingLanguage"
+      required: ["name","fit","version"]
+
+    DeleteSavedFittingBody:
+      type: "object"
+      properties:
+        version:
+          type: "integer"
+          minimum: 1
+      required: ["version"]
+
+    DeleteSavedFittingResult:
+      type: "object"
+      properties:
+        deleted:
+          type: "boolean"
+          enum: [true]
+      required: ["deleted"]
+
+    FittingCharacter:
+      type: "object"
+      properties:
+        id:
+          type: "integer"
+        eveCharacterId:
+          type: "integer"
+        name:
+          type: "string"
+        isMain:
+          type: "boolean"
+      required: ["id","eveCharacterId","name","isMain"]
+
+    FittingCharacterList:
+      type: "object"
+      properties:
+        characters:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/FittingCharacter"
+      required: ["characters"]
+
+    FittingSkillSnapshot:
+      type: "object"
+      properties:
+        characterId:
+          type: "integer"
+        eveCharacterId:
+          type: "integer"
+        characterName:
+          type: "string"
+        checkedAt:
+          type: "string"
+          format: "date-time"
+        source:
+          type: "string"
+          enum: ["esi"]
+        skills:
+          type: "array"
+          items:
+            type: "object"
+            properties:
+              skillId:
+                type: "integer"
+              activeLevel:
+                type: "integer"
+                minimum: 0
+                maximum: 5
+              trainedLevel:
+                type: "integer"
+                minimum: 0
+                maximum: 5
+            required: ["skillId","activeLevel","trainedLevel"]
+      required: ["characterId","eveCharacterId","characterName","checkedAt","source","skills"]
+
+    FittingWorkbenchErrorResponse:
+      type: "object"
+      properties:
+        error:
+          type: "string"
+        code:
+          type: "string"
+      required: ["error","code"]
+
+    FittingModelMetadata:
+      type: object
+      properties:
+        typeId:
+          type: integer
+        graphicId:
+          type: integer
+        dna:
+          type: ["string", "null"]
+          description: Public CCP SOF hull, faction and race identity; may incorporate compatible strategic-cruiser subsystems.
+        resourcePath:
+          type: ["string", "null"]
+          description: Public res:/ model path when supplied by the pinned SDE.
+        sdeBuildNumber:
+          type: integer
+          description: Build of the official static model metadata, separate from the currently available client assets.
+        clientBuild:
+          type: integer
+          description: Resolved public client resource build for this preview session.
+        resourceRoot:
+          type: string
+          description: Same-origin authenticated resource root ending with a slash, not an arbitrary upstream URL.
+      required: [typeId, graphicId, dna, resourcePath, sdeBuildNumber, clientBuild, resourceRoot]
 
     Fleet:
       type: object

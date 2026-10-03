@@ -252,7 +252,21 @@ export const GetUserCharactersResponse = zod.array(
  */
 export const SearchFittingCatalogQueryParams = zod.object({
   q: zod.coerce.string().optional(),
-  category: zod.enum(["all", "ship", "module", "charge", "drone"]).optional(),
+  category: zod
+    .enum([
+      "all",
+      "ship",
+      "module",
+      "charge",
+      "drone",
+      "subsystem",
+      "fighter",
+      "implant",
+      "booster",
+      "skill",
+      "cargo",
+    ])
+    .optional(),
   slot: zod
     .enum([
       "all",
@@ -261,13 +275,23 @@ export const SearchFittingCatalogQueryParams = zod.object({
       "low",
       "rig",
       "subsystem",
+      "service",
       "charge",
       "drone",
+      "fighter",
+      "implant",
+      "booster",
       "other",
     ])
     .optional(),
   language: zod.enum(["en", "zh"]).optional(),
   limit: zod.coerce.number().optional(),
+  typeIds: zod.coerce
+    .string()
+    .optional()
+    .describe(
+      "Comma-separated exact item IDs, maximum 100; bypasses text search.",
+    ),
 });
 
 export const SearchFittingCatalogResponse = zod.object({
@@ -276,7 +300,18 @@ export const SearchFittingCatalogResponse = zod.object({
   items: zod.array(
     zod.object({
       typeId: zod.number(),
-      category: zod.enum(["ship", "module", "charge", "drone"]),
+      category: zod.enum([
+        "ship",
+        "module",
+        "charge",
+        "drone",
+        "subsystem",
+        "fighter",
+        "implant",
+        "booster",
+        "skill",
+        "cargo",
+      ]),
       groupId: zod.number(),
       slot: zod.enum([
         "high",
@@ -284,8 +319,12 @@ export const SearchFittingCatalogResponse = zod.object({
         "low",
         "rig",
         "subsystem",
+        "service",
         "charge",
         "drone",
+        "fighter",
+        "implant",
+        "booster",
         "other",
       ]),
       hardpoint: zod
@@ -300,12 +339,25 @@ export const SearchFittingCatalogResponse = zod.object({
       nameZh: zod.string(),
       groupName: zod.string(),
       categoryName: zod.string(),
+      capabilities: zod
+        .object({
+          volume: zod.number(),
+          capacity: zod.number(),
+          rigSize: zod.number(),
+          maxState: zod.enum(["online", "active", "overheated"]),
+          chargeGroups: zod.array(zod.number()),
+          chargeSize: zod.number(),
+          chargeCapacity: zod.number(),
+          modeTypeIds: zod.array(zod.number()),
+        })
+        .optional(),
     }),
   ),
+  missingTypeIds: zod.array(zod.number()).optional(),
 });
 
 /**
- * @summary Simulate a ship fitting and return approximate PVP/PVE guidance
+ * @summary Simulate a ship fitting with a backward-compatible result discriminator
  */
 
 export const SimulateFittingBody = zod.object({
@@ -321,11 +373,27 @@ export const SimulateFittingBody = zod.object({
 });
 
 export const SimulateFittingResponse = zod.object({
-  precision: zod.enum(["approximate"]),
+  precision: zod
+    .enum(["approximate"])
+    .describe(
+      "Retained for compatibility. Use calculationPrecision for the active calculation engine.",
+    ),
+  calculationPrecision: zod.enum(["dogma"]).optional(),
   sdeBuildNumber: zod.number().nullable(),
   ship: zod.object({
     typeId: zod.number(),
-    category: zod.enum(["ship", "module", "charge", "drone"]),
+    category: zod.enum([
+      "ship",
+      "module",
+      "charge",
+      "drone",
+      "subsystem",
+      "fighter",
+      "implant",
+      "booster",
+      "skill",
+      "cargo",
+    ]),
     groupId: zod.number(),
     slot: zod.enum([
       "high",
@@ -333,8 +401,12 @@ export const SimulateFittingResponse = zod.object({
       "low",
       "rig",
       "subsystem",
+      "service",
       "charge",
       "drone",
+      "fighter",
+      "implant",
+      "booster",
       "other",
     ]),
     hardpoint: zod
@@ -349,12 +421,35 @@ export const SimulateFittingResponse = zod.object({
     nameZh: zod.string(),
     groupName: zod.string(),
     categoryName: zod.string(),
+    capabilities: zod
+      .object({
+        volume: zod.number(),
+        capacity: zod.number(),
+        rigSize: zod.number(),
+        maxState: zod.enum(["online", "active", "overheated"]),
+        chargeGroups: zod.array(zod.number()),
+        chargeSize: zod.number(),
+        chargeCapacity: zod.number(),
+        modeTypeIds: zod.array(zod.number()),
+      })
+      .optional(),
   }),
   modules: zod.array(
     zod
       .object({
         typeId: zod.number(),
-        category: zod.enum(["ship", "module", "charge", "drone"]),
+        category: zod.enum([
+          "ship",
+          "module",
+          "charge",
+          "drone",
+          "subsystem",
+          "fighter",
+          "implant",
+          "booster",
+          "skill",
+          "cargo",
+        ]),
         groupId: zod.number(),
         slot: zod.enum([
           "high",
@@ -362,8 +457,12 @@ export const SimulateFittingResponse = zod.object({
           "low",
           "rig",
           "subsystem",
+          "service",
           "charge",
           "drone",
+          "fighter",
+          "implant",
+          "booster",
           "other",
         ]),
         hardpoint: zod
@@ -378,12 +477,32 @@ export const SimulateFittingResponse = zod.object({
         nameZh: zod.string(),
         groupName: zod.string(),
         categoryName: zod.string(),
+        capabilities: zod
+          .object({
+            volume: zod.number(),
+            capacity: zod.number(),
+            rigSize: zod.number(),
+            maxState: zod.enum(["online", "active", "overheated"]),
+            chargeGroups: zod.array(zod.number()),
+            chargeSize: zod.number(),
+            chargeCapacity: zod.number(),
+            modeTypeIds: zod.array(zod.number()),
+          })
+          .optional(),
       })
       .and(
         zod.object({
           quantity: zod.number(),
           cpu: zod.number(),
           powergrid: zod.number(),
+          rack: zod
+            .enum(["high", "medium", "low", "rig", "subsystem", "service"])
+            .optional(),
+          index: zod.number().optional(),
+          state: zod
+            .enum(["offline", "online", "active", "overheated"])
+            .optional(),
+          chargeTypeId: zod.number().optional(),
         }),
       ),
   ),
@@ -413,6 +532,13 @@ export const SimulateFittingResponse = zod.object({
       limit: zod.number(),
       overloaded: zod.boolean(),
     }),
+    service: zod
+      .object({
+        used: zod.number(),
+        limit: zod.number(),
+        overloaded: zod.boolean(),
+      })
+      .optional(),
   }),
   resources: zod.object({
     cpu: zod.object({
@@ -468,6 +594,3055 @@ export const SimulateFittingResponse = zod.object({
   }),
   recommendations: zod.array(zod.string()),
   limitations: zod.array(zod.string()),
+});
+
+/**
+ * @summary Calculate a per-slot fitting with the selected skill and damage profiles
+ */
+export const simulateFittingWorkbenchBodyFitNameMax = 100;
+
+export const simulateFittingWorkbenchBodyFitSlotsItemIndexMin = 0;
+export const simulateFittingWorkbenchBodyFitSlotsItemIndexMax = 31;
+
+export const simulateFittingWorkbenchBodyFitSlotsItemChargeQuantityMax = 1000000;
+
+export const simulateFittingWorkbenchBodyFitSlotsMax = 256;
+
+export const simulateFittingWorkbenchBodyFitDronesItemQuantityMax = 1000;
+
+export const simulateFittingWorkbenchBodyFitDronesItemActiveQuantityMin = 0;
+export const simulateFittingWorkbenchBodyFitDronesItemActiveQuantityMax = 1000;
+
+export const simulateFittingWorkbenchBodyFitCargoItemQuantityMax = 1000000;
+
+export const SimulateFittingWorkbenchBody = zod.object({
+  fit: zod.object({
+    schemaVersion: zod.literal(2),
+    shipTypeId: zod.number(),
+    name: zod.string().max(simulateFittingWorkbenchBodyFitNameMax),
+    slots: zod
+      .array(
+        zod.object({
+          rack: zod.enum([
+            "high",
+            "medium",
+            "low",
+            "rig",
+            "subsystem",
+            "service",
+          ]),
+          index: zod
+            .number()
+            .min(simulateFittingWorkbenchBodyFitSlotsItemIndexMin)
+            .max(simulateFittingWorkbenchBodyFitSlotsItemIndexMax),
+          typeId: zod.number(),
+          state: zod.enum(["offline", "online", "active", "overheated"]),
+          chargeTypeId: zod.number().optional(),
+          chargeQuantity: zod
+            .number()
+            .min(1)
+            .max(simulateFittingWorkbenchBodyFitSlotsItemChargeQuantityMax)
+            .optional(),
+        }),
+      )
+      .max(simulateFittingWorkbenchBodyFitSlotsMax),
+    drones: zod.array(
+      zod.object({
+        typeId: zod.number(),
+        quantity: zod
+          .number()
+          .min(1)
+          .max(simulateFittingWorkbenchBodyFitDronesItemQuantityMax),
+        activeQuantity: zod
+          .number()
+          .min(simulateFittingWorkbenchBodyFitDronesItemActiveQuantityMin)
+          .max(simulateFittingWorkbenchBodyFitDronesItemActiveQuantityMax),
+      }),
+    ),
+    cargo: zod.array(
+      zod.object({
+        typeId: zod.number(),
+        quantity: zod
+          .number()
+          .min(1)
+          .max(simulateFittingWorkbenchBodyFitCargoItemQuantityMax),
+      }),
+    ),
+    implants: zod
+      .array(
+        zod.object({
+          typeId: zod.number(),
+        }),
+      )
+      .optional(),
+    boosters: zod
+      .array(
+        zod.object({
+          typeId: zod.number(),
+        }),
+      )
+      .optional(),
+    skillProfile: zod.object({
+      mode: zod.enum(["all5", "none", "character"]),
+      characterId: zod.number().optional(),
+    }),
+    damageProfile: zod.object({
+      em: zod.number(),
+      thermal: zod.number(),
+      kinetic: zod.number(),
+      explosive: zod.number(),
+    }),
+    modeTypeId: zod.number().optional(),
+  }),
+  language: zod.enum(["en", "zh"]).optional(),
+});
+
+export const simulateFittingWorkbenchResponseTwoFitNameMax = 100;
+
+export const simulateFittingWorkbenchResponseTwoFitSlotsItemIndexMin = 0;
+export const simulateFittingWorkbenchResponseTwoFitSlotsItemIndexMax = 31;
+
+export const simulateFittingWorkbenchResponseTwoFitSlotsItemChargeQuantityMax = 1000000;
+
+export const simulateFittingWorkbenchResponseTwoFitSlotsMax = 256;
+
+export const simulateFittingWorkbenchResponseTwoFitDronesItemQuantityMax = 1000;
+
+export const simulateFittingWorkbenchResponseTwoFitDronesItemActiveQuantityMin = 0;
+export const simulateFittingWorkbenchResponseTwoFitDronesItemActiveQuantityMax = 1000;
+
+export const simulateFittingWorkbenchResponseTwoFitCargoItemQuantityMax = 1000000;
+
+export const SimulateFittingWorkbenchResponse = zod
+  .object({
+    precision: zod
+      .enum(["approximate"])
+      .describe(
+        "Retained for compatibility. Use calculationPrecision for the active calculation engine.",
+      ),
+    calculationPrecision: zod.enum(["dogma"]).optional(),
+    sdeBuildNumber: zod.number().nullable(),
+    ship: zod.object({
+      typeId: zod.number(),
+      category: zod.enum([
+        "ship",
+        "module",
+        "charge",
+        "drone",
+        "subsystem",
+        "fighter",
+        "implant",
+        "booster",
+        "skill",
+        "cargo",
+      ]),
+      groupId: zod.number(),
+      slot: zod.enum([
+        "high",
+        "medium",
+        "low",
+        "rig",
+        "subsystem",
+        "service",
+        "charge",
+        "drone",
+        "fighter",
+        "implant",
+        "booster",
+        "other",
+      ]),
+      hardpoint: zod
+        .union([
+          zod.literal("turret"),
+          zod.literal("launcher"),
+          zod.literal(null),
+        ])
+        .nullable(),
+      name: zod.string(),
+      nameEn: zod.string(),
+      nameZh: zod.string(),
+      groupName: zod.string(),
+      categoryName: zod.string(),
+      capabilities: zod
+        .object({
+          volume: zod.number(),
+          capacity: zod.number(),
+          rigSize: zod.number(),
+          maxState: zod.enum(["online", "active", "overheated"]),
+          chargeGroups: zod.array(zod.number()),
+          chargeSize: zod.number(),
+          chargeCapacity: zod.number(),
+          modeTypeIds: zod.array(zod.number()),
+        })
+        .optional(),
+    }),
+    modules: zod.array(
+      zod
+        .object({
+          typeId: zod.number(),
+          category: zod.enum([
+            "ship",
+            "module",
+            "charge",
+            "drone",
+            "subsystem",
+            "fighter",
+            "implant",
+            "booster",
+            "skill",
+            "cargo",
+          ]),
+          groupId: zod.number(),
+          slot: zod.enum([
+            "high",
+            "medium",
+            "low",
+            "rig",
+            "subsystem",
+            "service",
+            "charge",
+            "drone",
+            "fighter",
+            "implant",
+            "booster",
+            "other",
+          ]),
+          hardpoint: zod
+            .union([
+              zod.literal("turret"),
+              zod.literal("launcher"),
+              zod.literal(null),
+            ])
+            .nullable(),
+          name: zod.string(),
+          nameEn: zod.string(),
+          nameZh: zod.string(),
+          groupName: zod.string(),
+          categoryName: zod.string(),
+          capabilities: zod
+            .object({
+              volume: zod.number(),
+              capacity: zod.number(),
+              rigSize: zod.number(),
+              maxState: zod.enum(["online", "active", "overheated"]),
+              chargeGroups: zod.array(zod.number()),
+              chargeSize: zod.number(),
+              chargeCapacity: zod.number(),
+              modeTypeIds: zod.array(zod.number()),
+            })
+            .optional(),
+        })
+        .and(
+          zod.object({
+            quantity: zod.number(),
+            cpu: zod.number(),
+            powergrid: zod.number(),
+            rack: zod
+              .enum(["high", "medium", "low", "rig", "subsystem", "service"])
+              .optional(),
+            index: zod.number().optional(),
+            state: zod
+              .enum(["offline", "online", "active", "overheated"])
+              .optional(),
+            chargeTypeId: zod.number().optional(),
+          }),
+        ),
+    ),
+    slots: zod.object({
+      high: zod.object({
+        used: zod.number(),
+        limit: zod.number(),
+        overloaded: zod.boolean(),
+      }),
+      medium: zod.object({
+        used: zod.number(),
+        limit: zod.number(),
+        overloaded: zod.boolean(),
+      }),
+      low: zod.object({
+        used: zod.number(),
+        limit: zod.number(),
+        overloaded: zod.boolean(),
+      }),
+      rig: zod.object({
+        used: zod.number(),
+        limit: zod.number(),
+        overloaded: zod.boolean(),
+      }),
+      subsystem: zod.object({
+        used: zod.number(),
+        limit: zod.number(),
+        overloaded: zod.boolean(),
+      }),
+      service: zod
+        .object({
+          used: zod.number(),
+          limit: zod.number(),
+          overloaded: zod.boolean(),
+        })
+        .optional(),
+    }),
+    resources: zod.object({
+      cpu: zod.object({
+        used: zod.number(),
+        limit: zod.number(),
+        percent: zod.number(),
+        overloaded: zod.boolean(),
+      }),
+      powergrid: zod.object({
+        used: zod.number(),
+        limit: zod.number(),
+        percent: zod.number(),
+        overloaded: zod.boolean(),
+      }),
+      calibration: zod.object({
+        used: zod.number(),
+        limit: zod.number(),
+        percent: zod.number(),
+        overloaded: zod.boolean(),
+      }),
+    }),
+    hardpoints: zod.object({
+      turret: zod.object({
+        used: zod.number(),
+        limit: zod.number(),
+        overloaded: zod.boolean(),
+      }),
+      launcher: zod.object({
+        used: zod.number(),
+        limit: zod.number(),
+        overloaded: zod.boolean(),
+      }),
+    }),
+    defense: zod.object({
+      shieldHp: zod.number(),
+      armorHp: zod.number(),
+      hullHp: zod.number(),
+      estimatedEhp: zod.number(),
+    }),
+    mobility: zod.object({
+      maxVelocity: zod.number(),
+      mass: zod.number(),
+      signatureRadius: zod.number(),
+    }),
+    capacitor: zod.object({
+      capacity: zod.number(),
+      rechargeTime: zod.number().nullable(),
+      activeCapUsePerSecond: zod.number(),
+    }),
+    offense: zod.object({
+      weaponCount: zod.number(),
+      estimatedDps: zod.number().nullable(),
+    }),
+    recommendations: zod.array(zod.string()),
+    limitations: zod.array(zod.string()),
+  })
+  .and(
+    zod.object({
+      calculationPrecision: zod.enum(["dogma"]),
+      fit: zod.object({
+        schemaVersion: zod.literal(2),
+        shipTypeId: zod.number(),
+        name: zod.string().max(simulateFittingWorkbenchResponseTwoFitNameMax),
+        slots: zod
+          .array(
+            zod.object({
+              rack: zod.enum([
+                "high",
+                "medium",
+                "low",
+                "rig",
+                "subsystem",
+                "service",
+              ]),
+              index: zod
+                .number()
+                .min(simulateFittingWorkbenchResponseTwoFitSlotsItemIndexMin)
+                .max(simulateFittingWorkbenchResponseTwoFitSlotsItemIndexMax),
+              typeId: zod.number(),
+              state: zod.enum(["offline", "online", "active", "overheated"]),
+              chargeTypeId: zod.number().optional(),
+              chargeQuantity: zod
+                .number()
+                .min(1)
+                .max(
+                  simulateFittingWorkbenchResponseTwoFitSlotsItemChargeQuantityMax,
+                )
+                .optional(),
+            }),
+          )
+          .max(simulateFittingWorkbenchResponseTwoFitSlotsMax),
+        drones: zod.array(
+          zod.object({
+            typeId: zod.number(),
+            quantity: zod
+              .number()
+              .min(1)
+              .max(simulateFittingWorkbenchResponseTwoFitDronesItemQuantityMax),
+            activeQuantity: zod
+              .number()
+              .min(
+                simulateFittingWorkbenchResponseTwoFitDronesItemActiveQuantityMin,
+              )
+              .max(
+                simulateFittingWorkbenchResponseTwoFitDronesItemActiveQuantityMax,
+              ),
+          }),
+        ),
+        cargo: zod.array(
+          zod.object({
+            typeId: zod.number(),
+            quantity: zod
+              .number()
+              .min(1)
+              .max(simulateFittingWorkbenchResponseTwoFitCargoItemQuantityMax),
+          }),
+        ),
+        implants: zod
+          .array(
+            zod.object({
+              typeId: zod.number(),
+            }),
+          )
+          .optional(),
+        boosters: zod
+          .array(
+            zod.object({
+              typeId: zod.number(),
+            }),
+          )
+          .optional(),
+        skillProfile: zod.object({
+          mode: zod.enum(["all5", "none", "character"]),
+          characterId: zod.number().optional(),
+        }),
+        damageProfile: zod.object({
+          em: zod.number(),
+          thermal: zod.number(),
+          kinetic: zod.number(),
+          explosive: zod.number(),
+        }),
+        modeTypeId: zod.number().optional(),
+      }),
+      engine: zod.object({
+        name: zod.string(),
+        version: zod.string(),
+        sdeReleaseDate: zod.coerce.date().nullable(),
+        note: zod.string(),
+      }),
+      moduleStates: zod.array(
+        zod.object({
+          rack: zod.enum([
+            "high",
+            "medium",
+            "low",
+            "rig",
+            "subsystem",
+            "service",
+          ]),
+          index: zod.number(),
+          typeId: zod.number(),
+          requestedState: zod.enum([
+            "offline",
+            "online",
+            "active",
+            "overheated",
+          ]),
+          state: zod.enum(["offline", "online", "active", "overheated"]),
+          maxState: zod.enum(["offline", "online", "active", "overheated"]),
+        }),
+      ),
+      violations: zod.array(
+        zod.object({
+          target: zod.object({
+            type: zod.enum(["ship", "item", "charge"]),
+            index: zod.number().optional(),
+          }),
+          rule: zod.object({
+            type: zod.string(),
+          }),
+          message: zod.string(),
+        }),
+      ),
+      valid: zod.boolean(),
+      stats: zod.object({
+        cargo: zod.object({
+          used: zod.number(),
+          capacity: zod.number(),
+        }),
+        defense: zod.object({
+          shield: zod.object({
+            hp: zod.number(),
+            ehp: zod.number(),
+            resistances: zod.object({
+              em: zod.number(),
+              thermal: zod.number(),
+              kinetic: zod.number(),
+              explosive: zod.number(),
+            }),
+          }),
+          armor: zod.object({
+            hp: zod.number(),
+            ehp: zod.number(),
+            resistances: zod.object({
+              em: zod.number(),
+              thermal: zod.number(),
+              kinetic: zod.number(),
+              explosive: zod.number(),
+            }),
+          }),
+          hull: zod.object({
+            hp: zod.number(),
+            ehp: zod.number(),
+            resistances: zod.object({
+              em: zod.number(),
+              thermal: zod.number(),
+              kinetic: zod.number(),
+              explosive: zod.number(),
+            }),
+          }),
+          ehp: zod.number(),
+        }),
+        offense: zod.object({
+          dps: zod.number(),
+          sustainedDps: zod.number(),
+          alpha: zod.number(),
+          weaponDps: zod.number(),
+          droneDps: zod.number(),
+          fighterDps: zod.number(),
+          weapons: zod.array(
+            zod.object({
+              typeId: zod.number(),
+              rack: zod.enum([
+                "high",
+                "medium",
+                "low",
+                "rig",
+                "subsystem",
+                "service",
+              ]),
+              index: zod.number(),
+              dps: zod.number(),
+              alpha: zod.number(),
+              cycleSeconds: zod.number(),
+              optimal: zod.number(),
+              falloff: zod.number(),
+              tracking: zod.number(),
+              missileRange: zod.number(),
+            }),
+          ),
+        }),
+        capacitor: zod.object({
+          capacity: zod.number(),
+          rechargeSeconds: zod.number(),
+          peakRecharge: zod.number(),
+          usage: zod.number(),
+          delta: zod.number(),
+          stablePercent: zod.number(),
+          stable: zod.boolean(),
+          secondsToEmpty: zod.number().nullable(),
+        }),
+        navigation: zod.object({
+          speed: zod.number(),
+          mass: zod.number(),
+          agility: zod.number(),
+          alignSeconds: zod.number(),
+          warpSpeed: zod.number(),
+        }),
+        targeting: zod.object({
+          range: zod.number(),
+          maxTargets: zod.number(),
+          scanResolution: zod.number(),
+          signatureRadius: zod.number(),
+          sensorStrength: zod.number(),
+        }),
+        drones: zod.object({
+          bayUsed: zod.number(),
+          bayCapacity: zod.number(),
+          bandwidthUsed: zod.number(),
+          bandwidthCapacity: zod.number(),
+          active: zod.number(),
+          activeLimit: zod.number(),
+          controlRange: zod.number(),
+        }),
+        repair: zod.object({
+          shield: zod.number(),
+          armor: zod.number(),
+          hull: zod.number(),
+          passiveShield: zod.number(),
+          shieldEffective: zod.number(),
+          armorEffective: zod.number(),
+          hullEffective: zod.number(),
+        }),
+      }),
+      skillSource: zod.object({
+        mode: zod.enum(["all5", "none", "character"]),
+        characterId: zod.number().optional(),
+        characterName: zod.string().optional(),
+        checkedAt: zod.coerce.date().optional(),
+      }),
+    }),
+  );
+
+/**
+ * @summary Import an English or localized EVE clipboard EFT fitting
+ */
+export const importFittingEftBodyTextMax = 65536;
+
+export const ImportFittingEftBody = zod.object({
+  text: zod.string().max(importFittingEftBodyTextMax),
+  language: zod.enum(["en", "zh"]).optional(),
+});
+
+export const importFittingEftResponseFitNameMax = 100;
+
+export const importFittingEftResponseFitSlotsItemIndexMin = 0;
+export const importFittingEftResponseFitSlotsItemIndexMax = 31;
+
+export const importFittingEftResponseFitSlotsItemChargeQuantityMax = 1000000;
+
+export const importFittingEftResponseFitSlotsMax = 256;
+
+export const importFittingEftResponseFitDronesItemQuantityMax = 1000;
+
+export const importFittingEftResponseFitDronesItemActiveQuantityMin = 0;
+export const importFittingEftResponseFitDronesItemActiveQuantityMax = 1000;
+
+export const importFittingEftResponseFitCargoItemQuantityMax = 1000000;
+
+export const ImportFittingEftResponse = zod.object({
+  fit: zod.object({
+    schemaVersion: zod.literal(2),
+    shipTypeId: zod.number(),
+    name: zod.string().max(importFittingEftResponseFitNameMax),
+    slots: zod
+      .array(
+        zod.object({
+          rack: zod.enum([
+            "high",
+            "medium",
+            "low",
+            "rig",
+            "subsystem",
+            "service",
+          ]),
+          index: zod
+            .number()
+            .min(importFittingEftResponseFitSlotsItemIndexMin)
+            .max(importFittingEftResponseFitSlotsItemIndexMax),
+          typeId: zod.number(),
+          state: zod.enum(["offline", "online", "active", "overheated"]),
+          chargeTypeId: zod.number().optional(),
+          chargeQuantity: zod
+            .number()
+            .min(1)
+            .max(importFittingEftResponseFitSlotsItemChargeQuantityMax)
+            .optional(),
+        }),
+      )
+      .max(importFittingEftResponseFitSlotsMax),
+    drones: zod.array(
+      zod.object({
+        typeId: zod.number(),
+        quantity: zod
+          .number()
+          .min(1)
+          .max(importFittingEftResponseFitDronesItemQuantityMax),
+        activeQuantity: zod
+          .number()
+          .min(importFittingEftResponseFitDronesItemActiveQuantityMin)
+          .max(importFittingEftResponseFitDronesItemActiveQuantityMax),
+      }),
+    ),
+    cargo: zod.array(
+      zod.object({
+        typeId: zod.number(),
+        quantity: zod
+          .number()
+          .min(1)
+          .max(importFittingEftResponseFitCargoItemQuantityMax),
+      }),
+    ),
+    implants: zod
+      .array(
+        zod.object({
+          typeId: zod.number(),
+        }),
+      )
+      .optional(),
+    boosters: zod
+      .array(
+        zod.object({
+          typeId: zod.number(),
+        }),
+      )
+      .optional(),
+    skillProfile: zod.object({
+      mode: zod.enum(["all5", "none", "character"]),
+      characterId: zod.number().optional(),
+    }),
+    damageProfile: zod.object({
+      em: zod.number(),
+      thermal: zod.number(),
+      kinetic: zod.number(),
+      explosive: zod.number(),
+    }),
+    modeTypeId: zod.number().optional(),
+  }),
+  warnings: zod.array(zod.string()),
+});
+
+/**
+ * @summary Export a fitting to the canonical English EVE clipboard EFT format
+ */
+export const exportFittingEftBodyFitNameMax = 100;
+
+export const exportFittingEftBodyFitSlotsItemIndexMin = 0;
+export const exportFittingEftBodyFitSlotsItemIndexMax = 31;
+
+export const exportFittingEftBodyFitSlotsItemChargeQuantityMax = 1000000;
+
+export const exportFittingEftBodyFitSlotsMax = 256;
+
+export const exportFittingEftBodyFitDronesItemQuantityMax = 1000;
+
+export const exportFittingEftBodyFitDronesItemActiveQuantityMin = 0;
+export const exportFittingEftBodyFitDronesItemActiveQuantityMax = 1000;
+
+export const exportFittingEftBodyFitCargoItemQuantityMax = 1000000;
+
+export const ExportFittingEftBody = zod.object({
+  fit: zod.object({
+    schemaVersion: zod.literal(2),
+    shipTypeId: zod.number(),
+    name: zod.string().max(exportFittingEftBodyFitNameMax),
+    slots: zod
+      .array(
+        zod.object({
+          rack: zod.enum([
+            "high",
+            "medium",
+            "low",
+            "rig",
+            "subsystem",
+            "service",
+          ]),
+          index: zod
+            .number()
+            .min(exportFittingEftBodyFitSlotsItemIndexMin)
+            .max(exportFittingEftBodyFitSlotsItemIndexMax),
+          typeId: zod.number(),
+          state: zod.enum(["offline", "online", "active", "overheated"]),
+          chargeTypeId: zod.number().optional(),
+          chargeQuantity: zod
+            .number()
+            .min(1)
+            .max(exportFittingEftBodyFitSlotsItemChargeQuantityMax)
+            .optional(),
+        }),
+      )
+      .max(exportFittingEftBodyFitSlotsMax),
+    drones: zod.array(
+      zod.object({
+        typeId: zod.number(),
+        quantity: zod
+          .number()
+          .min(1)
+          .max(exportFittingEftBodyFitDronesItemQuantityMax),
+        activeQuantity: zod
+          .number()
+          .min(exportFittingEftBodyFitDronesItemActiveQuantityMin)
+          .max(exportFittingEftBodyFitDronesItemActiveQuantityMax),
+      }),
+    ),
+    cargo: zod.array(
+      zod.object({
+        typeId: zod.number(),
+        quantity: zod
+          .number()
+          .min(1)
+          .max(exportFittingEftBodyFitCargoItemQuantityMax),
+      }),
+    ),
+    implants: zod
+      .array(
+        zod.object({
+          typeId: zod.number(),
+        }),
+      )
+      .optional(),
+    boosters: zod
+      .array(
+        zod.object({
+          typeId: zod.number(),
+        }),
+      )
+      .optional(),
+    skillProfile: zod.object({
+      mode: zod.enum(["all5", "none", "character"]),
+      characterId: zod.number().optional(),
+    }),
+    damageProfile: zod.object({
+      em: zod.number(),
+      thermal: zod.number(),
+      kinetic: zod.number(),
+      explosive: zod.number(),
+    }),
+    modeTypeId: zod.number().optional(),
+  }),
+  language: zod.enum(["en", "zh"]).optional(),
+});
+
+export const ExportFittingEftResponse = zod.object({
+  text: zod.string(),
+  warnings: zod.array(zod.string()),
+});
+
+/**
+ * @summary List readable personal and corporation fittings
+ */
+
+export const listSavedFittingsQueryLimitMax = 200;
+
+export const ListSavedFittingsQueryParams = zod.object({
+  cursor: zod.coerce.number().min(1).optional(),
+  limit: zod.coerce
+    .number()
+    .min(1)
+    .max(listSavedFittingsQueryLimitMax)
+    .optional(),
+  visibility: zod.enum(["all", "personal", "corporation"]).optional(),
+});
+
+export const listSavedFittingsResponseFittingsItemFitNameMax = 100;
+
+export const listSavedFittingsResponseFittingsItemFitSlotsItemIndexMin = 0;
+export const listSavedFittingsResponseFittingsItemFitSlotsItemIndexMax = 31;
+
+export const listSavedFittingsResponseFittingsItemFitSlotsItemChargeQuantityMax = 1000000;
+
+export const listSavedFittingsResponseFittingsItemFitSlotsMax = 256;
+
+export const listSavedFittingsResponseFittingsItemFitDronesItemQuantityMax = 1000;
+
+export const listSavedFittingsResponseFittingsItemFitDronesItemActiveQuantityMin = 0;
+export const listSavedFittingsResponseFittingsItemFitDronesItemActiveQuantityMax = 1000;
+
+export const listSavedFittingsResponseFittingsItemFitCargoItemQuantityMax = 1000000;
+
+export const listSavedFittingsResponseFittingsItemSimulationTwoFitNameMax = 100;
+
+export const listSavedFittingsResponseFittingsItemSimulationTwoFitSlotsItemIndexMin = 0;
+export const listSavedFittingsResponseFittingsItemSimulationTwoFitSlotsItemIndexMax = 31;
+
+export const listSavedFittingsResponseFittingsItemSimulationTwoFitSlotsItemChargeQuantityMax = 1000000;
+
+export const listSavedFittingsResponseFittingsItemSimulationTwoFitSlotsMax = 256;
+
+export const listSavedFittingsResponseFittingsItemSimulationTwoFitDronesItemQuantityMax = 1000;
+
+export const listSavedFittingsResponseFittingsItemSimulationTwoFitDronesItemActiveQuantityMin = 0;
+export const listSavedFittingsResponseFittingsItemSimulationTwoFitDronesItemActiveQuantityMax = 1000;
+
+export const listSavedFittingsResponseFittingsItemSimulationTwoFitCargoItemQuantityMax = 1000000;
+
+export const ListSavedFittingsResponse = zod.object({
+  fittings: zod.array(
+    zod.object({
+      id: zod.number(),
+      name: zod.string(),
+      description: zod.string(),
+      visibility: zod.enum(["personal", "corporation"]),
+      ownerUserId: zod.number().nullable(),
+      authorName: zod.string(),
+      fit: zod.object({
+        schemaVersion: zod.literal(2),
+        shipTypeId: zod.number(),
+        name: zod.string().max(listSavedFittingsResponseFittingsItemFitNameMax),
+        slots: zod
+          .array(
+            zod.object({
+              rack: zod.enum([
+                "high",
+                "medium",
+                "low",
+                "rig",
+                "subsystem",
+                "service",
+              ]),
+              index: zod
+                .number()
+                .min(listSavedFittingsResponseFittingsItemFitSlotsItemIndexMin)
+                .max(listSavedFittingsResponseFittingsItemFitSlotsItemIndexMax),
+              typeId: zod.number(),
+              state: zod.enum(["offline", "online", "active", "overheated"]),
+              chargeTypeId: zod.number().optional(),
+              chargeQuantity: zod
+                .number()
+                .min(1)
+                .max(
+                  listSavedFittingsResponseFittingsItemFitSlotsItemChargeQuantityMax,
+                )
+                .optional(),
+            }),
+          )
+          .max(listSavedFittingsResponseFittingsItemFitSlotsMax),
+        drones: zod.array(
+          zod.object({
+            typeId: zod.number(),
+            quantity: zod
+              .number()
+              .min(1)
+              .max(
+                listSavedFittingsResponseFittingsItemFitDronesItemQuantityMax,
+              ),
+            activeQuantity: zod
+              .number()
+              .min(
+                listSavedFittingsResponseFittingsItemFitDronesItemActiveQuantityMin,
+              )
+              .max(
+                listSavedFittingsResponseFittingsItemFitDronesItemActiveQuantityMax,
+              ),
+          }),
+        ),
+        cargo: zod.array(
+          zod.object({
+            typeId: zod.number(),
+            quantity: zod
+              .number()
+              .min(1)
+              .max(
+                listSavedFittingsResponseFittingsItemFitCargoItemQuantityMax,
+              ),
+          }),
+        ),
+        implants: zod
+          .array(
+            zod.object({
+              typeId: zod.number(),
+            }),
+          )
+          .optional(),
+        boosters: zod
+          .array(
+            zod.object({
+              typeId: zod.number(),
+            }),
+          )
+          .optional(),
+        skillProfile: zod.object({
+          mode: zod.enum(["all5", "none", "character"]),
+          characterId: zod.number().optional(),
+        }),
+        damageProfile: zod.object({
+          em: zod.number(),
+          thermal: zod.number(),
+          kinetic: zod.number(),
+          explosive: zod.number(),
+        }),
+        modeTypeId: zod.number().optional(),
+      }),
+      simulation: zod
+        .object({
+          precision: zod
+            .enum(["approximate"])
+            .describe(
+              "Retained for compatibility. Use calculationPrecision for the active calculation engine.",
+            ),
+          calculationPrecision: zod.enum(["dogma"]).optional(),
+          sdeBuildNumber: zod.number().nullable(),
+          ship: zod.object({
+            typeId: zod.number(),
+            category: zod.enum([
+              "ship",
+              "module",
+              "charge",
+              "drone",
+              "subsystem",
+              "fighter",
+              "implant",
+              "booster",
+              "skill",
+              "cargo",
+            ]),
+            groupId: zod.number(),
+            slot: zod.enum([
+              "high",
+              "medium",
+              "low",
+              "rig",
+              "subsystem",
+              "service",
+              "charge",
+              "drone",
+              "fighter",
+              "implant",
+              "booster",
+              "other",
+            ]),
+            hardpoint: zod
+              .union([
+                zod.literal("turret"),
+                zod.literal("launcher"),
+                zod.literal(null),
+              ])
+              .nullable(),
+            name: zod.string(),
+            nameEn: zod.string(),
+            nameZh: zod.string(),
+            groupName: zod.string(),
+            categoryName: zod.string(),
+            capabilities: zod
+              .object({
+                volume: zod.number(),
+                capacity: zod.number(),
+                rigSize: zod.number(),
+                maxState: zod.enum(["online", "active", "overheated"]),
+                chargeGroups: zod.array(zod.number()),
+                chargeSize: zod.number(),
+                chargeCapacity: zod.number(),
+                modeTypeIds: zod.array(zod.number()),
+              })
+              .optional(),
+          }),
+          modules: zod.array(
+            zod
+              .object({
+                typeId: zod.number(),
+                category: zod.enum([
+                  "ship",
+                  "module",
+                  "charge",
+                  "drone",
+                  "subsystem",
+                  "fighter",
+                  "implant",
+                  "booster",
+                  "skill",
+                  "cargo",
+                ]),
+                groupId: zod.number(),
+                slot: zod.enum([
+                  "high",
+                  "medium",
+                  "low",
+                  "rig",
+                  "subsystem",
+                  "service",
+                  "charge",
+                  "drone",
+                  "fighter",
+                  "implant",
+                  "booster",
+                  "other",
+                ]),
+                hardpoint: zod
+                  .union([
+                    zod.literal("turret"),
+                    zod.literal("launcher"),
+                    zod.literal(null),
+                  ])
+                  .nullable(),
+                name: zod.string(),
+                nameEn: zod.string(),
+                nameZh: zod.string(),
+                groupName: zod.string(),
+                categoryName: zod.string(),
+                capabilities: zod
+                  .object({
+                    volume: zod.number(),
+                    capacity: zod.number(),
+                    rigSize: zod.number(),
+                    maxState: zod.enum(["online", "active", "overheated"]),
+                    chargeGroups: zod.array(zod.number()),
+                    chargeSize: zod.number(),
+                    chargeCapacity: zod.number(),
+                    modeTypeIds: zod.array(zod.number()),
+                  })
+                  .optional(),
+              })
+              .and(
+                zod.object({
+                  quantity: zod.number(),
+                  cpu: zod.number(),
+                  powergrid: zod.number(),
+                  rack: zod
+                    .enum([
+                      "high",
+                      "medium",
+                      "low",
+                      "rig",
+                      "subsystem",
+                      "service",
+                    ])
+                    .optional(),
+                  index: zod.number().optional(),
+                  state: zod
+                    .enum(["offline", "online", "active", "overheated"])
+                    .optional(),
+                  chargeTypeId: zod.number().optional(),
+                }),
+              ),
+          ),
+          slots: zod.object({
+            high: zod.object({
+              used: zod.number(),
+              limit: zod.number(),
+              overloaded: zod.boolean(),
+            }),
+            medium: zod.object({
+              used: zod.number(),
+              limit: zod.number(),
+              overloaded: zod.boolean(),
+            }),
+            low: zod.object({
+              used: zod.number(),
+              limit: zod.number(),
+              overloaded: zod.boolean(),
+            }),
+            rig: zod.object({
+              used: zod.number(),
+              limit: zod.number(),
+              overloaded: zod.boolean(),
+            }),
+            subsystem: zod.object({
+              used: zod.number(),
+              limit: zod.number(),
+              overloaded: zod.boolean(),
+            }),
+            service: zod
+              .object({
+                used: zod.number(),
+                limit: zod.number(),
+                overloaded: zod.boolean(),
+              })
+              .optional(),
+          }),
+          resources: zod.object({
+            cpu: zod.object({
+              used: zod.number(),
+              limit: zod.number(),
+              percent: zod.number(),
+              overloaded: zod.boolean(),
+            }),
+            powergrid: zod.object({
+              used: zod.number(),
+              limit: zod.number(),
+              percent: zod.number(),
+              overloaded: zod.boolean(),
+            }),
+            calibration: zod.object({
+              used: zod.number(),
+              limit: zod.number(),
+              percent: zod.number(),
+              overloaded: zod.boolean(),
+            }),
+          }),
+          hardpoints: zod.object({
+            turret: zod.object({
+              used: zod.number(),
+              limit: zod.number(),
+              overloaded: zod.boolean(),
+            }),
+            launcher: zod.object({
+              used: zod.number(),
+              limit: zod.number(),
+              overloaded: zod.boolean(),
+            }),
+          }),
+          defense: zod.object({
+            shieldHp: zod.number(),
+            armorHp: zod.number(),
+            hullHp: zod.number(),
+            estimatedEhp: zod.number(),
+          }),
+          mobility: zod.object({
+            maxVelocity: zod.number(),
+            mass: zod.number(),
+            signatureRadius: zod.number(),
+          }),
+          capacitor: zod.object({
+            capacity: zod.number(),
+            rechargeTime: zod.number().nullable(),
+            activeCapUsePerSecond: zod.number(),
+          }),
+          offense: zod.object({
+            weaponCount: zod.number(),
+            estimatedDps: zod.number().nullable(),
+          }),
+          recommendations: zod.array(zod.string()),
+          limitations: zod.array(zod.string()),
+        })
+        .and(
+          zod.object({
+            calculationPrecision: zod.enum(["dogma"]),
+            fit: zod.object({
+              schemaVersion: zod.literal(2),
+              shipTypeId: zod.number(),
+              name: zod
+                .string()
+                .max(
+                  listSavedFittingsResponseFittingsItemSimulationTwoFitNameMax,
+                ),
+              slots: zod
+                .array(
+                  zod.object({
+                    rack: zod.enum([
+                      "high",
+                      "medium",
+                      "low",
+                      "rig",
+                      "subsystem",
+                      "service",
+                    ]),
+                    index: zod
+                      .number()
+                      .min(
+                        listSavedFittingsResponseFittingsItemSimulationTwoFitSlotsItemIndexMin,
+                      )
+                      .max(
+                        listSavedFittingsResponseFittingsItemSimulationTwoFitSlotsItemIndexMax,
+                      ),
+                    typeId: zod.number(),
+                    state: zod.enum([
+                      "offline",
+                      "online",
+                      "active",
+                      "overheated",
+                    ]),
+                    chargeTypeId: zod.number().optional(),
+                    chargeQuantity: zod
+                      .number()
+                      .min(1)
+                      .max(
+                        listSavedFittingsResponseFittingsItemSimulationTwoFitSlotsItemChargeQuantityMax,
+                      )
+                      .optional(),
+                  }),
+                )
+                .max(
+                  listSavedFittingsResponseFittingsItemSimulationTwoFitSlotsMax,
+                ),
+              drones: zod.array(
+                zod.object({
+                  typeId: zod.number(),
+                  quantity: zod
+                    .number()
+                    .min(1)
+                    .max(
+                      listSavedFittingsResponseFittingsItemSimulationTwoFitDronesItemQuantityMax,
+                    ),
+                  activeQuantity: zod
+                    .number()
+                    .min(
+                      listSavedFittingsResponseFittingsItemSimulationTwoFitDronesItemActiveQuantityMin,
+                    )
+                    .max(
+                      listSavedFittingsResponseFittingsItemSimulationTwoFitDronesItemActiveQuantityMax,
+                    ),
+                }),
+              ),
+              cargo: zod.array(
+                zod.object({
+                  typeId: zod.number(),
+                  quantity: zod
+                    .number()
+                    .min(1)
+                    .max(
+                      listSavedFittingsResponseFittingsItemSimulationTwoFitCargoItemQuantityMax,
+                    ),
+                }),
+              ),
+              implants: zod
+                .array(
+                  zod.object({
+                    typeId: zod.number(),
+                  }),
+                )
+                .optional(),
+              boosters: zod
+                .array(
+                  zod.object({
+                    typeId: zod.number(),
+                  }),
+                )
+                .optional(),
+              skillProfile: zod.object({
+                mode: zod.enum(["all5", "none", "character"]),
+                characterId: zod.number().optional(),
+              }),
+              damageProfile: zod.object({
+                em: zod.number(),
+                thermal: zod.number(),
+                kinetic: zod.number(),
+                explosive: zod.number(),
+              }),
+              modeTypeId: zod.number().optional(),
+            }),
+            engine: zod.object({
+              name: zod.string(),
+              version: zod.string(),
+              sdeReleaseDate: zod.coerce.date().nullable(),
+              note: zod.string(),
+            }),
+            moduleStates: zod.array(
+              zod.object({
+                rack: zod.enum([
+                  "high",
+                  "medium",
+                  "low",
+                  "rig",
+                  "subsystem",
+                  "service",
+                ]),
+                index: zod.number(),
+                typeId: zod.number(),
+                requestedState: zod.enum([
+                  "offline",
+                  "online",
+                  "active",
+                  "overheated",
+                ]),
+                state: zod.enum(["offline", "online", "active", "overheated"]),
+                maxState: zod.enum([
+                  "offline",
+                  "online",
+                  "active",
+                  "overheated",
+                ]),
+              }),
+            ),
+            violations: zod.array(
+              zod.object({
+                target: zod.object({
+                  type: zod.enum(["ship", "item", "charge"]),
+                  index: zod.number().optional(),
+                }),
+                rule: zod.object({
+                  type: zod.string(),
+                }),
+                message: zod.string(),
+              }),
+            ),
+            valid: zod.boolean(),
+            stats: zod.object({
+              cargo: zod.object({
+                used: zod.number(),
+                capacity: zod.number(),
+              }),
+              defense: zod.object({
+                shield: zod.object({
+                  hp: zod.number(),
+                  ehp: zod.number(),
+                  resistances: zod.object({
+                    em: zod.number(),
+                    thermal: zod.number(),
+                    kinetic: zod.number(),
+                    explosive: zod.number(),
+                  }),
+                }),
+                armor: zod.object({
+                  hp: zod.number(),
+                  ehp: zod.number(),
+                  resistances: zod.object({
+                    em: zod.number(),
+                    thermal: zod.number(),
+                    kinetic: zod.number(),
+                    explosive: zod.number(),
+                  }),
+                }),
+                hull: zod.object({
+                  hp: zod.number(),
+                  ehp: zod.number(),
+                  resistances: zod.object({
+                    em: zod.number(),
+                    thermal: zod.number(),
+                    kinetic: zod.number(),
+                    explosive: zod.number(),
+                  }),
+                }),
+                ehp: zod.number(),
+              }),
+              offense: zod.object({
+                dps: zod.number(),
+                sustainedDps: zod.number(),
+                alpha: zod.number(),
+                weaponDps: zod.number(),
+                droneDps: zod.number(),
+                fighterDps: zod.number(),
+                weapons: zod.array(
+                  zod.object({
+                    typeId: zod.number(),
+                    rack: zod.enum([
+                      "high",
+                      "medium",
+                      "low",
+                      "rig",
+                      "subsystem",
+                      "service",
+                    ]),
+                    index: zod.number(),
+                    dps: zod.number(),
+                    alpha: zod.number(),
+                    cycleSeconds: zod.number(),
+                    optimal: zod.number(),
+                    falloff: zod.number(),
+                    tracking: zod.number(),
+                    missileRange: zod.number(),
+                  }),
+                ),
+              }),
+              capacitor: zod.object({
+                capacity: zod.number(),
+                rechargeSeconds: zod.number(),
+                peakRecharge: zod.number(),
+                usage: zod.number(),
+                delta: zod.number(),
+                stablePercent: zod.number(),
+                stable: zod.boolean(),
+                secondsToEmpty: zod.number().nullable(),
+              }),
+              navigation: zod.object({
+                speed: zod.number(),
+                mass: zod.number(),
+                agility: zod.number(),
+                alignSeconds: zod.number(),
+                warpSpeed: zod.number(),
+              }),
+              targeting: zod.object({
+                range: zod.number(),
+                maxTargets: zod.number(),
+                scanResolution: zod.number(),
+                signatureRadius: zod.number(),
+                sensorStrength: zod.number(),
+              }),
+              drones: zod.object({
+                bayUsed: zod.number(),
+                bayCapacity: zod.number(),
+                bandwidthUsed: zod.number(),
+                bandwidthCapacity: zod.number(),
+                active: zod.number(),
+                activeLimit: zod.number(),
+                controlRange: zod.number(),
+              }),
+              repair: zod.object({
+                shield: zod.number(),
+                armor: zod.number(),
+                hull: zod.number(),
+                passiveShield: zod.number(),
+                shieldEffective: zod.number(),
+                armorEffective: zod.number(),
+                hullEffective: zod.number(),
+              }),
+            }),
+            skillSource: zod.object({
+              mode: zod.enum(["all5", "none", "character"]),
+              characterId: zod.number().optional(),
+              characterName: zod.string().optional(),
+              checkedAt: zod.coerce.date().optional(),
+            }),
+          }),
+        ),
+      version: zod.number(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+      canEdit: zod.boolean(),
+    }),
+  ),
+  nextCursor: zod.number().nullable(),
+  canManageCorporation: zod.boolean(),
+});
+
+/**
+ * @summary Save a personal fitting or an authorized corporation fitting
+ */
+export const createSavedFittingBodyNameMax = 100;
+
+export const createSavedFittingBodyDescriptionMax = 2000;
+
+export const createSavedFittingBodyFitNameMax = 100;
+
+export const createSavedFittingBodyFitSlotsItemIndexMin = 0;
+export const createSavedFittingBodyFitSlotsItemIndexMax = 31;
+
+export const createSavedFittingBodyFitSlotsItemChargeQuantityMax = 1000000;
+
+export const createSavedFittingBodyFitSlotsMax = 256;
+
+export const createSavedFittingBodyFitDronesItemQuantityMax = 1000;
+
+export const createSavedFittingBodyFitDronesItemActiveQuantityMin = 0;
+export const createSavedFittingBodyFitDronesItemActiveQuantityMax = 1000;
+
+export const createSavedFittingBodyFitCargoItemQuantityMax = 1000000;
+
+export const CreateSavedFittingBody = zod.object({
+  name: zod.string().min(1).max(createSavedFittingBodyNameMax),
+  description: zod
+    .string()
+    .max(createSavedFittingBodyDescriptionMax)
+    .optional(),
+  visibility: zod.enum(["personal", "corporation"]),
+  fit: zod.object({
+    schemaVersion: zod.literal(2),
+    shipTypeId: zod.number(),
+    name: zod.string().max(createSavedFittingBodyFitNameMax),
+    slots: zod
+      .array(
+        zod.object({
+          rack: zod.enum([
+            "high",
+            "medium",
+            "low",
+            "rig",
+            "subsystem",
+            "service",
+          ]),
+          index: zod
+            .number()
+            .min(createSavedFittingBodyFitSlotsItemIndexMin)
+            .max(createSavedFittingBodyFitSlotsItemIndexMax),
+          typeId: zod.number(),
+          state: zod.enum(["offline", "online", "active", "overheated"]),
+          chargeTypeId: zod.number().optional(),
+          chargeQuantity: zod
+            .number()
+            .min(1)
+            .max(createSavedFittingBodyFitSlotsItemChargeQuantityMax)
+            .optional(),
+        }),
+      )
+      .max(createSavedFittingBodyFitSlotsMax),
+    drones: zod.array(
+      zod.object({
+        typeId: zod.number(),
+        quantity: zod
+          .number()
+          .min(1)
+          .max(createSavedFittingBodyFitDronesItemQuantityMax),
+        activeQuantity: zod
+          .number()
+          .min(createSavedFittingBodyFitDronesItemActiveQuantityMin)
+          .max(createSavedFittingBodyFitDronesItemActiveQuantityMax),
+      }),
+    ),
+    cargo: zod.array(
+      zod.object({
+        typeId: zod.number(),
+        quantity: zod
+          .number()
+          .min(1)
+          .max(createSavedFittingBodyFitCargoItemQuantityMax),
+      }),
+    ),
+    implants: zod
+      .array(
+        zod.object({
+          typeId: zod.number(),
+        }),
+      )
+      .optional(),
+    boosters: zod
+      .array(
+        zod.object({
+          typeId: zod.number(),
+        }),
+      )
+      .optional(),
+    skillProfile: zod.object({
+      mode: zod.enum(["all5", "none", "character"]),
+      characterId: zod.number().optional(),
+    }),
+    damageProfile: zod.object({
+      em: zod.number(),
+      thermal: zod.number(),
+      kinetic: zod.number(),
+      explosive: zod.number(),
+    }),
+    modeTypeId: zod.number().optional(),
+  }),
+  language: zod.enum(["en", "zh"]).optional(),
+});
+
+/**
+ * @summary Read a fitting visible to this corporation member
+ */
+
+export const GetSavedFittingParams = zod.object({
+  id: zod.coerce.number().min(1),
+});
+
+export const getSavedFittingResponseFittingFitNameMax = 100;
+
+export const getSavedFittingResponseFittingFitSlotsItemIndexMin = 0;
+export const getSavedFittingResponseFittingFitSlotsItemIndexMax = 31;
+
+export const getSavedFittingResponseFittingFitSlotsItemChargeQuantityMax = 1000000;
+
+export const getSavedFittingResponseFittingFitSlotsMax = 256;
+
+export const getSavedFittingResponseFittingFitDronesItemQuantityMax = 1000;
+
+export const getSavedFittingResponseFittingFitDronesItemActiveQuantityMin = 0;
+export const getSavedFittingResponseFittingFitDronesItemActiveQuantityMax = 1000;
+
+export const getSavedFittingResponseFittingFitCargoItemQuantityMax = 1000000;
+
+export const getSavedFittingResponseFittingSimulationTwoFitNameMax = 100;
+
+export const getSavedFittingResponseFittingSimulationTwoFitSlotsItemIndexMin = 0;
+export const getSavedFittingResponseFittingSimulationTwoFitSlotsItemIndexMax = 31;
+
+export const getSavedFittingResponseFittingSimulationTwoFitSlotsItemChargeQuantityMax = 1000000;
+
+export const getSavedFittingResponseFittingSimulationTwoFitSlotsMax = 256;
+
+export const getSavedFittingResponseFittingSimulationTwoFitDronesItemQuantityMax = 1000;
+
+export const getSavedFittingResponseFittingSimulationTwoFitDronesItemActiveQuantityMin = 0;
+export const getSavedFittingResponseFittingSimulationTwoFitDronesItemActiveQuantityMax = 1000;
+
+export const getSavedFittingResponseFittingSimulationTwoFitCargoItemQuantityMax = 1000000;
+
+export const GetSavedFittingResponse = zod.object({
+  fitting: zod.object({
+    id: zod.number(),
+    name: zod.string(),
+    description: zod.string(),
+    visibility: zod.enum(["personal", "corporation"]),
+    ownerUserId: zod.number().nullable(),
+    authorName: zod.string(),
+    fit: zod.object({
+      schemaVersion: zod.literal(2),
+      shipTypeId: zod.number(),
+      name: zod.string().max(getSavedFittingResponseFittingFitNameMax),
+      slots: zod
+        .array(
+          zod.object({
+            rack: zod.enum([
+              "high",
+              "medium",
+              "low",
+              "rig",
+              "subsystem",
+              "service",
+            ]),
+            index: zod
+              .number()
+              .min(getSavedFittingResponseFittingFitSlotsItemIndexMin)
+              .max(getSavedFittingResponseFittingFitSlotsItemIndexMax),
+            typeId: zod.number(),
+            state: zod.enum(["offline", "online", "active", "overheated"]),
+            chargeTypeId: zod.number().optional(),
+            chargeQuantity: zod
+              .number()
+              .min(1)
+              .max(getSavedFittingResponseFittingFitSlotsItemChargeQuantityMax)
+              .optional(),
+          }),
+        )
+        .max(getSavedFittingResponseFittingFitSlotsMax),
+      drones: zod.array(
+        zod.object({
+          typeId: zod.number(),
+          quantity: zod
+            .number()
+            .min(1)
+            .max(getSavedFittingResponseFittingFitDronesItemQuantityMax),
+          activeQuantity: zod
+            .number()
+            .min(getSavedFittingResponseFittingFitDronesItemActiveQuantityMin)
+            .max(getSavedFittingResponseFittingFitDronesItemActiveQuantityMax),
+        }),
+      ),
+      cargo: zod.array(
+        zod.object({
+          typeId: zod.number(),
+          quantity: zod
+            .number()
+            .min(1)
+            .max(getSavedFittingResponseFittingFitCargoItemQuantityMax),
+        }),
+      ),
+      implants: zod
+        .array(
+          zod.object({
+            typeId: zod.number(),
+          }),
+        )
+        .optional(),
+      boosters: zod
+        .array(
+          zod.object({
+            typeId: zod.number(),
+          }),
+        )
+        .optional(),
+      skillProfile: zod.object({
+        mode: zod.enum(["all5", "none", "character"]),
+        characterId: zod.number().optional(),
+      }),
+      damageProfile: zod.object({
+        em: zod.number(),
+        thermal: zod.number(),
+        kinetic: zod.number(),
+        explosive: zod.number(),
+      }),
+      modeTypeId: zod.number().optional(),
+    }),
+    simulation: zod
+      .object({
+        precision: zod
+          .enum(["approximate"])
+          .describe(
+            "Retained for compatibility. Use calculationPrecision for the active calculation engine.",
+          ),
+        calculationPrecision: zod.enum(["dogma"]).optional(),
+        sdeBuildNumber: zod.number().nullable(),
+        ship: zod.object({
+          typeId: zod.number(),
+          category: zod.enum([
+            "ship",
+            "module",
+            "charge",
+            "drone",
+            "subsystem",
+            "fighter",
+            "implant",
+            "booster",
+            "skill",
+            "cargo",
+          ]),
+          groupId: zod.number(),
+          slot: zod.enum([
+            "high",
+            "medium",
+            "low",
+            "rig",
+            "subsystem",
+            "service",
+            "charge",
+            "drone",
+            "fighter",
+            "implant",
+            "booster",
+            "other",
+          ]),
+          hardpoint: zod
+            .union([
+              zod.literal("turret"),
+              zod.literal("launcher"),
+              zod.literal(null),
+            ])
+            .nullable(),
+          name: zod.string(),
+          nameEn: zod.string(),
+          nameZh: zod.string(),
+          groupName: zod.string(),
+          categoryName: zod.string(),
+          capabilities: zod
+            .object({
+              volume: zod.number(),
+              capacity: zod.number(),
+              rigSize: zod.number(),
+              maxState: zod.enum(["online", "active", "overheated"]),
+              chargeGroups: zod.array(zod.number()),
+              chargeSize: zod.number(),
+              chargeCapacity: zod.number(),
+              modeTypeIds: zod.array(zod.number()),
+            })
+            .optional(),
+        }),
+        modules: zod.array(
+          zod
+            .object({
+              typeId: zod.number(),
+              category: zod.enum([
+                "ship",
+                "module",
+                "charge",
+                "drone",
+                "subsystem",
+                "fighter",
+                "implant",
+                "booster",
+                "skill",
+                "cargo",
+              ]),
+              groupId: zod.number(),
+              slot: zod.enum([
+                "high",
+                "medium",
+                "low",
+                "rig",
+                "subsystem",
+                "service",
+                "charge",
+                "drone",
+                "fighter",
+                "implant",
+                "booster",
+                "other",
+              ]),
+              hardpoint: zod
+                .union([
+                  zod.literal("turret"),
+                  zod.literal("launcher"),
+                  zod.literal(null),
+                ])
+                .nullable(),
+              name: zod.string(),
+              nameEn: zod.string(),
+              nameZh: zod.string(),
+              groupName: zod.string(),
+              categoryName: zod.string(),
+              capabilities: zod
+                .object({
+                  volume: zod.number(),
+                  capacity: zod.number(),
+                  rigSize: zod.number(),
+                  maxState: zod.enum(["online", "active", "overheated"]),
+                  chargeGroups: zod.array(zod.number()),
+                  chargeSize: zod.number(),
+                  chargeCapacity: zod.number(),
+                  modeTypeIds: zod.array(zod.number()),
+                })
+                .optional(),
+            })
+            .and(
+              zod.object({
+                quantity: zod.number(),
+                cpu: zod.number(),
+                powergrid: zod.number(),
+                rack: zod
+                  .enum([
+                    "high",
+                    "medium",
+                    "low",
+                    "rig",
+                    "subsystem",
+                    "service",
+                  ])
+                  .optional(),
+                index: zod.number().optional(),
+                state: zod
+                  .enum(["offline", "online", "active", "overheated"])
+                  .optional(),
+                chargeTypeId: zod.number().optional(),
+              }),
+            ),
+        ),
+        slots: zod.object({
+          high: zod.object({
+            used: zod.number(),
+            limit: zod.number(),
+            overloaded: zod.boolean(),
+          }),
+          medium: zod.object({
+            used: zod.number(),
+            limit: zod.number(),
+            overloaded: zod.boolean(),
+          }),
+          low: zod.object({
+            used: zod.number(),
+            limit: zod.number(),
+            overloaded: zod.boolean(),
+          }),
+          rig: zod.object({
+            used: zod.number(),
+            limit: zod.number(),
+            overloaded: zod.boolean(),
+          }),
+          subsystem: zod.object({
+            used: zod.number(),
+            limit: zod.number(),
+            overloaded: zod.boolean(),
+          }),
+          service: zod
+            .object({
+              used: zod.number(),
+              limit: zod.number(),
+              overloaded: zod.boolean(),
+            })
+            .optional(),
+        }),
+        resources: zod.object({
+          cpu: zod.object({
+            used: zod.number(),
+            limit: zod.number(),
+            percent: zod.number(),
+            overloaded: zod.boolean(),
+          }),
+          powergrid: zod.object({
+            used: zod.number(),
+            limit: zod.number(),
+            percent: zod.number(),
+            overloaded: zod.boolean(),
+          }),
+          calibration: zod.object({
+            used: zod.number(),
+            limit: zod.number(),
+            percent: zod.number(),
+            overloaded: zod.boolean(),
+          }),
+        }),
+        hardpoints: zod.object({
+          turret: zod.object({
+            used: zod.number(),
+            limit: zod.number(),
+            overloaded: zod.boolean(),
+          }),
+          launcher: zod.object({
+            used: zod.number(),
+            limit: zod.number(),
+            overloaded: zod.boolean(),
+          }),
+        }),
+        defense: zod.object({
+          shieldHp: zod.number(),
+          armorHp: zod.number(),
+          hullHp: zod.number(),
+          estimatedEhp: zod.number(),
+        }),
+        mobility: zod.object({
+          maxVelocity: zod.number(),
+          mass: zod.number(),
+          signatureRadius: zod.number(),
+        }),
+        capacitor: zod.object({
+          capacity: zod.number(),
+          rechargeTime: zod.number().nullable(),
+          activeCapUsePerSecond: zod.number(),
+        }),
+        offense: zod.object({
+          weaponCount: zod.number(),
+          estimatedDps: zod.number().nullable(),
+        }),
+        recommendations: zod.array(zod.string()),
+        limitations: zod.array(zod.string()),
+      })
+      .and(
+        zod.object({
+          calculationPrecision: zod.enum(["dogma"]),
+          fit: zod.object({
+            schemaVersion: zod.literal(2),
+            shipTypeId: zod.number(),
+            name: zod
+              .string()
+              .max(getSavedFittingResponseFittingSimulationTwoFitNameMax),
+            slots: zod
+              .array(
+                zod.object({
+                  rack: zod.enum([
+                    "high",
+                    "medium",
+                    "low",
+                    "rig",
+                    "subsystem",
+                    "service",
+                  ]),
+                  index: zod
+                    .number()
+                    .min(
+                      getSavedFittingResponseFittingSimulationTwoFitSlotsItemIndexMin,
+                    )
+                    .max(
+                      getSavedFittingResponseFittingSimulationTwoFitSlotsItemIndexMax,
+                    ),
+                  typeId: zod.number(),
+                  state: zod.enum([
+                    "offline",
+                    "online",
+                    "active",
+                    "overheated",
+                  ]),
+                  chargeTypeId: zod.number().optional(),
+                  chargeQuantity: zod
+                    .number()
+                    .min(1)
+                    .max(
+                      getSavedFittingResponseFittingSimulationTwoFitSlotsItemChargeQuantityMax,
+                    )
+                    .optional(),
+                }),
+              )
+              .max(getSavedFittingResponseFittingSimulationTwoFitSlotsMax),
+            drones: zod.array(
+              zod.object({
+                typeId: zod.number(),
+                quantity: zod
+                  .number()
+                  .min(1)
+                  .max(
+                    getSavedFittingResponseFittingSimulationTwoFitDronesItemQuantityMax,
+                  ),
+                activeQuantity: zod
+                  .number()
+                  .min(
+                    getSavedFittingResponseFittingSimulationTwoFitDronesItemActiveQuantityMin,
+                  )
+                  .max(
+                    getSavedFittingResponseFittingSimulationTwoFitDronesItemActiveQuantityMax,
+                  ),
+              }),
+            ),
+            cargo: zod.array(
+              zod.object({
+                typeId: zod.number(),
+                quantity: zod
+                  .number()
+                  .min(1)
+                  .max(
+                    getSavedFittingResponseFittingSimulationTwoFitCargoItemQuantityMax,
+                  ),
+              }),
+            ),
+            implants: zod
+              .array(
+                zod.object({
+                  typeId: zod.number(),
+                }),
+              )
+              .optional(),
+            boosters: zod
+              .array(
+                zod.object({
+                  typeId: zod.number(),
+                }),
+              )
+              .optional(),
+            skillProfile: zod.object({
+              mode: zod.enum(["all5", "none", "character"]),
+              characterId: zod.number().optional(),
+            }),
+            damageProfile: zod.object({
+              em: zod.number(),
+              thermal: zod.number(),
+              kinetic: zod.number(),
+              explosive: zod.number(),
+            }),
+            modeTypeId: zod.number().optional(),
+          }),
+          engine: zod.object({
+            name: zod.string(),
+            version: zod.string(),
+            sdeReleaseDate: zod.coerce.date().nullable(),
+            note: zod.string(),
+          }),
+          moduleStates: zod.array(
+            zod.object({
+              rack: zod.enum([
+                "high",
+                "medium",
+                "low",
+                "rig",
+                "subsystem",
+                "service",
+              ]),
+              index: zod.number(),
+              typeId: zod.number(),
+              requestedState: zod.enum([
+                "offline",
+                "online",
+                "active",
+                "overheated",
+              ]),
+              state: zod.enum(["offline", "online", "active", "overheated"]),
+              maxState: zod.enum(["offline", "online", "active", "overheated"]),
+            }),
+          ),
+          violations: zod.array(
+            zod.object({
+              target: zod.object({
+                type: zod.enum(["ship", "item", "charge"]),
+                index: zod.number().optional(),
+              }),
+              rule: zod.object({
+                type: zod.string(),
+              }),
+              message: zod.string(),
+            }),
+          ),
+          valid: zod.boolean(),
+          stats: zod.object({
+            cargo: zod.object({
+              used: zod.number(),
+              capacity: zod.number(),
+            }),
+            defense: zod.object({
+              shield: zod.object({
+                hp: zod.number(),
+                ehp: zod.number(),
+                resistances: zod.object({
+                  em: zod.number(),
+                  thermal: zod.number(),
+                  kinetic: zod.number(),
+                  explosive: zod.number(),
+                }),
+              }),
+              armor: zod.object({
+                hp: zod.number(),
+                ehp: zod.number(),
+                resistances: zod.object({
+                  em: zod.number(),
+                  thermal: zod.number(),
+                  kinetic: zod.number(),
+                  explosive: zod.number(),
+                }),
+              }),
+              hull: zod.object({
+                hp: zod.number(),
+                ehp: zod.number(),
+                resistances: zod.object({
+                  em: zod.number(),
+                  thermal: zod.number(),
+                  kinetic: zod.number(),
+                  explosive: zod.number(),
+                }),
+              }),
+              ehp: zod.number(),
+            }),
+            offense: zod.object({
+              dps: zod.number(),
+              sustainedDps: zod.number(),
+              alpha: zod.number(),
+              weaponDps: zod.number(),
+              droneDps: zod.number(),
+              fighterDps: zod.number(),
+              weapons: zod.array(
+                zod.object({
+                  typeId: zod.number(),
+                  rack: zod.enum([
+                    "high",
+                    "medium",
+                    "low",
+                    "rig",
+                    "subsystem",
+                    "service",
+                  ]),
+                  index: zod.number(),
+                  dps: zod.number(),
+                  alpha: zod.number(),
+                  cycleSeconds: zod.number(),
+                  optimal: zod.number(),
+                  falloff: zod.number(),
+                  tracking: zod.number(),
+                  missileRange: zod.number(),
+                }),
+              ),
+            }),
+            capacitor: zod.object({
+              capacity: zod.number(),
+              rechargeSeconds: zod.number(),
+              peakRecharge: zod.number(),
+              usage: zod.number(),
+              delta: zod.number(),
+              stablePercent: zod.number(),
+              stable: zod.boolean(),
+              secondsToEmpty: zod.number().nullable(),
+            }),
+            navigation: zod.object({
+              speed: zod.number(),
+              mass: zod.number(),
+              agility: zod.number(),
+              alignSeconds: zod.number(),
+              warpSpeed: zod.number(),
+            }),
+            targeting: zod.object({
+              range: zod.number(),
+              maxTargets: zod.number(),
+              scanResolution: zod.number(),
+              signatureRadius: zod.number(),
+              sensorStrength: zod.number(),
+            }),
+            drones: zod.object({
+              bayUsed: zod.number(),
+              bayCapacity: zod.number(),
+              bandwidthUsed: zod.number(),
+              bandwidthCapacity: zod.number(),
+              active: zod.number(),
+              activeLimit: zod.number(),
+              controlRange: zod.number(),
+            }),
+            repair: zod.object({
+              shield: zod.number(),
+              armor: zod.number(),
+              hull: zod.number(),
+              passiveShield: zod.number(),
+              shieldEffective: zod.number(),
+              armorEffective: zod.number(),
+              hullEffective: zod.number(),
+            }),
+          }),
+          skillSource: zod.object({
+            mode: zod.enum(["all5", "none", "character"]),
+            characterId: zod.number().optional(),
+            characterName: zod.string().optional(),
+            checkedAt: zod.coerce.date().optional(),
+          }),
+        }),
+      ),
+    version: zod.number(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+    canEdit: zod.boolean(),
+  }),
+});
+
+/**
+ * @summary Update an editable fitting using its current version
+ */
+
+export const UpdateSavedFittingParams = zod.object({
+  id: zod.coerce.number().min(1),
+});
+
+export const updateSavedFittingBodyNameMax = 100;
+
+export const updateSavedFittingBodyDescriptionMax = 2000;
+
+export const updateSavedFittingBodyFitNameMax = 100;
+
+export const updateSavedFittingBodyFitSlotsItemIndexMin = 0;
+export const updateSavedFittingBodyFitSlotsItemIndexMax = 31;
+
+export const updateSavedFittingBodyFitSlotsItemChargeQuantityMax = 1000000;
+
+export const updateSavedFittingBodyFitSlotsMax = 256;
+
+export const updateSavedFittingBodyFitDronesItemQuantityMax = 1000;
+
+export const updateSavedFittingBodyFitDronesItemActiveQuantityMin = 0;
+export const updateSavedFittingBodyFitDronesItemActiveQuantityMax = 1000;
+
+export const updateSavedFittingBodyFitCargoItemQuantityMax = 1000000;
+
+export const UpdateSavedFittingBody = zod.object({
+  name: zod.string().min(1).max(updateSavedFittingBodyNameMax),
+  description: zod
+    .string()
+    .max(updateSavedFittingBodyDescriptionMax)
+    .optional(),
+  fit: zod.object({
+    schemaVersion: zod.literal(2),
+    shipTypeId: zod.number(),
+    name: zod.string().max(updateSavedFittingBodyFitNameMax),
+    slots: zod
+      .array(
+        zod.object({
+          rack: zod.enum([
+            "high",
+            "medium",
+            "low",
+            "rig",
+            "subsystem",
+            "service",
+          ]),
+          index: zod
+            .number()
+            .min(updateSavedFittingBodyFitSlotsItemIndexMin)
+            .max(updateSavedFittingBodyFitSlotsItemIndexMax),
+          typeId: zod.number(),
+          state: zod.enum(["offline", "online", "active", "overheated"]),
+          chargeTypeId: zod.number().optional(),
+          chargeQuantity: zod
+            .number()
+            .min(1)
+            .max(updateSavedFittingBodyFitSlotsItemChargeQuantityMax)
+            .optional(),
+        }),
+      )
+      .max(updateSavedFittingBodyFitSlotsMax),
+    drones: zod.array(
+      zod.object({
+        typeId: zod.number(),
+        quantity: zod
+          .number()
+          .min(1)
+          .max(updateSavedFittingBodyFitDronesItemQuantityMax),
+        activeQuantity: zod
+          .number()
+          .min(updateSavedFittingBodyFitDronesItemActiveQuantityMin)
+          .max(updateSavedFittingBodyFitDronesItemActiveQuantityMax),
+      }),
+    ),
+    cargo: zod.array(
+      zod.object({
+        typeId: zod.number(),
+        quantity: zod
+          .number()
+          .min(1)
+          .max(updateSavedFittingBodyFitCargoItemQuantityMax),
+      }),
+    ),
+    implants: zod
+      .array(
+        zod.object({
+          typeId: zod.number(),
+        }),
+      )
+      .optional(),
+    boosters: zod
+      .array(
+        zod.object({
+          typeId: zod.number(),
+        }),
+      )
+      .optional(),
+    skillProfile: zod.object({
+      mode: zod.enum(["all5", "none", "character"]),
+      characterId: zod.number().optional(),
+    }),
+    damageProfile: zod.object({
+      em: zod.number(),
+      thermal: zod.number(),
+      kinetic: zod.number(),
+      explosive: zod.number(),
+    }),
+    modeTypeId: zod.number().optional(),
+  }),
+  version: zod.number().min(1),
+  language: zod.enum(["en", "zh"]).optional(),
+});
+
+export const updateSavedFittingResponseFittingFitNameMax = 100;
+
+export const updateSavedFittingResponseFittingFitSlotsItemIndexMin = 0;
+export const updateSavedFittingResponseFittingFitSlotsItemIndexMax = 31;
+
+export const updateSavedFittingResponseFittingFitSlotsItemChargeQuantityMax = 1000000;
+
+export const updateSavedFittingResponseFittingFitSlotsMax = 256;
+
+export const updateSavedFittingResponseFittingFitDronesItemQuantityMax = 1000;
+
+export const updateSavedFittingResponseFittingFitDronesItemActiveQuantityMin = 0;
+export const updateSavedFittingResponseFittingFitDronesItemActiveQuantityMax = 1000;
+
+export const updateSavedFittingResponseFittingFitCargoItemQuantityMax = 1000000;
+
+export const updateSavedFittingResponseFittingSimulationTwoFitNameMax = 100;
+
+export const updateSavedFittingResponseFittingSimulationTwoFitSlotsItemIndexMin = 0;
+export const updateSavedFittingResponseFittingSimulationTwoFitSlotsItemIndexMax = 31;
+
+export const updateSavedFittingResponseFittingSimulationTwoFitSlotsItemChargeQuantityMax = 1000000;
+
+export const updateSavedFittingResponseFittingSimulationTwoFitSlotsMax = 256;
+
+export const updateSavedFittingResponseFittingSimulationTwoFitDronesItemQuantityMax = 1000;
+
+export const updateSavedFittingResponseFittingSimulationTwoFitDronesItemActiveQuantityMin = 0;
+export const updateSavedFittingResponseFittingSimulationTwoFitDronesItemActiveQuantityMax = 1000;
+
+export const updateSavedFittingResponseFittingSimulationTwoFitCargoItemQuantityMax = 1000000;
+
+export const UpdateSavedFittingResponse = zod.object({
+  fitting: zod.object({
+    id: zod.number(),
+    name: zod.string(),
+    description: zod.string(),
+    visibility: zod.enum(["personal", "corporation"]),
+    ownerUserId: zod.number().nullable(),
+    authorName: zod.string(),
+    fit: zod.object({
+      schemaVersion: zod.literal(2),
+      shipTypeId: zod.number(),
+      name: zod.string().max(updateSavedFittingResponseFittingFitNameMax),
+      slots: zod
+        .array(
+          zod.object({
+            rack: zod.enum([
+              "high",
+              "medium",
+              "low",
+              "rig",
+              "subsystem",
+              "service",
+            ]),
+            index: zod
+              .number()
+              .min(updateSavedFittingResponseFittingFitSlotsItemIndexMin)
+              .max(updateSavedFittingResponseFittingFitSlotsItemIndexMax),
+            typeId: zod.number(),
+            state: zod.enum(["offline", "online", "active", "overheated"]),
+            chargeTypeId: zod.number().optional(),
+            chargeQuantity: zod
+              .number()
+              .min(1)
+              .max(
+                updateSavedFittingResponseFittingFitSlotsItemChargeQuantityMax,
+              )
+              .optional(),
+          }),
+        )
+        .max(updateSavedFittingResponseFittingFitSlotsMax),
+      drones: zod.array(
+        zod.object({
+          typeId: zod.number(),
+          quantity: zod
+            .number()
+            .min(1)
+            .max(updateSavedFittingResponseFittingFitDronesItemQuantityMax),
+          activeQuantity: zod
+            .number()
+            .min(
+              updateSavedFittingResponseFittingFitDronesItemActiveQuantityMin,
+            )
+            .max(
+              updateSavedFittingResponseFittingFitDronesItemActiveQuantityMax,
+            ),
+        }),
+      ),
+      cargo: zod.array(
+        zod.object({
+          typeId: zod.number(),
+          quantity: zod
+            .number()
+            .min(1)
+            .max(updateSavedFittingResponseFittingFitCargoItemQuantityMax),
+        }),
+      ),
+      implants: zod
+        .array(
+          zod.object({
+            typeId: zod.number(),
+          }),
+        )
+        .optional(),
+      boosters: zod
+        .array(
+          zod.object({
+            typeId: zod.number(),
+          }),
+        )
+        .optional(),
+      skillProfile: zod.object({
+        mode: zod.enum(["all5", "none", "character"]),
+        characterId: zod.number().optional(),
+      }),
+      damageProfile: zod.object({
+        em: zod.number(),
+        thermal: zod.number(),
+        kinetic: zod.number(),
+        explosive: zod.number(),
+      }),
+      modeTypeId: zod.number().optional(),
+    }),
+    simulation: zod
+      .object({
+        precision: zod
+          .enum(["approximate"])
+          .describe(
+            "Retained for compatibility. Use calculationPrecision for the active calculation engine.",
+          ),
+        calculationPrecision: zod.enum(["dogma"]).optional(),
+        sdeBuildNumber: zod.number().nullable(),
+        ship: zod.object({
+          typeId: zod.number(),
+          category: zod.enum([
+            "ship",
+            "module",
+            "charge",
+            "drone",
+            "subsystem",
+            "fighter",
+            "implant",
+            "booster",
+            "skill",
+            "cargo",
+          ]),
+          groupId: zod.number(),
+          slot: zod.enum([
+            "high",
+            "medium",
+            "low",
+            "rig",
+            "subsystem",
+            "service",
+            "charge",
+            "drone",
+            "fighter",
+            "implant",
+            "booster",
+            "other",
+          ]),
+          hardpoint: zod
+            .union([
+              zod.literal("turret"),
+              zod.literal("launcher"),
+              zod.literal(null),
+            ])
+            .nullable(),
+          name: zod.string(),
+          nameEn: zod.string(),
+          nameZh: zod.string(),
+          groupName: zod.string(),
+          categoryName: zod.string(),
+          capabilities: zod
+            .object({
+              volume: zod.number(),
+              capacity: zod.number(),
+              rigSize: zod.number(),
+              maxState: zod.enum(["online", "active", "overheated"]),
+              chargeGroups: zod.array(zod.number()),
+              chargeSize: zod.number(),
+              chargeCapacity: zod.number(),
+              modeTypeIds: zod.array(zod.number()),
+            })
+            .optional(),
+        }),
+        modules: zod.array(
+          zod
+            .object({
+              typeId: zod.number(),
+              category: zod.enum([
+                "ship",
+                "module",
+                "charge",
+                "drone",
+                "subsystem",
+                "fighter",
+                "implant",
+                "booster",
+                "skill",
+                "cargo",
+              ]),
+              groupId: zod.number(),
+              slot: zod.enum([
+                "high",
+                "medium",
+                "low",
+                "rig",
+                "subsystem",
+                "service",
+                "charge",
+                "drone",
+                "fighter",
+                "implant",
+                "booster",
+                "other",
+              ]),
+              hardpoint: zod
+                .union([
+                  zod.literal("turret"),
+                  zod.literal("launcher"),
+                  zod.literal(null),
+                ])
+                .nullable(),
+              name: zod.string(),
+              nameEn: zod.string(),
+              nameZh: zod.string(),
+              groupName: zod.string(),
+              categoryName: zod.string(),
+              capabilities: zod
+                .object({
+                  volume: zod.number(),
+                  capacity: zod.number(),
+                  rigSize: zod.number(),
+                  maxState: zod.enum(["online", "active", "overheated"]),
+                  chargeGroups: zod.array(zod.number()),
+                  chargeSize: zod.number(),
+                  chargeCapacity: zod.number(),
+                  modeTypeIds: zod.array(zod.number()),
+                })
+                .optional(),
+            })
+            .and(
+              zod.object({
+                quantity: zod.number(),
+                cpu: zod.number(),
+                powergrid: zod.number(),
+                rack: zod
+                  .enum([
+                    "high",
+                    "medium",
+                    "low",
+                    "rig",
+                    "subsystem",
+                    "service",
+                  ])
+                  .optional(),
+                index: zod.number().optional(),
+                state: zod
+                  .enum(["offline", "online", "active", "overheated"])
+                  .optional(),
+                chargeTypeId: zod.number().optional(),
+              }),
+            ),
+        ),
+        slots: zod.object({
+          high: zod.object({
+            used: zod.number(),
+            limit: zod.number(),
+            overloaded: zod.boolean(),
+          }),
+          medium: zod.object({
+            used: zod.number(),
+            limit: zod.number(),
+            overloaded: zod.boolean(),
+          }),
+          low: zod.object({
+            used: zod.number(),
+            limit: zod.number(),
+            overloaded: zod.boolean(),
+          }),
+          rig: zod.object({
+            used: zod.number(),
+            limit: zod.number(),
+            overloaded: zod.boolean(),
+          }),
+          subsystem: zod.object({
+            used: zod.number(),
+            limit: zod.number(),
+            overloaded: zod.boolean(),
+          }),
+          service: zod
+            .object({
+              used: zod.number(),
+              limit: zod.number(),
+              overloaded: zod.boolean(),
+            })
+            .optional(),
+        }),
+        resources: zod.object({
+          cpu: zod.object({
+            used: zod.number(),
+            limit: zod.number(),
+            percent: zod.number(),
+            overloaded: zod.boolean(),
+          }),
+          powergrid: zod.object({
+            used: zod.number(),
+            limit: zod.number(),
+            percent: zod.number(),
+            overloaded: zod.boolean(),
+          }),
+          calibration: zod.object({
+            used: zod.number(),
+            limit: zod.number(),
+            percent: zod.number(),
+            overloaded: zod.boolean(),
+          }),
+        }),
+        hardpoints: zod.object({
+          turret: zod.object({
+            used: zod.number(),
+            limit: zod.number(),
+            overloaded: zod.boolean(),
+          }),
+          launcher: zod.object({
+            used: zod.number(),
+            limit: zod.number(),
+            overloaded: zod.boolean(),
+          }),
+        }),
+        defense: zod.object({
+          shieldHp: zod.number(),
+          armorHp: zod.number(),
+          hullHp: zod.number(),
+          estimatedEhp: zod.number(),
+        }),
+        mobility: zod.object({
+          maxVelocity: zod.number(),
+          mass: zod.number(),
+          signatureRadius: zod.number(),
+        }),
+        capacitor: zod.object({
+          capacity: zod.number(),
+          rechargeTime: zod.number().nullable(),
+          activeCapUsePerSecond: zod.number(),
+        }),
+        offense: zod.object({
+          weaponCount: zod.number(),
+          estimatedDps: zod.number().nullable(),
+        }),
+        recommendations: zod.array(zod.string()),
+        limitations: zod.array(zod.string()),
+      })
+      .and(
+        zod.object({
+          calculationPrecision: zod.enum(["dogma"]),
+          fit: zod.object({
+            schemaVersion: zod.literal(2),
+            shipTypeId: zod.number(),
+            name: zod
+              .string()
+              .max(updateSavedFittingResponseFittingSimulationTwoFitNameMax),
+            slots: zod
+              .array(
+                zod.object({
+                  rack: zod.enum([
+                    "high",
+                    "medium",
+                    "low",
+                    "rig",
+                    "subsystem",
+                    "service",
+                  ]),
+                  index: zod
+                    .number()
+                    .min(
+                      updateSavedFittingResponseFittingSimulationTwoFitSlotsItemIndexMin,
+                    )
+                    .max(
+                      updateSavedFittingResponseFittingSimulationTwoFitSlotsItemIndexMax,
+                    ),
+                  typeId: zod.number(),
+                  state: zod.enum([
+                    "offline",
+                    "online",
+                    "active",
+                    "overheated",
+                  ]),
+                  chargeTypeId: zod.number().optional(),
+                  chargeQuantity: zod
+                    .number()
+                    .min(1)
+                    .max(
+                      updateSavedFittingResponseFittingSimulationTwoFitSlotsItemChargeQuantityMax,
+                    )
+                    .optional(),
+                }),
+              )
+              .max(updateSavedFittingResponseFittingSimulationTwoFitSlotsMax),
+            drones: zod.array(
+              zod.object({
+                typeId: zod.number(),
+                quantity: zod
+                  .number()
+                  .min(1)
+                  .max(
+                    updateSavedFittingResponseFittingSimulationTwoFitDronesItemQuantityMax,
+                  ),
+                activeQuantity: zod
+                  .number()
+                  .min(
+                    updateSavedFittingResponseFittingSimulationTwoFitDronesItemActiveQuantityMin,
+                  )
+                  .max(
+                    updateSavedFittingResponseFittingSimulationTwoFitDronesItemActiveQuantityMax,
+                  ),
+              }),
+            ),
+            cargo: zod.array(
+              zod.object({
+                typeId: zod.number(),
+                quantity: zod
+                  .number()
+                  .min(1)
+                  .max(
+                    updateSavedFittingResponseFittingSimulationTwoFitCargoItemQuantityMax,
+                  ),
+              }),
+            ),
+            implants: zod
+              .array(
+                zod.object({
+                  typeId: zod.number(),
+                }),
+              )
+              .optional(),
+            boosters: zod
+              .array(
+                zod.object({
+                  typeId: zod.number(),
+                }),
+              )
+              .optional(),
+            skillProfile: zod.object({
+              mode: zod.enum(["all5", "none", "character"]),
+              characterId: zod.number().optional(),
+            }),
+            damageProfile: zod.object({
+              em: zod.number(),
+              thermal: zod.number(),
+              kinetic: zod.number(),
+              explosive: zod.number(),
+            }),
+            modeTypeId: zod.number().optional(),
+          }),
+          engine: zod.object({
+            name: zod.string(),
+            version: zod.string(),
+            sdeReleaseDate: zod.coerce.date().nullable(),
+            note: zod.string(),
+          }),
+          moduleStates: zod.array(
+            zod.object({
+              rack: zod.enum([
+                "high",
+                "medium",
+                "low",
+                "rig",
+                "subsystem",
+                "service",
+              ]),
+              index: zod.number(),
+              typeId: zod.number(),
+              requestedState: zod.enum([
+                "offline",
+                "online",
+                "active",
+                "overheated",
+              ]),
+              state: zod.enum(["offline", "online", "active", "overheated"]),
+              maxState: zod.enum(["offline", "online", "active", "overheated"]),
+            }),
+          ),
+          violations: zod.array(
+            zod.object({
+              target: zod.object({
+                type: zod.enum(["ship", "item", "charge"]),
+                index: zod.number().optional(),
+              }),
+              rule: zod.object({
+                type: zod.string(),
+              }),
+              message: zod.string(),
+            }),
+          ),
+          valid: zod.boolean(),
+          stats: zod.object({
+            cargo: zod.object({
+              used: zod.number(),
+              capacity: zod.number(),
+            }),
+            defense: zod.object({
+              shield: zod.object({
+                hp: zod.number(),
+                ehp: zod.number(),
+                resistances: zod.object({
+                  em: zod.number(),
+                  thermal: zod.number(),
+                  kinetic: zod.number(),
+                  explosive: zod.number(),
+                }),
+              }),
+              armor: zod.object({
+                hp: zod.number(),
+                ehp: zod.number(),
+                resistances: zod.object({
+                  em: zod.number(),
+                  thermal: zod.number(),
+                  kinetic: zod.number(),
+                  explosive: zod.number(),
+                }),
+              }),
+              hull: zod.object({
+                hp: zod.number(),
+                ehp: zod.number(),
+                resistances: zod.object({
+                  em: zod.number(),
+                  thermal: zod.number(),
+                  kinetic: zod.number(),
+                  explosive: zod.number(),
+                }),
+              }),
+              ehp: zod.number(),
+            }),
+            offense: zod.object({
+              dps: zod.number(),
+              sustainedDps: zod.number(),
+              alpha: zod.number(),
+              weaponDps: zod.number(),
+              droneDps: zod.number(),
+              fighterDps: zod.number(),
+              weapons: zod.array(
+                zod.object({
+                  typeId: zod.number(),
+                  rack: zod.enum([
+                    "high",
+                    "medium",
+                    "low",
+                    "rig",
+                    "subsystem",
+                    "service",
+                  ]),
+                  index: zod.number(),
+                  dps: zod.number(),
+                  alpha: zod.number(),
+                  cycleSeconds: zod.number(),
+                  optimal: zod.number(),
+                  falloff: zod.number(),
+                  tracking: zod.number(),
+                  missileRange: zod.number(),
+                }),
+              ),
+            }),
+            capacitor: zod.object({
+              capacity: zod.number(),
+              rechargeSeconds: zod.number(),
+              peakRecharge: zod.number(),
+              usage: zod.number(),
+              delta: zod.number(),
+              stablePercent: zod.number(),
+              stable: zod.boolean(),
+              secondsToEmpty: zod.number().nullable(),
+            }),
+            navigation: zod.object({
+              speed: zod.number(),
+              mass: zod.number(),
+              agility: zod.number(),
+              alignSeconds: zod.number(),
+              warpSpeed: zod.number(),
+            }),
+            targeting: zod.object({
+              range: zod.number(),
+              maxTargets: zod.number(),
+              scanResolution: zod.number(),
+              signatureRadius: zod.number(),
+              sensorStrength: zod.number(),
+            }),
+            drones: zod.object({
+              bayUsed: zod.number(),
+              bayCapacity: zod.number(),
+              bandwidthUsed: zod.number(),
+              bandwidthCapacity: zod.number(),
+              active: zod.number(),
+              activeLimit: zod.number(),
+              controlRange: zod.number(),
+            }),
+            repair: zod.object({
+              shield: zod.number(),
+              armor: zod.number(),
+              hull: zod.number(),
+              passiveShield: zod.number(),
+              shieldEffective: zod.number(),
+              armorEffective: zod.number(),
+              hullEffective: zod.number(),
+            }),
+          }),
+          skillSource: zod.object({
+            mode: zod.enum(["all5", "none", "character"]),
+            characterId: zod.number().optional(),
+            characterName: zod.string().optional(),
+            checkedAt: zod.coerce.date().optional(),
+          }),
+        }),
+      ),
+    version: zod.number(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+    canEdit: zod.boolean(),
+  }),
+});
+
+/**
+ * @summary Delete an editable fitting using its current version
+ */
+
+export const DeleteSavedFittingParams = zod.object({
+  id: zod.coerce.number().min(1),
+});
+
+export const DeleteSavedFittingBody = zod.object({
+  version: zod.number().min(1),
+});
+
+export const DeleteSavedFittingResponse = zod.object({
+  deleted: zod.literal(true),
+});
+
+/**
+ * @summary List the caller's bound and active corporation characters
+ */
+export const ListFittingCharactersResponse = zod.object({
+  characters: zod.array(
+    zod.object({
+      id: zod.number(),
+      eveCharacterId: zod.number(),
+      name: zod.string(),
+      isMain: zod.boolean(),
+    }),
+  ),
+});
+
+/**
+ * @summary Read the caller's character skills with effective active levels
+ */
+
+export const GetFittingCharacterSkillsParams = zod.object({
+  id: zod.coerce.number().min(1),
+});
+
+export const getFittingCharacterSkillsResponseSkillsItemActiveLevelMin = 0;
+export const getFittingCharacterSkillsResponseSkillsItemActiveLevelMax = 5;
+
+export const getFittingCharacterSkillsResponseSkillsItemTrainedLevelMin = 0;
+export const getFittingCharacterSkillsResponseSkillsItemTrainedLevelMax = 5;
+
+export const GetFittingCharacterSkillsResponse = zod.object({
+  characterId: zod.number(),
+  eveCharacterId: zod.number(),
+  characterName: zod.string(),
+  checkedAt: zod.coerce.date(),
+  source: zod.enum(["esi"]),
+  skills: zod.array(
+    zod.object({
+      skillId: zod.number(),
+      activeLevel: zod
+        .number()
+        .min(getFittingCharacterSkillsResponseSkillsItemActiveLevelMin)
+        .max(getFittingCharacterSkillsResponseSkillsItemActiveLevelMax),
+      trainedLevel: zod
+        .number()
+        .min(getFittingCharacterSkillsResponseSkillsItemTrainedLevelMin)
+        .max(getFittingCharacterSkillsResponseSkillsItemTrainedLevelMax),
+    }),
+  ),
+});
+
+/**
+ * Uses the same fitting authorization as the workbench. Returns a pinned SDE model identity and the resolved public CCP client resource build; does not access game account or corporation files.
+ * @summary Read authenticated public-asset metadata for a ship 3D preview
+ */
+
+export const GetFittingModelMetadataParams = zod.object({
+  id: zod.coerce.number().min(1),
+});
+
+export const getFittingModelMetadataQuerySubsystemsMax = 60;
+
+export const GetFittingModelMetadataQueryParams = zod.object({
+  subsystems: zod.coerce
+    .string()
+    .max(getFittingModelMetadataQuerySubsystemsMax)
+    .optional()
+    .describe(
+      "Optional comma-separated subsystem type IDs, up to five, for strategic-cruiser appearance.",
+    ),
+});
+
+export const GetFittingModelMetadataResponse = zod.object({
+  typeId: zod.number(),
+  graphicId: zod.number(),
+  dna: zod
+    .string()
+    .nullable()
+    .describe(
+      "Public CCP SOF hull, faction and race identity; may incorporate compatible strategic-cruiser subsystems.",
+    ),
+  resourcePath: zod
+    .string()
+    .nullable()
+    .describe("Public res:\/ model path when supplied by the pinned SDE."),
+  sdeBuildNumber: zod
+    .number()
+    .describe(
+      "Build of the official static model metadata, separate from the currently available client assets.",
+    ),
+  clientBuild: zod
+    .number()
+    .describe(
+      "Resolved public client resource build for this preview session.",
+    ),
+  resourceRoot: zod
+    .string()
+    .describe(
+      "Same-origin authenticated resource root ending with a slash, not an arbitrary upstream URL.",
+    ),
 });
 
 /**

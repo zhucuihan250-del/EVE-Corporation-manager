@@ -162,4 +162,6 @@ overrides:
   esbuild: "0.28.1"
 
 allowBuilds:
+  # The resource-index facade does not invoke the optional SQLite/SDE tools.
+  better-sqlite3: false
   esbuild: true

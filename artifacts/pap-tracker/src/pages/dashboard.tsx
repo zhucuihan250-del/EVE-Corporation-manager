@@ -86,12 +86,13 @@ export function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="bg-card/40 backdrop-blur border-primary/20 rounded-sm">
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-xs font-mono font-medium text-muted-foreground tracking-wider uppercase">{t("dashboard.papBalance")}</CardTitle>
+              <CardTitle className="text-xs font-mono font-medium text-muted-foreground tracking-wider uppercase">{tr("通用 PAP 余额", "Common PAP balance")}</CardTitle>
               <Award className="w-4 h-4 text-primary" />
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold font-mono text-foreground">{summary.pap}</div>
               <p className="text-xs text-muted-foreground mt-1 font-mono">{t("dashboard.availableBalance")}</p>
+              <Link href="/pap-wallet" className="mt-2 inline-block text-xs text-primary underline">{tr("查看其他 PAP 与转换", "Other PAP balances and conversion")}</Link>
             </CardContent>
           </Card>
           <Card className="bg-card/40 backdrop-blur border-border/50 rounded-sm">
@@ -106,7 +107,7 @@ export function Dashboard() {
           </Card>
           <Card className="bg-card/40 backdrop-blur border-border/50 rounded-sm">
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-xs font-mono font-medium text-muted-foreground tracking-wider uppercase">{t("dashboard.recentEarned")}</CardTitle>
+              <CardTitle className="text-xs font-mono font-medium text-muted-foreground tracking-wider uppercase">{tr("近期获得通用 PAP", "Recent common PAP earned")}</CardTitle>
               <Activity className="w-4 h-4 text-purple-400" />
             </CardHeader>
             <CardContent>
@@ -121,7 +122,7 @@ export function Dashboard() {
       <Card className="bg-card/20 border-border/50 rounded-sm">
         <CardHeader className="border-b border-border/30 pb-3">
           <CardTitle className="text-xs font-mono font-medium text-muted-foreground tracking-wider uppercase flex items-center justify-between">
-            <span>{t("dashboard.papTrend")}</span>
+            <span>{tr("通用 PAP 获取趋势", "Common PAP earning trend")}</span>
             <TrendingUp className="w-4 h-4 text-primary" />
           </CardTitle>
         </CardHeader>
@@ -152,7 +153,7 @@ export function Dashboard() {
                   tick={{ fontFamily: "monospace", fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
                   tickLine={false}
                   axisLine={false}
-                  allowDecimals={false}
+                  allowDecimals
                 />
                 <Tooltip content={<CustomTooltip />} cursor={{ stroke: "hsl(var(--primary))", strokeWidth: 1, strokeDasharray: "4 2" }} />
                 <Area
@@ -206,7 +207,7 @@ export function Dashboard() {
                       </div>
                       <div className="text-right shrink-0">
                         <div className="text-2xl font-bold font-mono text-primary">{fleet.papValue}</div>
-                        <div className="text-[10px] font-mono text-muted-foreground uppercase">PAP</div>
+                        <div className="max-w-40 break-words text-[10px] font-mono text-muted-foreground">{fleet.papCurrencyName ?? (i18n.language.startsWith("zh") ? "通用 PAP" : "Common PAP")}</div>
                       </div>
                     </div>
                     <div className="mt-2 text-[10px] font-mono text-muted-foreground/60">

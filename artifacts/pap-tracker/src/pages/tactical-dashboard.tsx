@@ -42,7 +42,7 @@ export function TacticalDashboard() {
         <Metric label={tr("身份组成员", "Group members")} value={data.memberCount} icon={<Users className="h-4 w-4" />} />
         <Metric label={tr("当前活跃舰队", "Active fleets")} value={data.activeFleetCount} icon={<Activity className="h-4 w-4 text-emerald-400" />} />
         <Metric label={tr("我参加的舰队", "My fleets")} value={data.myFleetCount} icon={<Swords className="h-4 w-4" />} />
-        <Metric label={tr("我的身份组PAP", "My group PAP")} value={data.myPap} icon={<ShieldCheck className="h-4 w-4 text-violet-300" />} />
+        <Metric label={tr("我的身份组通用 PAP", "My group common PAP")} value={data.myPap} icon={<ShieldCheck className="h-4 w-4 text-violet-300" />} />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">

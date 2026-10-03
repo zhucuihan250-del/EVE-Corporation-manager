@@ -11,11 +11,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { Loader2, Swords, Plus, Shield, ScanSearch, Crosshair, Radio, Settings2 } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { useLiveFleetCounts } from "@/hooks/use-live-fleet-counts";
 import { apiUrl } from "@/lib/api";
+import { papCurrencyApi, papCurrencyKeys } from "@/lib/pap-currency-api";
+import { isPositivePapInput } from "@/lib/pap-currency-presentation";
 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -35,6 +37,7 @@ export function AdminFleets() {
   const tr = (cn: string, en: string) => i18n.language.startsWith("zh") ? cn : en;
   const { data: fleets, isLoading } = useListFleets();
   const { data: currentUser } = useGetMe();
+  const currencies = useQuery({ queryKey: papCurrencyKeys.currencies, queryFn: ({ signal }) => papCurrencyApi.currencies(signal) });
   const identityGroups = useListIdentityGroups(undefined, {
     query: { enabled: Boolean(currentUser?.modules.identity), queryKey: ["/api/identity-groups"] },
   });
@@ -48,6 +51,7 @@ export function AdminFleets() {
   const [fleetName, setFleetName] = useState("");
   const [fleetCommander, setFleetCommander] = useState("");
   const [papValue, setPapValue] = useState("");
+  const [papCurrencyId, setPapCurrencyId] = useState("");
   const [eveFleetId, setEveFleetId] = useState("");
   const [fleetFunction, setFleetFunction] = useState("general");
   const [identityGroupId, setIdentityGroupId] = useState("");
@@ -58,8 +62,12 @@ export function AdminFleets() {
   const [configuringFleet, setConfiguringFleet] = useState<Fleet | null>(null);
   const [configFunction, setConfigFunction] = useState("");
   const [configIdentityGroupId, setConfigIdentityGroupId] = useState("");
+  const [configPapCurrencyId, setConfigPapCurrencyId] = useState("");
+  const [configPapValue, setConfigPapValue] = useState("");
   const fleetList = Array.isArray(fleets) ? fleets : [];
   const tacticalGroups = (identityGroups.data ?? []).filter((group) => group.category === "combat" && group.isActive);
+  const availableCurrencies = (currencies.data?.currencies ?? []).filter((currency) => currency.issuanceEnabled);
+  const validPapAmount = (value: string) => isPositivePapInput(value) && Number(value) <= 1_000_000;
 
   const { liveCounts, scanFleet: scanFleetLive } = useLiveFleetCounts(fleetList);
 
@@ -70,6 +78,7 @@ export function AdminFleets() {
     queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
     queryClient.invalidateQueries({ queryKey: getListUsersQueryKey() });
     queryClient.invalidateQueries({ queryKey: getListAllPapRecordsQueryKey() });
+    queryClient.invalidateQueries({ queryKey: papCurrencyKeys.all });
   };
 
 
@@ -129,12 +138,13 @@ export function AdminFleets() {
   };
 
   const handleCreateFleet = () => {
-    if (!fleetName || !fleetCommander || !papValue) return;
+    if (!fleetName || !fleetCommander || !validPapAmount(papValue)) return;
     createFleet.mutate(
       { data: {
         name: fleetName,
         fleetCommander,
         papValue: Number(papValue),
+        papCurrencyId: papCurrencyId ? Number(papCurrencyId) : null,
         eveFleetId: eveFleetId || null,
         fleetFunction: fleetFunction.trim() || "general",
         identityGroupId: identityGroupId ? Number(identityGroupId) : null,
@@ -147,10 +157,12 @@ export function AdminFleets() {
           setFleetName("");
           setFleetCommander("");
           setPapValue("");
+          setPapCurrencyId("");
           setEveFleetId("");
           setFleetFunction("general");
           setIdentityGroupId("");
-        }
+        },
+        onError: (error) => toast({ title: tr("创建失败", "Could not create fleet"), description: error.message, variant: "destructive" }),
       }
     );
   };
@@ -179,7 +191,10 @@ export function AdminFleets() {
               }
               resolve();
             },
-            onError: () => resolve(),
+            onError: (error) => {
+              toast({ title: tr("本次 PAP 发放未完成", "PAP awards did not complete"), description: error.message, variant: "destructive" });
+              resolve();
+            },
           },
         );
       });
@@ -217,18 +232,24 @@ export function AdminFleets() {
     setConfiguringFleet(fleet);
     setConfigFunction(fleet.fleetFunction);
     setConfigIdentityGroupId(fleet.identityGroupId ? String(fleet.identityGroupId) : "");
+    setConfigPapCurrencyId(fleet.papCurrencyId ? String(fleet.papCurrencyId) : "");
+    setConfigPapValue(String(fleet.papValue));
   };
 
   const saveFleetConfiguration = () => {
     if (!configuringFleet || !configFunction.trim()) return;
+    const amountChanged = configPapValue !== String(configuringFleet.papValue);
+    if (amountChanged && !validPapAmount(configPapValue)) return;
     updateFleet.mutate({ id: configuringFleet.id, data: {
       fleetFunction: configFunction.trim(),
       identityGroupId: configIdentityGroupId ? Number(configIdentityGroupId) : null,
+      papCurrencyId: configPapCurrencyId ? Number(configPapCurrencyId) : null,
+      ...(amountChanged ? { papValue: Number(configPapValue) } : {}),
     } }, { onSuccess: () => {
       setConfiguringFleet(null);
       queryClient.invalidateQueries({ queryKey: getListFleetsQueryKey() });
-      toast({ title: tr("舰队职能已更新", "Fleet function updated") });
-    } });
+      toast({ title: tr("舰队设置已更新", "Fleet settings updated") });
+    }, onError: (error) => toast({ title: tr("保存失败", "Could not save fleet"), description: error.message, variant: "destructive" }) });
   };
 
   return (
@@ -305,6 +326,7 @@ export function AdminFleets() {
                     </TableCell>
                     <TableCell className="font-mono font-bold text-right text-primary">
                       {fleet.papValue}
+                      <div className="mt-1 text-xs font-normal text-muted-foreground">{fleet.papCurrencyId ? fleet.papCurrencyName : tr("通用 PAP", "Common PAP")}</div>
                     </TableCell>
                     <TableCell className="font-mono text-sm text-right text-muted-foreground">
                       {fleet.isActive
@@ -313,7 +335,7 @@ export function AdminFleets() {
                     </TableCell>
                     <TableCell className="text-right">
                       <Button variant="outline" size="sm" className="h-8 mb-2 ml-2 rounded-sm font-mono text-[10px]" onClick={() => openFleetConfiguration(fleet)}>
-                        <Settings2 className="w-3 h-3 mr-1" />{tr("职能", "FUNCTION")}
+                        <Settings2 className="w-3 h-3 mr-1" />{tr("设置", "SETTINGS")}
                       </Button>
                       {fleet.isActive ? (
                         <div className="flex items-center justify-end gap-2 flex-wrap">
@@ -378,7 +400,7 @@ export function AdminFleets() {
       </Card>
 
       <Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
-        <DialogContent className="sm:max-w-[425px] bg-card border-primary/20 rounded-sm font-mono">
+        <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto bg-card border-primary/20 rounded-sm font-mono">
           <DialogHeader>
             <DialogTitle className="tracking-wider uppercase text-primary flex items-center gap-2">
               <Swords className="w-5 h-5" /> {t("fleets.initializeOperation")}
@@ -413,12 +435,24 @@ export function AdminFleets() {
               />
             </div>
             <div className="flex flex-col gap-1.5">
+              <Label htmlFor="papCurrency">{tr("发放 PAP 种类", "PAP currency to award")}</Label>
+              <select id="papCurrency" className="h-10 rounded-sm border border-border/50 bg-background/50 px-3 text-sm" value={papCurrencyId} onChange={(event) => setPapCurrencyId(event.target.value)}>
+                <option value="">{tr("通用 PAP", "Common PAP")}</option>
+                {availableCurrencies.map((currency) => <option key={currency.id} value={currency.id}>{currency.name}</option>)}
+              </select>
+              <p className="text-xs text-muted-foreground">{tr("自定义种类单独入账，不会自动变为通用 PAP；首次发放后不可更改种类。", "Custom PAP is credited separately, not automatically converted. The currency cannot change after the first award.")}</p>
+              {currencies.isError && <p className="text-xs text-destructive">{tr("自定义 PAP 种类加载失败，请刷新重试。", "Could not load custom PAP currencies. Refresh to retry.")}</p>}
+            </div>
+            <div className="flex flex-col gap-1.5">
               <Label htmlFor="pap" className="text-xs tracking-widest">
                 {t("fleets.papValue")}
               </Label>
               <Input
                 id="pap"
                 type="number"
+                min="0.000001"
+                max="1000000"
+                step="0.000001"
                 value={papValue}
                 onChange={(e) => setPapValue(e.target.value)}
                 className="bg-background/50 border-border/50 rounded-sm"
@@ -478,7 +512,7 @@ export function AdminFleets() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateModalOpen(false)} className="rounded-sm">{t("fleets.abort")}</Button>
-            <Button onClick={handleCreateFleet} disabled={createFleet.isPending || !fleetName || !fleetCommander || !papValue} className="rounded-sm">
+            <Button onClick={handleCreateFleet} disabled={createFleet.isPending || !fleetName || !fleetCommander || !validPapAmount(papValue)} className="rounded-sm">
               {createFleet.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : t("fleets.initialize")}
             </Button>
           </DialogFooter>
@@ -486,13 +520,15 @@ export function AdminFleets() {
       </Dialog>
 
       <Dialog open={Boolean(configuringFleet)} onOpenChange={(open) => { if (!open) setConfiguringFleet(null); }}>
-        <DialogContent className="sm:max-w-[480px] bg-card border-primary/20 rounded-sm font-mono">
-          <DialogHeader><DialogTitle>{tr("舰队职能设置", "FLEET FUNCTION")}</DialogTitle><DialogDescription>{configuringFleet?.name}</DialogDescription></DialogHeader>
+        <DialogContent className="sm:max-w-[480px] max-h-[90vh] overflow-y-auto bg-card border-primary/20 rounded-sm font-mono">
+          <DialogHeader><DialogTitle>{tr("舰队设置", "FLEET SETTINGS")}</DialogTitle><DialogDescription>{configuringFleet?.name}</DialogDescription></DialogHeader>
           <div className="space-y-4 py-3">
+            <div className="space-y-2"><Label htmlFor="configPapCurrency">{tr("发放 PAP 种类", "PAP currency to award")}</Label><select id="configPapCurrency" className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm disabled:opacity-60" value={configPapCurrencyId} disabled={(configuringFleet?.participantCount ?? 0) > 0} onChange={(event) => setConfigPapCurrencyId(event.target.value)}><option value="">{tr("通用 PAP", "Common PAP")}</option>{(currencies.data?.currencies ?? []).filter((currency) => currency.issuanceEnabled || String(currency.id) === configPapCurrencyId).map((currency) => <option key={currency.id} value={currency.id} disabled={!currency.issuanceEnabled}>{currency.name}{currency.issuanceEnabled ? "" : tr("（暂停发放）", " (issuance paused)")}</option>)}</select><p className="text-xs text-muted-foreground">{tr("已发放 PAP 的舰队不能更改种类，后续数量调整不改写历史发放。", "A fleet with PAP awards cannot change currency. Changing the amount does not rewrite previous awards.")}</p></div>
+            <div className="space-y-2"><Label htmlFor="configPapValue">{tr("每次发放数量", "PAP per award")}</Label><Input id="configPapValue" type="number" min="0.000001" max="1000000" step="0.000001" value={configPapValue} onChange={(event) => setConfigPapValue(event.target.value)} /></div>
             <div className="space-y-2"><Label>{tr("舰队职能", "Fleet function")}</Label><Input value={configFunction} onChange={(event) => setConfigFunction(event.target.value)} placeholder={tr("例如：值守舰队", "e.g. Standing fleet")} /></div>
             <div className="space-y-2"><Label>{tr("战术身份组", "Tactical identity group")}</Label><select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={configIdentityGroupId} onChange={(event) => setConfigIdentityGroupId(event.target.value)}><option value="">{tr("通用舰队", "General fleet")}</option>{tacticalGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></div>
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setConfiguringFleet(null)}>{tr("取消", "Cancel")}</Button><Button onClick={saveFleetConfiguration} disabled={updateFleet.isPending || !configFunction.trim()}>{tr("保存", "Save")}</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setConfiguringFleet(null)}>{tr("取消", "Cancel")}</Button><Button onClick={saveFleetConfiguration} disabled={updateFleet.isPending || !configFunction.trim() || (configPapValue !== String(configuringFleet?.papValue) && !validPapAmount(configPapValue))}>{tr("保存", "Save")}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

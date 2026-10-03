@@ -10,7 +10,17 @@ import type { FleetReimbursementRule } from "./fleetReimbursementRule";
 export interface UpdateFleetBody {
   name?: string;
   fleetCommander?: string;
+  /**
+   * @minimum 0.000001
+   * @maximum 1000000
+   */
   papValue?: number;
+  /**
+   * May change only before the first PAP award for this fleet.
+   * @minimum 1
+   * @nullable
+   */
+  papCurrencyId?: number | null;
   isActive?: boolean;
   /** @nullable */
   endedAt?: string | null;

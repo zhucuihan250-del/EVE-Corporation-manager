@@ -1,8 +1,9 @@
-import { pgTable, text, serial, timestamp, boolean, real, integer, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, boolean, doublePrecision, integer, jsonb, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { corporationsTable } from "./corporations";
 import { identityGroupsTable } from "./identity_groups";
+import { papCurrenciesTable } from "./pap_currencies";
 
 export type FleetReimbursementRule = {
   description?: string;
@@ -18,7 +19,9 @@ export const fleetsTable = pgTable("fleets", {
   eveFleetId: text("eve_fleet_id"),
   name: text("name").notNull(),
   fleetCommander: text("fleet_commander").notNull(),
-  papValue: real("pap_value").notNull().default(1),
+  papValue: doublePrecision("pap_value").notNull().default(1),
+  papCurrencyId: integer("pap_currency_id").references(() => papCurrenciesTable.id, { onDelete: "restrict" }),
+  papCurrencyName: text("pap_currency_name"),
   isActive: boolean("is_active").notNull().default(true),
   fleetFunction: text("fleet_function").notNull().default("general"),
   identityGroupId: integer("identity_group_id").references(() => identityGroupsTable.id, {

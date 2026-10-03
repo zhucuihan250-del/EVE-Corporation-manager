@@ -139,6 +139,7 @@ export type PapLedgerEntryType =
 export const PapLedgerEntryType = {
   opening_balance: "opening_balance",
   pap_earned: "pap_earned",
+  pap_conversion: "pap_conversion",
   redemption: "redemption",
   admin_adjustment: "admin_adjustment",
   activity_deduction: "activity_deduction",
@@ -576,6 +577,13 @@ export interface Fleet {
   name: string;
   fleetCommander: string;
   papValue: number;
+  /**
+   * Null means common PAP; a custom currency never credits the common balance directly.
+   * @nullable
+   */
+  papCurrencyId?: number | null;
+  /** @nullable */
+  papCurrencyName?: string | null;
   isActive: boolean;
   fleetFunction: string;
   /** @nullable */
@@ -600,7 +608,16 @@ export interface CreateFleetBody {
   eveFleetId?: string | null;
   name: string;
   fleetCommander: string;
+  /**
+   * @minimum 0.000001
+   * @maximum 1000000
+   */
   papValue: number;
+  /**
+   * @minimum 1
+   * @nullable
+   */
+  papCurrencyId?: number | null;
   /** @nullable */
   startedAt?: string | null;
   fleetFunction?: string;
@@ -1012,7 +1029,17 @@ export interface UpdateBattleReplayBody {
 export interface UpdateFleetBody {
   name?: string;
   fleetCommander?: string;
+  /**
+   * @minimum 0.000001
+   * @maximum 1000000
+   */
   papValue?: number;
+  /**
+   * May change only before the first PAP award for this fleet.
+   * @minimum 1
+   * @nullable
+   */
+  papCurrencyId?: number | null;
   isActive?: boolean;
   /** @nullable */
   endedAt?: string | null;
@@ -1468,6 +1495,13 @@ export interface PapRecord {
   /** @nullable */
   fleetId?: number | null;
   amount: number;
+  /** @nullable */
+  currencyId?: number | null;
+  /**
+   * Currency name snapshot at issuance; null means common PAP.
+   * @nullable
+   */
+  currencyName?: string | null;
   type: PapRecordType;
   /** @nullable */
   reason?: string | null;

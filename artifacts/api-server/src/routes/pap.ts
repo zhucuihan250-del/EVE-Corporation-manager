@@ -16,6 +16,8 @@ function formatRecord(r: {
   characterId: number | null;
   fleetId: number | null;
   amount: number;
+  currencyId?: number | null;
+  currencyName?: string | null;
   type: string;
   reason: string | null;
   createdAt: Date;
@@ -29,6 +31,8 @@ function formatRecord(r: {
     characterId: r.characterId,
     fleetId: r.fleetId,
     amount: r.amount,
+    currencyId: r.currencyId ?? null,
+    currencyName: r.currencyName ?? null,
     type: r.type,
     reason: r.reason,
     fleetName: r.fleetName ?? null,
@@ -47,6 +51,8 @@ router.get("/pap", requireAuth, async (req: Request, res: Response): Promise<voi
       characterId: papRecordsTable.characterId,
       fleetId: papRecordsTable.fleetId,
       amount: papRecordsTable.amount,
+      currencyId: papRecordsTable.currencyId,
+      currencyName: papRecordsTable.currencyName,
       type: papRecordsTable.type,
       reason: papRecordsTable.reason,
       createdAt: papRecordsTable.createdAt,
@@ -90,6 +96,8 @@ router.get("/pap/all", requireAuth, async (req: Request, res: Response): Promise
       characterId: papRecordsTable.characterId,
       fleetId: papRecordsTable.fleetId,
       amount: papRecordsTable.amount,
+      currencyId: papRecordsTable.currencyId,
+      currencyName: papRecordsTable.currencyName,
       type: papRecordsTable.type,
       reason: papRecordsTable.reason,
       createdAt: papRecordsTable.createdAt,

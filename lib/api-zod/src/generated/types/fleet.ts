@@ -15,6 +15,13 @@ export interface Fleet {
   name: string;
   fleetCommander: string;
   papValue: number;
+  /**
+   * Null means common PAP; a custom currency never credits the common balance directly.
+   * @nullable
+   */
+  papCurrencyId?: number | null;
+  /** @nullable */
+  papCurrencyName?: string | null;
   isActive: boolean;
   fleetFunction: string;
   /** @nullable */

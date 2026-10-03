@@ -28,6 +28,8 @@ import { systemMonitoringMigration } from "./0026-system-monitoring";
 import { diplomacyManagementMigration } from "./0027-diplomacy-management";
 import { monitoredSystemRemovalMigration } from "./0028-monitored-system-removal";
 import { buybackCalculatorMigration } from "./0029-buyback-calculator";
+import { editablePapCurrenciesMigration } from "./0030-editable-pap-currencies";
+import { fleetPapCurrenciesMigration } from "./0031-fleet-pap-currencies";
 
 type Migration = {
   id: string;
@@ -64,6 +66,8 @@ const migrations: Migration[] = [
   diplomacyManagementMigration,
   monitoredSystemRemovalMigration,
   buybackCalculatorMigration,
+  editablePapCurrenciesMigration,
+  fleetPapCurrenciesMigration,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {

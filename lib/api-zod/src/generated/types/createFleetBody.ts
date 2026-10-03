@@ -12,7 +12,16 @@ export interface CreateFleetBody {
   eveFleetId?: string | null;
   name: string;
   fleetCommander: string;
+  /**
+   * @minimum 0.000001
+   * @maximum 1000000
+   */
   papValue: number;
+  /**
+   * @minimum 1
+   * @nullable
+   */
+  papCurrencyId?: number | null;
   /** @nullable */
   startedAt?: string | null;
   fleetFunction?: string;

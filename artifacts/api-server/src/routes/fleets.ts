@@ -5,8 +5,8 @@ import { refreshAccessToken } from "../lib/eve-sso";
 import { requireAuth, hasRole } from "../middlewares/auth";
 import { ensureBattleReportForFleet, queueBattleReportGeneration } from "../lib/battle-reports";
 import { ensureCorporationMembership, hasPermission, requireModule, requireTenant } from "../lib/tenant";
-import { incrementPapBalance } from "../lib/pap-balance";
-import { writePapLedger } from "../lib/pap-ledger";
+import { awardFleetPap, fleetCurrencyUpdate, FleetPapError, lockFleetCurrency, validateFleetPapValue } from "../lib/fleet-pap";
+import { PapCurrencyError } from "../lib/pap-currency-math";
 import {
   CreateFleetBody,
   GetFleetParams,
@@ -62,6 +62,8 @@ router.get("/fleets", requireAuth, async (req: Request, res: Response): Promise<
       name: fleetsTable.name,
       fleetCommander: fleetsTable.fleetCommander,
       papValue: fleetsTable.papValue,
+      papCurrencyId: fleetsTable.papCurrencyId,
+      papCurrencyName: fleetsTable.papCurrencyName,
       isActive: fleetsTable.isActive,
       fleetFunction: fleetsTable.fleetFunction,
       identityGroupId: fleetsTable.identityGroupId,
@@ -110,6 +112,7 @@ router.post("/fleets", requireAuth, async (req: Request, res: Response): Promise
 
   let reimbursementRule: (typeof fleetsTable.$inferInsert)["reimbursementRule"];
   try {
+    validateFleetPapValue(body.data.papValue);
     reimbursementRule = normalizeReimbursementRule(body.data.reimbursementRule);
   } catch (error) {
     res.status(400).json({ error: error instanceof Error ? error.message : "Invalid reimbursement rule" });
@@ -128,21 +131,33 @@ router.post("/fleets", requireAuth, async (req: Request, res: Response): Promise
     return;
   }
 
-  const [fleet] = await db
-    .insert(fleetsTable)
-    .values({
-      corporationId: req.tenant!.corporation.id,
-      eveFleetId: body.data.eveFleetId ?? null,
-      name: body.data.name,
-      fleetCommander: body.data.fleetCommander,
-      papValue: body.data.papValue,
-      fleetFunction: body.data.fleetFunction?.trim().slice(0, 80) || "general",
-      identityGroupId: tacticalGroup?.id ?? null,
-      reimbursementEnabled: body.data.reimbursementEnabled === true,
-      reimbursementRule,
-      startedAt: body.data.startedAt ? new Date(body.data.startedAt) : new Date(),
-    })
-    .returning();
+  let fleet: typeof fleetsTable.$inferSelect;
+  try {
+    fleet = await db.transaction(async (tx) => {
+      const currency = await lockFleetCurrency(tx, req.tenant!.corporation.id, body.data.papCurrencyId ?? null);
+      const [created] = await tx.insert(fleetsTable)
+        .values({
+          corporationId: req.tenant!.corporation.id,
+          eveFleetId: body.data.eveFleetId ?? null,
+          name: body.data.name,
+          fleetCommander: body.data.fleetCommander,
+          papValue: body.data.papValue,
+          papCurrencyId: currency?.id ?? null,
+          papCurrencyName: currency?.name ?? null,
+          fleetFunction: body.data.fleetFunction?.trim().slice(0, 80) || "general",
+          identityGroupId: tacticalGroup?.id ?? null,
+          reimbursementEnabled: body.data.reimbursementEnabled === true,
+          reimbursementRule,
+          startedAt: body.data.startedAt ? new Date(body.data.startedAt) : new Date(),
+        })
+        .returning();
+      return created;
+    });
+  } catch (error) {
+    if (!(error instanceof FleetPapError || error instanceof PapCurrencyError)) throw error;
+    res.status(error.status).json({ error: error.message });
+    return;
+  }
 
   res.status(201).json({
     ...fleet,
@@ -236,6 +251,8 @@ router.get("/fleets/:id", requireAuth, async (req: Request, res: Response): Prom
       name: fleetsTable.name,
       fleetCommander: fleetsTable.fleetCommander,
       papValue: fleetsTable.papValue,
+      papCurrencyId: fleetsTable.papCurrencyId,
+      papCurrencyName: fleetsTable.papCurrencyName,
       isActive: fleetsTable.isActive,
       fleetFunction: fleetsTable.fleetFunction,
       identityGroupId: fleetsTable.identityGroupId,
@@ -297,7 +314,14 @@ router.patch("/fleets/:id", requireAuth, async (req: Request, res: Response): Pr
   const updates: Partial<typeof fleetsTable.$inferInsert> = {};
   if (body.data.name !== undefined) updates.name = body.data.name;
   if (body.data.fleetCommander !== undefined) updates.fleetCommander = body.data.fleetCommander;
-  if (body.data.papValue !== undefined) updates.papValue = body.data.papValue;
+  if (body.data.papValue !== undefined) {
+    try { validateFleetPapValue(body.data.papValue); } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : "Invalid PAP amount" });
+      return;
+    }
+    updates.papValue = body.data.papValue;
+  }
+  if (body.data.papCurrencyId !== undefined) updates.papCurrencyId = body.data.papCurrencyId;
   if (body.data.isActive !== undefined) updates.isActive = body.data.isActive;
   if (body.data.endedAt !== undefined) updates.endedAt = body.data.endedAt ? new Date(body.data.endedAt) : null;
   if (body.data.isActive === false && body.data.endedAt === undefined) updates.endedAt = new Date();
@@ -331,14 +355,27 @@ router.patch("/fleets/:id", requireAuth, async (req: Request, res: Response): Pr
     return;
   }
 
-  const [fleet] = await db
-    .update(fleetsTable)
-    .set(updates)
-    .where(and(
-      eq(fleetsTable.id, params.data.id),
-      eq(fleetsTable.corporationId, req.tenant!.corporation.id),
-    ))
-    .returning();
+  let fleet: typeof fleetsTable.$inferSelect | undefined;
+  try {
+    fleet = await db.transaction(async (tx) => {
+      const [existing] = await tx.select().from(fleetsTable).where(and(
+        eq(fleetsTable.id, params.data.id), eq(fleetsTable.corporationId, req.tenant!.corporation.id),
+      )).for("update");
+      if (!existing) return undefined;
+      if (body.data.papCurrencyId !== undefined) {
+        if (body.data.papCurrencyId !== null && body.data.papCurrencyId !== existing.papCurrencyId) {
+          validateFleetPapValue(updates.papValue ?? existing.papValue);
+        }
+        Object.assign(updates, await fleetCurrencyUpdate(tx, existing, body.data.papCurrencyId));
+      }
+      const [updated] = await tx.update(fleetsTable).set(updates).where(eq(fleetsTable.id, existing.id)).returning();
+      return updated;
+    });
+  } catch (error) {
+    if (!(error instanceof FleetPapError || error instanceof PapCurrencyError)) throw error;
+    res.status(error.status).json({ error: error.message });
+    return;
+  }
 
   if (!fleet) {
     res.status(404).json({ error: "Fleet not found" });
@@ -470,13 +507,7 @@ router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response)
     return;
   }
 
-  const existingPaps = await db
-    .select({ characterId: papRecordsTable.characterId })
-    .from(papRecordsTable)
-    .where(eq(papRecordsTable.fleetId, fleet.id));
-
-  const alreadyAwardedCharIds = new Set(existingPaps.map((p) => p.characterId));
-  const memberCharIds = members.map((m) => m.character_id);
+  const memberCharIds = [...new Set(members.map((m) => m.character_id))];
 
   req.log.info({ memberCharIds, esiMemberCount: memberCharIds.length }, "Looking up ESI character IDs in DB");
 
@@ -595,53 +626,29 @@ router.post("/fleets/:id/scan", requireAuth, async (req: Request, res: Response)
     }
   }
 
-  const allCharacters = [...characters, ...autoRegisteredChars];
+  const allCharacters = [...new Map([...characters, ...autoRegisteredChars].map((character) => [character.id, character])).values()]
+    .sort((left, right) => (left.userId ?? 0) - (right.userId ?? 0) || left.id - right.id);
 
   let awarded = 0;
   let skipped = 0;
   const notFound = memberCharIds.length - allCharacters.length;
 
-  for (const character of allCharacters) {
-    if (!character.userId) {
-      skipped++;
-      req.log.warn({ characterId: character.id, eveCharacterId: character.eveCharacterId }, "Skipping active character with no linked user");
-      continue;
-    }
-    if (alreadyAwardedCharIds.has(character.id)) {
-      skipped++;
-      continue;
-    }
+  try {
     await db.transaction(async (tx) => {
-      await tx.insert(papRecordsTable).values({
-        corporationId: req.tenant!.corporation.id,
-        userId: character.userId!,
-        characterId: character.id,
-        fleetId: fleet.id,
-        amount: fleet.papValue,
-        type: "fleet",
-        reason: `Fleet: ${fleet.name}`,
-      });
-      const [updatedUser] = await tx
-        .update(usersTable)
-        .set(incrementPapBalance(fleet.papValue))
-        .where(eq(usersTable.id, character.userId!))
-        .returning({
-          redeemablePap: usersTable.redeemablePap,
-          lockedPap: usersTable.lockedPap,
+      for (const character of allCharacters) {
+        if (!character.userId) { skipped++; continue; }
+        const result = await awardFleetPap(tx, {
+          fleetId: fleet.id, corporationId: req.tenant!.corporation.id,
+          character: { ...character, userId: character.userId }, adminId: currentUser.id,
+          expectedEveFleetId: fleet.eveFleetId!,
         });
-      if (!updatedUser) throw new Error(`PAP award target ${character.userId} no longer exists`);
-      await writePapLedger(tx, {
-        corporationId: req.tenant!.corporation.id,
-        userId: character.userId!,
-        userName: character.eveCharacterName,
-        amount: fleet.papValue,
-        type: "pap_earned",
-        balanceAfter: updatedUser.redeemablePap,
-        lockedAfter: updatedUser.lockedPap,
-        reason: `Fleet: ${fleet.name}`,
-      });
+        if (result.awarded) awarded++; else skipped++;
+      }
     });
-    awarded++;
+  } catch (error) {
+    if (!(error instanceof FleetPapError || error instanceof PapCurrencyError)) throw error;
+    res.status(error.status).json({ error: error.message });
+    return;
   }
 
   res.json({ awarded, skipped, notFound, esiMemberCount: members.length, autoRegistered: autoRegisteredChars.length });
@@ -716,44 +723,21 @@ router.post("/fleets/:id/participants", requireAuth, async (req: Request, res: R
     return;
   }
 
-  const papRecord = await db.transaction(async (tx) => {
-    const [record] = await tx
-      .insert(papRecordsTable)
-      .values({
-        corporationId: req.tenant!.corporation.id,
-        userId: character.userId!,
-        characterId: character.id,
-        fleetId: fleet.id,
-        amount: fleet.papValue,
-        type: "fleet",
-        reason: `Fleet: ${fleet.name}`,
-      })
-      .returning();
-    const [updatedUser] = await tx
-      .update(usersTable)
-      .set(incrementPapBalance(fleet.papValue))
-      .where(eq(usersTable.id, character.userId!))
-      .returning({
-        redeemablePap: usersTable.redeemablePap,
-        lockedPap: usersTable.lockedPap,
-      });
-    if (!updatedUser) throw new Error(`PAP award target ${character.userId} no longer exists`);
-    await writePapLedger(tx, {
-      corporationId: req.tenant!.corporation.id,
-      userId: character.userId!,
-      userName: character.eveCharacterName,
-      amount: fleet.papValue,
-      type: "pap_earned",
-      balanceAfter: updatedUser.redeemablePap,
-      lockedAfter: updatedUser.lockedPap,
-      reason: `Fleet: ${fleet.name}`,
-    });
-    return record;
-  });
+  let result: Awaited<ReturnType<typeof awardFleetPap>>;
+  try {
+    result = await db.transaction((tx) => awardFleetPap(tx, {
+      fleetId: fleet.id, corporationId: req.tenant!.corporation.id,
+      character: { ...character, userId: character.userId! }, adminId: currentUser.id,
+    }));
+  } catch (error) {
+    if (!(error instanceof FleetPapError || error instanceof PapCurrencyError)) throw error;
+    res.status(error.status).json({ error: error.message });
+    return;
+  }
 
-  res.status(201).json({
-    ...papRecord,
-    fleetName: fleet.name,
+  res.status(result.awarded ? 201 : 200).json({
+    ...result.record,
+    fleetName: result.fleet.name,
     characterName: character.eveCharacterName,
     userName: null,
   });

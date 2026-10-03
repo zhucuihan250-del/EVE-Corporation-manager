@@ -81,7 +81,7 @@ export const papLedgerTable = pgTable("pap_ledger", {
   userName: text("user_name").notNull(),
   amount: doublePrecision("amount").notNull().default(0),
   lockedDelta: doublePrecision("locked_delta").notNull().default(0),
-  type: text("type", { enum: ["opening_balance", "pap_earned", "redemption", "admin_adjustment", "activity_deduction", "account_merge", "market_order_lock", "market_order_unlock", "market_transaction_lock", "market_transaction_unlock", "market_buy", "market_sell", "reversal"] }).notNull(),
+  type: text("type", { enum: ["opening_balance", "pap_earned", "pap_conversion", "redemption", "admin_adjustment", "activity_deduction", "account_merge", "market_order_lock", "market_order_unlock", "market_transaction_lock", "market_transaction_unlock", "market_buy", "market_sell", "reversal"] }).notNull(),
   orderId: integer("order_id").references(() => papMarketOrdersTable.id, { onDelete: "restrict" }),
   transactionId: integer("transaction_id").references(() => papMarketTransactionsTable.id, { onDelete: "restrict" }),
   balanceAfter: doublePrecision("balance_after").notNull(),

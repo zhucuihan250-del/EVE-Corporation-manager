@@ -26,7 +26,8 @@ import {
   getTenantContext,
 } from "../lib/tenant";
 import { timingSafeEqual } from "node:crypto";
-import { availablePap, incrementPapBalance } from "../lib/pap-balance";
+import { availablePap } from "../lib/pap-balance";
+import { mergePapWallets } from "../lib/pap-currency-account-merge";
 import { ensureCharacterCorporationReference, recordNonSiteLoginAffiliation, requireSiteCorporation } from "../lib/single-corporation";
 import { siteAllowsLogin } from "../lib/single-corporation-rules";
 
@@ -40,36 +41,27 @@ async function mergeOrphanUser(
 ): Promise<void> {
   if (!orphan) return;
   await assertOrphanBelongsToSite(orphan);
-  // The authenticated target already has its own site membership. Never copy
-  // another account's roles or historical foreign-corporation memberships.
-  // Move all PAP records to main user
-  await db.execute(sql`UPDATE pap_records SET user_id = ${mainUserId} WHERE user_id = ${orphan.id}`);
-  // The spendable balance is canonical; totalPap is only a mirrored legacy field.
-  if (orphan.redeemablePap > 0 || orphan.lockedPap > 0) {
-    await db.update(usersTable)
-      .set({
-        ...incrementPapBalance(orphan.redeemablePap),
-        lockedPap: sql`locked_pap + ${orphan.lockedPap}`,
-      })
-      .where(eq(usersTable.id, mainUserId));
-  }
-  // Keep immutable PAP Market history while moving live ownership to the main account.
-  await db.update(papMarketOrdersTable).set({ ownerId: mainUserId }).where(eq(papMarketOrdersTable.ownerId, orphan.id));
-  await db.update(papMarketTransactionsTable).set({ buyerId: mainUserId }).where(eq(papMarketTransactionsTable.buyerId, orphan.id));
-  await db.update(papMarketTransactionsTable).set({ sellerId: mainUserId }).where(eq(papMarketTransactionsTable.sellerId, orphan.id));
-  await db.update(papMarketTransactionsTable).set({ reviewedBy: mainUserId }).where(eq(papMarketTransactionsTable.reviewedBy, orphan.id));
-  await db.update(papLedgerTable).set({ userId: mainUserId }).where(eq(papLedgerTable.userId, orphan.id));
-  await db.update(papLedgerTable).set({ adminId: mainUserId }).where(eq(papLedgerTable.adminId, orphan.id));
-  await db.update(papMarketAdminLogsTable).set({ adminId: mainUserId }).where(eq(papMarketAdminLogsTable.adminId, orphan.id));
-  // Reassign all of orphan's character records to main user (all as alts)
-  await db.update(charactersTable).set({
-    userId: mainUserId,
-    isMain: false,
-    deletedAt: null,
-    retainedUntil: null,
-  }).where(and(eq(charactersTable.userId, orphan.id), isNull(charactersTable.deletedAt)));
-  // Delete orphan user row
-  await db.delete(usersTable).where(eq(usersTable.id, orphan.id));
+  await db.transaction(async (tx) => {
+    const merged = await mergePapWallets(tx, orphan.corporationId!, orphan.id, mainUserId);
+    if (!merged) return;
+    // Never copy another account's permissions or historical foreign memberships.
+    await tx.execute(sql`UPDATE pap_records SET user_id = ${mainUserId} WHERE user_id = ${orphan.id}`);
+    // Preserve market audit history while moving live ownership to the main account.
+    await tx.update(papMarketOrdersTable).set({ ownerId: mainUserId }).where(eq(papMarketOrdersTable.ownerId, orphan.id));
+    await tx.update(papMarketTransactionsTable).set({ buyerId: mainUserId }).where(eq(papMarketTransactionsTable.buyerId, orphan.id));
+    await tx.update(papMarketTransactionsTable).set({ sellerId: mainUserId }).where(eq(papMarketTransactionsTable.sellerId, orphan.id));
+    await tx.update(papMarketTransactionsTable).set({ reviewedBy: mainUserId }).where(eq(papMarketTransactionsTable.reviewedBy, orphan.id));
+    await tx.update(papLedgerTable).set({ userId: mainUserId }).where(eq(papLedgerTable.userId, orphan.id));
+    await tx.update(papLedgerTable).set({ adminId: mainUserId }).where(eq(papLedgerTable.adminId, orphan.id));
+    await tx.update(papMarketAdminLogsTable).set({ adminId: mainUserId }).where(eq(papMarketAdminLogsTable.adminId, orphan.id));
+    await tx.update(charactersTable).set({
+      userId: mainUserId,
+      isMain: false,
+      deletedAt: null,
+      retainedUntil: null,
+    }).where(and(eq(charactersTable.userId, orphan.id), isNull(charactersTable.deletedAt)));
+    await tx.delete(usersTable).where(eq(usersTable.id, orphan.id));
+  });
   log.info({ orphanId: orphan.id, mainUserId, orphanPap: orphan.redeemablePap }, "Orphan user merged into main account");
 }
 

@@ -12,6 +12,8 @@ import {
   Building2,
   ArrowLeftRight,
   Calculator,
+  Coins,
+  Wallet,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent,
@@ -48,6 +50,7 @@ export function Layout({ children }: { children: ReactNode }) {
     serviceItems.push(
       { href: "/dashboard", label: t("nav.dashboard"), icon: LayoutDashboard, exact: true },
       { href: "/history", label: t("nav.history"), icon: History },
+      { href: "/pap-wallet", label: tr("PAP 钱包", "PAP wallet"), icon: Wallet },
       { href: "/pap-market", label: "PAP Market", icon: ArrowLeftRight },
     );
   }
@@ -108,6 +111,7 @@ export function Layout({ children }: { children: ReactNode }) {
       { href: "/admin/rewards", label: t("nav.rewards"), icon: Gift },
       { href: "/admin/redemptions", label: t("nav.requisitions"), icon: Inbox },
       { href: "/admin/pap", label: t("nav.papLedger"), icon: BookOpen },
+      { href: "/admin/pap-currencies", label: tr("PAP 种类管理", "PAP currencies"), icon: Coins },
       { href: "/admin/pap-market", label: tr("PAP 市场管理", "PAP Market management"), icon: ArrowLeftRight },
     );
   }
@@ -184,7 +188,7 @@ export function Layout({ children }: { children: ReactNode }) {
           </SidebarContent>
           <SidebarFooter className="border-t border-border/50 p-4">
             <div className="flex flex-col gap-4">
-              <div className="text-xs font-mono text-muted-foreground flex flex-col gap-1"><span className="text-foreground">{user?.eveCharacterName || user?.eveCharacterId || t("nav.unknownPilot")}</span><span>{user?.corporationName}</span>{modules?.pap && <span className="text-primary">{user?.pap} PAP</span>}</div>
+              <div className="text-xs font-mono text-muted-foreground flex flex-col gap-1"><span className="text-foreground">{user?.eveCharacterName || user?.eveCharacterId || t("nav.unknownPilot")}</span><span>{user?.corporationName}</span>{modules?.pap && <span className="text-primary">{user?.pap} {tr("通用 PAP", "common PAP")}</span>}</div>
               <Button variant="outline" className="w-full justify-start text-muted-foreground hover:text-primary hover:bg-primary/10 font-mono text-xs border-border/50" onClick={() => { const next = i18n.language === "en" ? "zh" : "en"; i18n.changeLanguage(next); localStorage.setItem("pap-lang", next); }}><Languages className="w-4 h-4 mr-2" />{i18n.language === "en" ? "中文" : "English"}</Button>
               <Button variant="outline" className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 font-mono text-xs border-border/50" onClick={() => logoutMutation.mutate(undefined, { onSuccess: () => { queryClient.clear(); setLocation("/"); } })}><LogOut className="w-4 h-4 mr-2" />{t("nav.disconnect")}</Button>
             </div>

@@ -2495,7 +2495,7 @@ components:
         userName: { type: string }
         amount: { type: number }
         lockedDelta: { type: number }
-        type: { type: string, enum: [opening_balance, pap_earned, redemption, admin_adjustment, activity_deduction, account_merge, market_order_lock, market_order_unlock, market_transaction_lock, market_transaction_unlock, market_buy, market_sell, reversal] }
+        type: { type: string, enum: [opening_balance, pap_earned, pap_conversion, redemption, admin_adjustment, activity_deduction, account_merge, market_order_lock, market_order_unlock, market_transaction_lock, market_transaction_unlock, market_buy, market_sell, reversal] }
         orderId: { type: [integer, "null"] }
         transactionId: { type: [integer, "null"] }
         balanceAfter: { type: number }
@@ -3035,6 +3035,11 @@ components:
           type: string
         papValue:
           type: number
+        papCurrencyId:
+          type: ["integer", "null"]
+          description: Null means common PAP; a custom currency never credits the common balance directly.
+        papCurrencyName:
+          type: ["string", "null"]
         isActive:
           type: boolean
         fleetFunction:
@@ -3086,6 +3091,11 @@ components:
           type: string
         papValue:
           type: number
+          minimum: 0.000001
+          maximum: 1000000
+        papCurrencyId:
+          type: ["integer", "null"]
+          minimum: 1
         startedAt:
           type: ["string", "null"]
         fleetFunction:
@@ -3700,6 +3710,12 @@ components:
           type: string
         papValue:
           type: number
+          minimum: 0.000001
+          maximum: 1000000
+        papCurrencyId:
+          type: ["integer", "null"]
+          minimum: 1
+          description: May change only before the first PAP award for this fleet.
         isActive:
           type: boolean
         endedAt:
@@ -4096,6 +4112,11 @@ components:
           type: ["integer", "null"]
         amount:
           type: number
+        currencyId:
+          type: ["integer", "null"]
+        currencyName:
+          type: ["string", "null"]
+          description: Currency name snapshot at issuance; null means common PAP.
         type:
           type: string
           enum: [fleet, manual, adjustment, activity_deduction, market_buy, market_sell]

@@ -15,6 +15,13 @@ export interface PapRecord {
   /** @nullable */
   fleetId?: number | null;
   amount: number;
+  /** @nullable */
+  currencyId?: number | null;
+  /**
+   * Currency name snapshot at issuance; null means common PAP.
+   * @nullable
+   */
+  currencyName?: string | null;
   type: PapRecordType;
   /** @nullable */
   reason?: string | null;

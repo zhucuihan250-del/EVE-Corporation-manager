@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { corporationMembershipsTable, db, usersTable, papRecordsTable, charactersTable, redemptionsTable, papMarketOrdersTable, papMarketTransactionsTable } from "@workspace/db";
+import { corporationMembershipsTable, db, usersTable, papRecordsTable, charactersTable, redemptionsTable, papMarketOrdersTable, papMarketTransactionsTable, papCurrenciesTable, papCurrencyWalletsTable, papCurrencyLedgerTable } from "@workspace/db";
 import { and, asc, count, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { requireAuth, hasRole } from "../middlewares/auth";
 import {
@@ -279,12 +279,29 @@ router.delete("/users/:id", requireAuth, async (req: Request, res: Response): Pr
   }
   const identity = (await corporationIdentities([targetId], req.tenant!.corporation.id)).get(targetId);
 
-  // Cascade delete: PAP records, redemptions, characters, then user
-  // (FK cascade handles most of this, but we log what's removed)
-  await db.delete(papRecordsTable).where(and(eq(papRecordsTable.userId, targetId), eq(papRecordsTable.corporationId, req.tenant!.corporation.id)));
-  await db.delete(redemptionsTable).where(and(eq(redemptionsTable.userId, targetId), eq(redemptionsTable.corporationId, req.tenant!.corporation.id)));
-  await db.delete(charactersTable).where(eq(charactersTable.userId, targetId));
-  await db.delete(usersTable).where(eq(usersTable.id, targetId));
+  const removed = await db.transaction(async (tx) => {
+    // Same lock order as currency issuance/conversion. A concurrent grant must
+    // finish before this check, or observe that its member no longer exists.
+    await tx.select({ id: papCurrenciesTable.id }).from(papCurrenciesTable)
+      .where(eq(papCurrenciesTable.corporationId, req.tenant!.corporation.id)).orderBy(asc(papCurrenciesTable.id)).for("update");
+    const [lockedUser] = await tx.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.id, targetId)).for("update");
+    if (!lockedUser) return true;
+    const [wallets, history] = await Promise.all([
+      tx.select({ id: papCurrencyWalletsTable.id }).from(papCurrencyWalletsTable).where(eq(papCurrencyWalletsTable.userId, targetId)).limit(1),
+      tx.select({ id: papCurrencyLedgerTable.id }).from(papCurrencyLedgerTable).where(eq(papCurrencyLedgerTable.userId, targetId)).limit(1),
+    ]);
+    // Even an empty wallet may carry conversion dust or immutable audit history.
+    if (wallets.length || history.length) return false;
+    await tx.delete(papRecordsTable).where(and(eq(papRecordsTable.userId, targetId), eq(papRecordsTable.corporationId, req.tenant!.corporation.id)));
+    await tx.delete(redemptionsTable).where(and(eq(redemptionsTable.userId, targetId), eq(redemptionsTable.corporationId, req.tenant!.corporation.id)));
+    await tx.delete(charactersTable).where(eq(charactersTable.userId, targetId));
+    await tx.delete(usersTable).where(eq(usersTable.id, targetId));
+    return true;
+  });
+  if (!removed) {
+    res.status(409).json({ error: "该成员存在 PAP 种类钱包或不可删除的兑换流水，不能硬删除账号；关联角色时余额可随账号合并。" });
+    return;
+  }
 
   req.log.info({ deletedUserId: targetId, name: identity?.eveCharacterName ?? null }, "Admin hard-deleted user and all their data");
   res.json({ success: true });

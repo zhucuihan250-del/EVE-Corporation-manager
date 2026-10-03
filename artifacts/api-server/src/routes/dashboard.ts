@@ -1,9 +1,9 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { corporationMembershipsTable, db, usersTable, fleetsTable, papRecordsTable, redemptionsTable } from "@workspace/db";
-import { eq, desc, asc, count, sql, and, sum, gte } from "drizzle-orm";
+import { eq, desc, asc, count, sql, and, sum, gte, isNull } from "drizzle-orm";
 import { requireAuth, hasRole } from "../middlewares/auth";
 import { requireModule, requireTenant } from "../lib/tenant";
-import { availablePap } from "../lib/pap-balance";
+import { availablePap, normalizePap } from "../lib/pap-balance";
 
 const router: IRouter = Router();
 router.use("/dashboard", requireAuth, requireTenant, requireModule("pap"));
@@ -13,11 +13,12 @@ const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 async function getTopContributors(corporationId: number, since?: Date) {
   const fleetCount = sql<number>`COUNT(DISTINCT ${papRecordsTable.fleetId})::int`;
   const totalPap = since
-    ? sql<number>`COALESCE(SUM(${papRecordsTable.amount}), 0)::real`
+    ? sql<number>`ROUND(COALESCE(SUM(${papRecordsTable.amount}) FILTER (WHERE ${papRecordsTable.currencyId} IS NULL), 0)::numeric, 6)::double precision`
     : sql<number>`COALESCE((
-        SELECT SUM(p."amount")::real FROM "pap_records" p
+        SELECT ROUND(SUM(p."amount")::numeric, 6)::double precision FROM "pap_records" p
         WHERE p."user_id" = ${usersTable.id} AND p."corporation_id" = ${corporationId}
-      ), 0)::real`;
+          AND p."currency_id" IS NULL
+      ), 0)::double precision`;
   const userName = sql<string | null>`(
     SELECT c."eve_character_name" FROM "characters" c
     WHERE c."user_id" = ${usersTable.id}
@@ -94,6 +95,7 @@ router.get("/dashboard/summary", requireAuth, async (req: Request, res: Response
         eq(papRecordsTable.userId, user.id),
         eq(papRecordsTable.corporationId, req.tenant!.corporation.id),
         gte(papRecordsTable.createdAt, thirtyDaysAgo),
+        isNull(papRecordsTable.currencyId),
         sql`${papRecordsTable.amount} > 0`,
       ),
     );
@@ -106,7 +108,7 @@ router.get("/dashboard/summary", requireAuth, async (req: Request, res: Response
     lockedPap: user.lockedPap,
     fleetCount: fleetCountResult.count,
     redemptionCount: redemptionCountResult.count,
-    recentPapEarned: Number(recentPapResult.total ?? 0),
+    recentPapEarned: normalizePap(Number(recentPapResult.total ?? 0)),
   });
 });
 
@@ -129,7 +131,7 @@ router.get("/dashboard/admin-summary", requireAuth, async (req: Request, res: Re
   const [totalPapResult] = await db
     .select({ total: sum(papRecordsTable.amount) })
     .from(papRecordsTable)
-    .where(and(sql`${papRecordsTable.amount} > 0`, eq(papRecordsTable.corporationId, req.tenant!.corporation.id)));
+    .where(and(sql`${papRecordsTable.amount} > 0`, isNull(papRecordsTable.currencyId), eq(papRecordsTable.corporationId, req.tenant!.corporation.id)));
   const [totalRedemptionsResult] = await db.select({ count: count() }).from(redemptionsTable)
     .where(eq(redemptionsTable.corporationId, req.tenant!.corporation.id));
   const [pendingRedemptionsResult] = await db
@@ -140,7 +142,7 @@ router.get("/dashboard/admin-summary", requireAuth, async (req: Request, res: Re
   res.json({
     totalUsers: totalUsersResult.count,
     totalFleets: totalFleetsResult.count,
-    totalPapAwarded: Number(totalPapResult.total ?? 0),
+    totalPapAwarded: normalizePap(Number(totalPapResult.total ?? 0)),
     totalRedemptions: totalRedemptionsResult.count,
     activeFleets: activeFleetsResult.count,
     pendingRedemptions: pendingRedemptionsResult.count,
@@ -170,6 +172,8 @@ router.get("/dashboard/recent-fleets", requireAuth, async (req: Request, res: Re
       name: fleetsTable.name,
       fleetCommander: fleetsTable.fleetCommander,
       papValue: fleetsTable.papValue,
+      papCurrencyId: fleetsTable.papCurrencyId,
+      papCurrencyName: fleetsTable.papCurrencyName,
       isActive: fleetsTable.isActive,
       startedAt: fleetsTable.startedAt,
       endedAt: fleetsTable.endedAt,
@@ -193,10 +197,11 @@ router.get("/dashboard/pap-history", requireAuth, async (req: Request, res: Resp
   const userId = req.session.userId!;
 
   const rows = await db.execute<{ date: string; pap: number }>(
-    sql`SELECT DATE(created_at)::text AS date, SUM(amount)::int AS pap
+    sql`SELECT DATE(created_at)::text AS date, ROUND(SUM(amount)::numeric, 6)::double precision AS pap
         FROM pap_records
         WHERE user_id = ${userId}
           AND corporation_id = ${req.tenant!.corporation.id}
+          AND currency_id IS NULL
           AND created_at >= NOW() - INTERVAL '30 days'
           AND amount > 0
         GROUP BY DATE(created_at)

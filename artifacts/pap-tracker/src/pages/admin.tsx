@@ -14,7 +14,7 @@ import { useTranslation } from "react-i18next";
 const LEADERBOARD_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 export function AdminDashboard() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [leaderboardPeriod, setLeaderboardPeriod] = useState<"all" | "30-days">("all");
   const { data: summary, isLoading: isSummaryLoading } = useGetAdminSummary({
     query: { queryKey: ["adminSummary"] }
@@ -77,7 +77,7 @@ export function AdminDashboard() {
           
           <Card className="bg-card/40 backdrop-blur border-primary/20 rounded-sm">
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-xs font-mono font-medium text-primary tracking-wider uppercase">{t("admin.papDistributed")}</CardTitle>
+              <CardTitle className="text-xs font-mono font-medium text-primary tracking-wider uppercase">{i18n.language.startsWith("zh") ? "已发放通用 PAP" : "Common PAP distributed"}</CardTitle>
               <Award className="w-4 h-4 text-primary" />
             </CardHeader>
             <CardContent>
@@ -140,7 +140,7 @@ export function AdminDashboard() {
                   <TableRow className="border-border/30 hover:bg-transparent">
                     <TableHead className="font-mono text-xs text-muted-foreground">{t("admin.pilot")}</TableHead>
                     <TableHead className="font-mono text-xs text-muted-foreground text-right">{t("admin.ops")}</TableHead>
-                    <TableHead className="font-mono text-xs text-muted-foreground text-right">{t("admin.pap")}</TableHead>
+                    <TableHead className="font-mono text-xs text-muted-foreground text-right">{i18n.language.startsWith("zh") ? "通用 PAP" : "Common PAP"}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

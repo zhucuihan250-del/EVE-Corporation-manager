@@ -12,6 +12,7 @@ export type PapLedgerEntryType =
 export const PapLedgerEntryType = {
   opening_balance: "opening_balance",
   pap_earned: "pap_earned",
+  pap_conversion: "pap_conversion",
   redemption: "redemption",
   admin_adjustment: "admin_adjustment",
   activity_deduction: "activity_deduction",

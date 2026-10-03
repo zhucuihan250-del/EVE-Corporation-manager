@@ -480,6 +480,13 @@ export const ListFleetsResponseItem = zod.object({
   name: zod.string(),
   fleetCommander: zod.string(),
   papValue: zod.number(),
+  papCurrencyId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Null means common PAP; a custom currency never credits the common balance directly.",
+    ),
+  papCurrencyName: zod.string().nullish(),
   isActive: zod.boolean(),
   fleetFunction: zod.string(),
   identityGroupId: zod.number().nullable(),
@@ -506,11 +513,18 @@ export const ListFleetsResponse = zod.array(ListFleetsResponseItem);
 /**
  * @summary Register a new fleet (admin only)
  */
+export const createFleetBodyPapValueMin = 0.000001;
+export const createFleetBodyPapValueMax = 1000000;
+
 export const CreateFleetBody = zod.object({
   eveFleetId: zod.string().nullish(),
   name: zod.string(),
   fleetCommander: zod.string(),
-  papValue: zod.number(),
+  papValue: zod
+    .number()
+    .min(createFleetBodyPapValueMin)
+    .max(createFleetBodyPapValueMax),
+  papCurrencyId: zod.number().min(1).nullish(),
   startedAt: zod.string().nullish(),
   fleetFunction: zod.string().optional(),
   identityGroupId: zod.number().nullish(),
@@ -541,6 +555,13 @@ export const GetFleetResponse = zod.object({
   name: zod.string(),
   fleetCommander: zod.string(),
   papValue: zod.number(),
+  papCurrencyId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Null means common PAP; a custom currency never credits the common balance directly.",
+    ),
+  papCurrencyName: zod.string().nullish(),
   isActive: zod.boolean(),
   fleetFunction: zod.string(),
   identityGroupId: zod.number().nullable(),
@@ -570,10 +591,22 @@ export const UpdateFleetParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const updateFleetBodyPapValueMin = 0.000001;
+export const updateFleetBodyPapValueMax = 1000000;
+
 export const UpdateFleetBody = zod.object({
   name: zod.string().optional(),
   fleetCommander: zod.string().optional(),
-  papValue: zod.number().optional(),
+  papValue: zod
+    .number()
+    .min(updateFleetBodyPapValueMin)
+    .max(updateFleetBodyPapValueMax)
+    .optional(),
+  papCurrencyId: zod
+    .number()
+    .min(1)
+    .nullish()
+    .describe("May change only before the first PAP award for this fleet."),
   isActive: zod.boolean().optional(),
   endedAt: zod.string().nullish(),
   eveFleetId: zod.string().nullish(),
@@ -599,6 +632,13 @@ export const UpdateFleetResponse = zod.object({
   name: zod.string(),
   fleetCommander: zod.string(),
   papValue: zod.number(),
+  papCurrencyId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Null means common PAP; a custom currency never credits the common balance directly.",
+    ),
+  papCurrencyName: zod.string().nullish(),
   isActive: zod.boolean(),
   fleetFunction: zod.string(),
   identityGroupId: zod.number().nullable(),
@@ -1664,6 +1704,11 @@ export const ListPapRecordsResponseItem = zod.object({
   characterId: zod.number().nullish(),
   fleetId: zod.number().nullish(),
   amount: zod.number(),
+  currencyId: zod.number().nullish(),
+  currencyName: zod
+    .string()
+    .nullish()
+    .describe("Currency name snapshot at issuance; null means common PAP."),
   type: zod.enum([
     "fleet",
     "manual",
@@ -1689,6 +1734,11 @@ export const ListAllPapRecordsResponseItem = zod.object({
   characterId: zod.number().nullish(),
   fleetId: zod.number().nullish(),
   amount: zod.number(),
+  currencyId: zod.number().nullish(),
+  currencyName: zod
+    .string()
+    .nullish()
+    .describe("Currency name snapshot at issuance; null means common PAP."),
   type: zod.enum([
     "fleet",
     "manual",
@@ -2189,6 +2239,13 @@ export const GetRecentFleetsResponseItem = zod.object({
   name: zod.string(),
   fleetCommander: zod.string(),
   papValue: zod.number(),
+  papCurrencyId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Null means common PAP; a custom currency never credits the common balance directly.",
+    ),
+  papCurrencyName: zod.string().nullish(),
   isActive: zod.boolean(),
   fleetFunction: zod.string(),
   identityGroupId: zod.number().nullable(),
@@ -4031,6 +4088,13 @@ export const ListReimbursementFleetsResponseItem = zod.object({
   name: zod.string(),
   fleetCommander: zod.string(),
   papValue: zod.number(),
+  papCurrencyId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Null means common PAP; a custom currency never credits the common balance directly.",
+    ),
+  papCurrencyName: zod.string().nullish(),
   isActive: zod.boolean(),
   fleetFunction: zod.string(),
   identityGroupId: zod.number().nullable(),
@@ -4176,6 +4240,13 @@ export const GetTacticalGroupDashboardResponse = zod.object({
       name: zod.string(),
       fleetCommander: zod.string(),
       papValue: zod.number(),
+      papCurrencyId: zod
+        .number()
+        .nullish()
+        .describe(
+          "Null means common PAP; a custom currency never credits the common balance directly.",
+        ),
+      papCurrencyName: zod.string().nullish(),
       isActive: zod.boolean(),
       fleetFunction: zod.string(),
       identityGroupId: zod.number().nullable(),
@@ -5178,6 +5249,7 @@ export const GetPapMarketOverviewResponse = zod.object({
       type: zod.enum([
         "opening_balance",
         "pap_earned",
+        "pap_conversion",
         "redemption",
         "admin_adjustment",
         "activity_deduction",
@@ -5360,6 +5432,7 @@ export const GetPapMarketAdminOverviewResponse = zod.object({
       type: zod.enum([
         "opening_balance",
         "pap_earned",
+        "pap_conversion",
         "redemption",
         "admin_adjustment",
         "activity_deduction",

@@ -7,7 +7,7 @@ import { Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 export function AdminPap() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { data: records, isLoading } = useListAllPapRecords({
     query: {
       queryKey: ["adminPapRecords"]
@@ -64,6 +64,7 @@ export function AdminPap() {
                     </TableCell>
                     <TableCell className={`font-mono font-bold text-right ${record.amount > 0 ? 'text-primary' : 'text-destructive'}`}>
                       {record.amount > 0 ? '+' : ''}{record.amount}
+                      <div className="mt-1 text-xs font-normal text-muted-foreground">{record.currencyId ? record.currencyName : i18n.language.startsWith("zh") ? "通用 PAP" : "Common PAP"}</div>
                     </TableCell>
                   </TableRow>
                 ))}

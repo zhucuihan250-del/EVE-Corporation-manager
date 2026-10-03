@@ -84,6 +84,8 @@ router.get("/tactical-groups/:id", async (req: Request, res: Response): Promise<
       name: fleetsTable.name,
       fleetCommander: fleetsTable.fleetCommander,
       papValue: fleetsTable.papValue,
+      papCurrencyId: fleetsTable.papCurrencyId,
+      papCurrencyName: fleetsTable.papCurrencyName,
       isActive: fleetsTable.isActive,
       fleetFunction: fleetsTable.fleetFunction,
       identityGroupId: fleetsTable.identityGroupId,
@@ -122,7 +124,7 @@ router.get("/tactical-groups/:id", async (req: Request, res: Response): Promise<
     )).then((rows) => rows[0]),
     db.select({
       fleetCount: sql<number>`COUNT(DISTINCT ${papRecordsTable.fleetId})::int`,
-      pap: sql<number>`COALESCE(SUM(${papRecordsTable.amount}), 0)::float8`,
+      pap: sql<number>`ROUND(COALESCE(SUM(${papRecordsTable.amount}) FILTER (WHERE ${papRecordsTable.currencyId} IS NULL), 0)::numeric, 6)::double precision`,
     }).from(papRecordsTable).innerJoin(fleetsTable, and(
       eq(fleetsTable.id, papRecordsTable.fleetId),
       eq(fleetsTable.corporationId, corporationId),

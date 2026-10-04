@@ -2,10 +2,13 @@ import { apiUrl } from "@/lib/api";
 import type {
   CanonicalFit,
   FittingCharacter,
+  FittingAdviceRequest,
+  FittingAdviceResponse,
   SavedFitting,
   WorkbenchCatalogItem,
   WorkbenchSimulation,
 } from "./fitting-workbench-types";
+import { validateFittingAdviceResponse } from "./fitting-ai-advice";
 
 export class FittingWorkbenchError extends Error {
   constructor(
@@ -54,6 +57,16 @@ async function request<T>(
 }
 
 export const fittingWorkbenchApi = {
+  advice: async (body: FittingAdviceRequest, signal: AbortSignal) => {
+    const data = await request<unknown>("/advice", { method: "POST", body, signal });
+    if (!validateFittingAdviceResponse(data, body))
+      throw new FittingWorkbenchError(
+        "建议内容未通过检查，请重新生成。 / Advice could not be verified. Please generate it again.",
+        502,
+        "FITTING_AI_INVALID_OUTPUT",
+      );
+    return data as FittingAdviceResponse;
+  },
   catalog: (
     options: {
       q?: string;

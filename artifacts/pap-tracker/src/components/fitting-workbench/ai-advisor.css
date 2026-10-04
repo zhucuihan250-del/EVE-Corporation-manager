@@ -1,0 +1,82 @@
+.fit-ai-dialog {
+  display: block;
+  width: calc(100vw - 24px);
+  max-width: 880px;
+  max-height: 90vh;
+  max-height: 90dvh;
+  overflow-y: auto;
+  padding: 20px;
+  border-radius: 5px;
+  background: #101b28;
+  color: #dbe7ed;
+  font-size: 12px;
+  line-height: 1.6;
+  scrollbar-width: thin;
+}
+.fit-ai-dialog *, .fit-ai-dialog *::before, .fit-ai-dialog *::after { box-sizing: border-box; }
+.fit-ai-dialog h3 { font-size: 14px; font-weight: 600; }
+.fit-ai-dialog h4 { font-size: 11px; font-weight: 600; color: #aac5d3; }
+.fit-ai-dialog p, .fit-ai-dialog h3, .fit-ai-dialog h4 { overflow-wrap: anywhere; }
+.fit-ai-dialog p { margin: 7px 0; }
+.fit-ai-dialog ul { list-style: disc; padding-left: 18px; margin: 6px 0; overflow-wrap: anywhere; }
+.fit-ai-title { display: flex; gap: 8px; align-items: center; padding-right: 25px; }
+.fit-ai-context { display: grid; gap: 3px; margin: 15px 0; padding: 10px 12px; border: 1px solid #8dadbf30; border-radius: 3px; background: #08111c80; overflow-wrap: anywhere; }
+.fit-ai-context span { color: #9db2c0; font-size: 11px; }
+.fit-ai-modes { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; border: 0; min-width: 0; margin: 14px 0; padding: 0; }
+.fit-ai-modes legend { font-weight: 600; margin-bottom: 6px; }
+.fit-ai-modes label { display: flex; gap: 8px; align-items: flex-start; padding: 10px; border: 1px solid #8dadbf30; border-radius: 3px; cursor: pointer; }
+.fit-ai-modes input { margin-top: 4px; flex: none; accent-color: #81c8e6; }
+.fit-ai-modes span { min-width: 0; }
+.fit-ai-modes small { display: block; color: #91a9b8; margin-top: 3px; }
+.fit-ai-form { display: grid; gap: 12px; }
+.fit-ai-form label { display: block; font-weight: 500; }
+.fit-ai-form input, .fit-ai-form textarea, .fit-ai-eft { display: block; width: 100%; min-width: 0; border: 1px solid #8dadbf40; border-radius: 3px; background: #070f1a; color: #dbe7ed; padding: 8px; margin-top: 5px; font: inherit; }
+.fit-ai-form textarea { min-height: 88px; resize: vertical; }
+.fit-ai-form input { max-width: 310px; }
+.fit-ai-form input:focus, .fit-ai-form textarea:focus, .fit-ai-eft:focus { outline: 1px solid #80bedb; }
+.fit-ai-form small { display: block; color: #91a9b8; font-weight: 400; margin-top: 4px; }
+.fit-ai-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
+.fit-ai-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 10px; border: 1px solid #8dadbf40; border-radius: 3px; background: #213749; color: #dbe7ed; font: inherit; cursor: pointer; max-width: 100%; }
+.fit-ai-button.is-primary { background: #305b73; border-color: #76aec5; }
+.fit-ai-button:hover:not(:disabled) { background: #3b6279; }
+.fit-ai-button:focus-visible { outline: 2px solid #97d6f1; outline-offset: 2px; }
+.fit-ai-button:disabled, .fit-ai-modes:disabled { opacity: .55; cursor: not-allowed; }
+.fit-ai-error { display: flex; align-items: flex-start; gap: 7px; padding: 10px; border: 1px solid #a35858; background: #712c2c30; color: #f1b5ac; overflow-wrap: anywhere; }
+.fit-ai-error svg, .fit-ai-verification svg { flex: none; margin-top: 3px; }
+.fit-ai-muted { color: #94aaba; font-size: 11px; }
+.fit-ai-warning, .fit-ai-warning-list { color: #e8c28d; font-size: 11px; overflow-wrap: anywhere; }
+.fit-ai-results { margin-top: 18px; }
+.fit-ai-summary, .fit-ai-baseline { border-top: 1px solid #8dadbf30; padding-top: 12px; margin-top: 12px; }
+.fit-ai-summary small { color: #94aaba; overflow-wrap: anywhere; }
+.fit-ai-verification { display: flex; align-items: flex-start; gap: 7px; color: #a6cabe; font-size: 11px; }
+.fit-ai-dialog summary { cursor: pointer; font-weight: 500; color: #a9cedf; padding: 8px 0; overflow-wrap: anywhere; }
+.fit-ai-candidate { border: 1px solid #8dadbf40; border-radius: 4px; padding: 14px; margin-top: 15px; background: #07111b70; }
+.fit-ai-candidate header { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; flex-wrap: wrap; }
+.fit-ai-verified { font-size: 10px; padding: 2px 5px; color: #acd7b1; background: #2d633b33; border: 1px solid #6ba37955; border-radius: 2px; }
+.fit-ai-metrics { display: grid; grid-template-columns: repeat(auto-fit,minmax(120px,1fr)); gap: 8px; margin: 12px 0; }
+.fit-ai-metrics > div { border: 1px solid #8dadbf25; padding: 7px 8px; background: #15253466; min-width: 0; }
+.fit-ai-metrics dt { color: #94aaba; font-size: 10px; }
+.fit-ai-metrics dd { font-size: 12px; overflow-wrap: anywhere; }
+.fit-ai-metrics small { display: block; font-size: 10px; color: #96c2d3; overflow-wrap: anywhere; }
+.fit-ai-price { padding: 9px 0; border-top: 1px solid #8dadbf20; }
+.fit-ai-price strong, .fit-ai-price span, .fit-ai-price small { display: block; overflow-wrap: anywhere; }
+.fit-ai-price strong { font-size: 15px; }
+.fit-ai-price small, .fit-ai-price p { font-size: 10px; color: #94aaba; }
+.fit-ai-equipment { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px 14px; }
+.fit-ai-equipment section { min-width: 0; }
+.fit-ai-equipment-row { display: flex; align-items: flex-start; gap: 7px; padding: 5px 0; border-bottom: 1px solid #8dadbf15; }
+.fit-ai-equipment-row > span { flex: none; width: 15px; color: #789aad; font-size: 10px; }
+.fit-ai-equipment-row > div { min-width: 0; }
+.fit-ai-equipment-row strong { font-size: 11px; font-weight: 500; overflow-wrap: anywhere; }
+.fit-ai-equipment-row small { display: block; color: #94aaba; font-size: 10px; overflow-wrap: anywhere; }
+.fit-ai-eft { height: 180px; font-family: ui-monospace, monospace; font-size: 11px; resize: vertical; }
+.fit-ai-spinner { animation: fit-ai-spin 1s linear infinite; }
+@keyframes fit-ai-spin { to { transform: rotate(360deg); } }
+@media (max-width: 520px) {
+  .fit-ai-dialog { padding: 16px 12px; width: calc(100vw - 16px); }
+  .fit-ai-modes, .fit-ai-equipment { grid-template-columns: minmax(0,1fr); }
+  .fit-ai-candidate { padding: 10px 8px; }
+  .fit-ai-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 6px; }
+  .fit-ai-metrics > div { padding: 6px; }
+  .fit-ai-metrics dd { font-size: 11px; }
+}

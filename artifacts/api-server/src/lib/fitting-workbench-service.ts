@@ -18,6 +18,7 @@ export type FittingWorkbenchEngine = {
 export type FittingSimulationWithSource = WorkbenchSimulation & {
   skillSource: { mode: "all5" | "none" | "character"; characterId?: number; characterName?: string; checkedAt?: string };
 };
+export type FittingSkillContext = { levels?: Record<number, number>; skillSource: FittingSimulationWithSource["skillSource"] };
 
 export function canManageCorporationFittings(actor: FittingActor): boolean {
   return ["fc", "admin", "controller"].includes(actor.role) || actor.permissions.includes("fleet.manage");
@@ -49,19 +50,21 @@ function view(actor: FittingActor, row: Saved) {
 
 export function createFittingWorkbenchService(dependencies: { database: Database; engine: FittingWorkbenchEngine; skills: ReturnType<typeof createFittingSkillsService> }) {
   const { database, engine, skills } = dependencies;
+  async function resolveSkillContext(actor: FittingActor, fit: CanonicalFit): Promise<FittingSkillContext> {
+    if (fit.skillProfile.mode !== "character") return { skillSource: { mode: fit.skillProfile.mode } };
+    const snapshot = await skills.getSkills(actor, fittingId(fit.skillProfile.characterId));
+    return {
+      levels: Object.fromEntries(snapshot.skills.map(item => [item.skillId, item.activeLevel])),
+      skillSource: { mode: "character", characterId: snapshot.characterId, characterName: snapshot.characterName, checkedAt: snapshot.checkedAt },
+    };
+  }
   async function simulate(actor: FittingActor, value: unknown, legacy = false): Promise<FittingSimulationWithSource> {
     const body = fittingObject(value), lng = language(body.language);
     const fit = legacy ? engine.resolveWorkbenchFit(body) : engine.validateCanonicalFit(body.fit);
     if (Object.hasOwn(body, "skills")) throw new FittingWorkbenchError(400, "FITTING_SERVER_SKILLS_REQUIRED", "角色技能由网站读取，请通过技能模式选择角色。");
-    let skillLevels: Record<number, number> | undefined;
-    let skillSource: FittingSimulationWithSource["skillSource"] = { mode: fit.skillProfile.mode };
-    if (fit.skillProfile.mode === "character") {
-      const snapshot = await skills.getSkills(actor, fittingId(fit.skillProfile.characterId));
-      skillLevels = Object.fromEntries(snapshot.skills.map(item => [item.skillId, item.activeLevel]));
-      skillSource = { mode: "character", characterId: snapshot.characterId, characterName: snapshot.characterName, checkedAt: snapshot.checkedAt };
-    }
-    const result = await engine.simulateWorkbench(fit, lng, skillLevels);
-    return { ...result, skillSource };
+    const context = await resolveSkillContext(actor, fit);
+    const result = await engine.simulateWorkbench(fit, lng, context.levels);
+    return { ...result, skillSource: context.skillSource };
   }
   async function importFit(value: unknown) {
     const body = fittingObject(value), lng = language(body.language);
@@ -129,5 +132,5 @@ export function createFittingWorkbenchService(dependencies: { database: Database
     if (!row) throw new FittingWorkbenchError(409, "FITTING_VERSION_CONFLICT", "配置已被修改或移除，请刷新后重试。");
     return { deleted: true };
   }
-  return { simulate, importFit, exportFit, listSaved, getSaved, createSaved, updateSaved, deleteSaved, listCharacters: skills.listCharacters, getSkills: skills.getSkills };
+  return { simulate, resolveSkillContext, importFit, exportFit, listSaved, getSaved, createSaved, updateSaved, deleteSaved, listCharacters: skills.listCharacters, getSkills: skills.getSkills };
 }

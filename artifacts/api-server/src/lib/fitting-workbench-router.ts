@@ -2,6 +2,8 @@ import { Router, type ErrorRequestHandler, type NextFunction, type Request, type
 import type { FittingCategory, FittingLanguage, FittingSlot } from "./fitting-data";
 import { fittingId, FittingWorkbenchError, type FittingActor } from "./fitting-workbench-errors";
 import type { createFittingWorkbenchService } from "./fitting-workbench-service";
+import type { createFittingAdviceService } from "./fitting-advice-service";
+import { adviceError } from "./fitting-advice-provider";
 
 type CatalogOptions = { query?: string; category?: FittingCategory | "all"; slot?: FittingSlot | "all"; language: FittingLanguage; limit?: number };
 type CatalogResult = { sdeBuildNumber: number | null; generatedAt: string; items: unknown[] };
@@ -26,6 +28,7 @@ export const fittingWorkbenchErrorHandler: ErrorRequestHandler = (error: unknown
 
 export function createFittingWorkbenchRouter(dependencies: {
   service: ReturnType<typeof createFittingWorkbenchService>;
+  adviceService?: ReturnType<typeof createFittingAdviceService>;
   requireAuth: RequestHandler;
   requireTenant: RequestHandler;
   requireFleet: RequestHandler;
@@ -55,7 +58,12 @@ export function createFittingWorkbenchRouter(dependencies: {
   const route = (handler: (req: Request, res: Response) => Promise<void>) => async (req: Request, res: Response, next: NextFunction) => {
     try { await handler(req, res); }
     catch (error) {
-      if (error instanceof FittingWorkbenchError || dependencies.isEngineInputError(error)) { res.status(error.status).json({ error: error.message, code: error.code }); return; }
+      if (res.destroyed || res.writableEnded) return;
+      if (error instanceof FittingWorkbenchError || dependencies.isEngineInputError(error)) {
+        if (error.code === "FITTING_AI_RATE_LIMIT") res.setHeader("Retry-After", "60");
+        if (error.code === "FITTING_AI_BUSY") res.setHeader("Retry-After", "10");
+        res.status(error.status).json({ error: error.message, code: error.code }); return;
+      }
       fittingWorkbenchErrorHandler(error, req, res, next);
     }
   };
@@ -84,6 +92,15 @@ export function createFittingWorkbenchRouter(dependencies: {
     res.json({ ...simulation, precision: "approximate", calculationPrecision: simulation.calculationPrecision });
   }));
   router.post("/fitting/workbench", route(async (req, res) => { res.json(await service.simulate(actor(req), req.body)); }));
+  router.post("/fitting/advice", route(async (req, res) => {
+    if (!dependencies.adviceService) throw adviceError("FITTING_AI_NOT_CONFIGURED");
+    const controller = new AbortController(), close = () => { if (!res.writableEnded) controller.abort(); };
+    res.once("close", close);
+    try {
+      const result = await dependencies.adviceService.advise(actor(req), req.body, controller.signal);
+      if (!res.destroyed) res.json(result);
+    } finally { res.removeListener("close", close); }
+  }));
   router.post("/fitting/import", route(async (req, res) => { res.json(await service.importFit(req.body)); }));
   router.post("/fitting/export", route(async (req, res) => { res.json(await service.exportFit(req.body)); }));
   router.get("/fitting/saved", route(async (req, res) => { res.json(await service.listSaved(actor(req), { cursor: req.query.cursor, limit: req.query.limit, visibility: req.query.visibility })); }));

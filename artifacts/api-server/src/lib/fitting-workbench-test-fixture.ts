@@ -12,6 +12,9 @@ import { createFittingSkillsService, type fetchFittingSkills } from "./fitting-w
 import type { FittingActor } from "./fitting-workbench-errors";
 import type { CanonicalFit } from "./fitting-engine-types";
 import type { refreshSkillTokens } from "./identity-skills-client";
+import { createFittingAdviceService } from "./fitting-advice-service";
+import { adviceError, type FittingAdviceProvider } from "./fitting-advice-provider";
+import type { FittingAdvicePrice } from "./fitting-advice-types";
 
 export const FITTING_FIXTURE_ACTORS: Record<number, FittingActor> = {
   1: { corporationId: 1001, userId: 1, userName: "测试管理员", role: "admin", permissions: [] },
@@ -24,7 +27,7 @@ export const FITTING_FIXTURE_ACTORS: Record<number, FittingActor> = {
 export function fittingFixtureInput(overrides: Partial<CanonicalFit> = {}): CanonicalFit {
   return { schemaVersion: 2, shipTypeId: 593, name: "Tristan Test", slots: [], drones: [], cargo: [], skillProfile: { mode: "all5" }, damageProfile: { em: 0.25, thermal: 0.25, kinetic: 0.25, explosive: 0.25 }, ...overrides };
 }
-export async function createFittingWorkbenchFixture(options: { defaultActor?: number; fleetEnabled?: boolean; fetchSkills?: typeof fetchFittingSkills; refreshTokens?: typeof refreshSkillTokens; logQuery?: (query: string) => void; extraRouterFactory?: (guards: RequestHandler[]) => IRouter } = {}) {
+export async function createFittingWorkbenchFixture(options: { defaultActor?: number; fleetEnabled?: boolean; fetchSkills?: typeof fetchFittingSkills; refreshTokens?: typeof refreshSkillTokens; logQuery?: (query: string) => void; extraRouterFactory?: (guards: RequestHandler[]) => IRouter; adviceProvider?: FittingAdviceProvider; adviceQuotes?: (fits: CanonicalFit[]) => Promise<FittingAdvicePrice[]>; adviceLimits?: Parameters<typeof createFittingAdviceService>[0]["limits"] } = {}) {
   const pg = new PGlite();
   await pg.exec(`
     CREATE TABLE corporations(id integer PRIMARY KEY);
@@ -45,6 +48,11 @@ export async function createFittingWorkbenchFixture(options: { defaultActor?: nu
   const database = drizzle(pg, { logger: options.logQuery ? { logQuery: query => options.logQuery!(query) } : false }) as unknown as Parameters<typeof createFittingWorkbenchService>[0]["database"];
   const skills = createFittingSkillsService({ database, fetchSkills: options.fetchSkills ?? (async () => [{ skillId: 3426, activeLevel: 3, trainedLevel: 5 }, { skillId: 3436, activeLevel: 2, trainedLevel: 4 }]), refreshTokens: options.refreshTokens });
   const service = createFittingWorkbenchService({ database, engine: { validateCanonicalFit, resolveWorkbenchFit, simulateWorkbench, parseEft, exportEft }, skills });
+  const adviceService = createFittingAdviceService({ engine: { validateCanonicalFit, simulateWorkbench, exportEft }, resolveSkills: service.resolveSkillContext,
+    provider: options.adviceProvider ?? { isConfigured: () => false, generate: async () => { throw adviceError("FITTING_AI_NOT_CONFIGURED"); } },
+    quoteFits: options.adviceQuotes ?? (async fits => fits.map(() => ({ estimatedTotalIsk: null, complete: false, basis: "jita_sell" as const, checkedAt: new Date().toISOString(), missingTypeIds: [], note: "Fixture does not call public market services." }))),
+    limits: options.adviceLimits,
+  });
   const app = express();
   app.use(express.json({ limit: "100kb" }));
   const authenticate: RequestHandler = (req, res, next) => {
@@ -65,13 +73,13 @@ export async function createFittingWorkbenchFixture(options: { defaultActor?: nu
     const actor = req.tenant!;
     res.json({ id: actor.user.id, eveCharacterId: 90000000 + actor.user.id, eveCharacterName: actor.user.eveCharacterName, corporationId: actor.corporation.id, corporationName: "Local fitting QA corporation", role: actor.membership.role, permissions: actor.permissions, isPrimaryCorporation: actor.corporation.id === 1001, tacticalGroups: [], reimbursementOpen: true, modules: { fleet: options.fleetEnabled !== false, pap: true, identity: false, economy: false, reimbursement: false, diplomacy: false, courier: false, structures: false }, pap: 0, totalPap: 0, redeemablePap: 0, availablePap: 0, lockedPap: 0, createdAt: new Date().toISOString() });
   });
-  app.use("/api", createFittingWorkbenchRouter({ service, requireAuth: authenticate, requireTenant: (_req, _res, next) => next(), requireFleet: requireFixtureFleet, searchCatalog: searchFittingCatalog, getCatalogItem: getFittingCatalogItem, isEngineInputError: (error): error is FittingInputError => error instanceof FittingInputError }));
+  app.use("/api", createFittingWorkbenchRouter({ service, adviceService, requireAuth: authenticate, requireTenant: (_req, _res, next) => next(), requireFleet: requireFixtureFleet, searchCatalog: searchFittingCatalog, getCatalogItem: getFittingCatalogItem, isEngineInputError: (error): error is FittingInputError => error instanceof FittingInputError }));
   app.use("/api/fitting", fittingWorkbenchErrorHandler);
   app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     const status = (error as { status?: number }).status === 413 ? 413 : 500;
     res.status(status).json({ error: status === 413 ? "Payload too large" : "Fixture failure" });
   });
-  return { pg, database, skills, service, app, runMigration, close: () => pg.close(), async listen(port = 0) {
+  return { pg, database, skills, service, adviceService, app, runMigration, close: () => pg.close(), async listen(port = 0) {
     const server = app.listen(port, "127.0.0.1"); await new Promise<void>(resolve => server.once("listening", resolve));
     return { url: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, server };
   } };

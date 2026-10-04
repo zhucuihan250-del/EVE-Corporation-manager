@@ -24,6 +24,7 @@ import {
   Save,
   Search,
   Settings2,
+  Sparkles,
   Shield,
   Ship,
   Trash2,
@@ -61,6 +62,7 @@ import {
 import { StatsPanel } from "@/components/fitting-workbench/stats-panel";
 import { FittingBays } from "@/components/fitting-workbench/bays";
 import { FittingShipPreview } from "@/components/fitting-workbench/ship-preview";
+import { FittingAiAdvisor } from "@/components/fitting-workbench/ai-advisor";
 import "@/components/fitting-workbench/workbench.css";
 
 type Selection = { rack: WorkbenchRack; index: number };
@@ -129,6 +131,7 @@ export function Fitting() {
     null,
   );
   const [modal, setModal] = useState<ModalKind>(null);
+  const [adviceOpen, setAdviceOpen] = useState(false);
   const [text, setText] = useState(""),
     [modalError, setModalError] = useState("");
   const [notice, setNotice] = useState(""),
@@ -920,6 +923,15 @@ export function Fitting() {
             {tr("导入配置", "Import")}
           </button>
           <button
+            type="button"
+            className="fit-btn"
+            disabled={!fit.shipTypeId || !user}
+            onClick={() => setAdviceOpen(true)}
+          >
+            <Sparkles size={13} />
+            {tr("AI 配船建议", "AI fitting advice")}
+          </button>
+          <button
             className="fit-btn"
             disabled={!fit.shipTypeId || busy}
             onClick={showExport}
@@ -1642,6 +1654,16 @@ export function Fitting() {
           {tr("官方许可协议", "Official license agreement")}
         </a>
       </p>
+      <FittingAiAdvisor
+        key={`${user?.corporationId ?? "primary"}:${user?.id ?? "guest"}`}
+        open={adviceOpen}
+        onOpenChange={setAdviceOpen}
+        fit={fit}
+        actorKey={`${user?.corporationId ?? "primary"}:${user?.id ?? "guest"}`}
+        language={language}
+        lookup={lookup}
+        characterName={characters.data?.characters.find(character => character.id === fit.skillProfile.characterId)?.name}
+      />
       {modal && (
         <div
           className="fit-modal-overlay"

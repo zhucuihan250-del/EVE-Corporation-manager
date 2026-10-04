@@ -237,3 +237,84 @@ export interface FittingCharacter {
   name: string;
   isMain: boolean;
 }
+
+export type FittingAdviceMode = "optimize" | "new";
+export interface FittingAdviceSkillSource {
+  mode: "all5" | "none" | "character";
+  characterId?: number;
+  characterName?: string;
+  checkedAt?: string;
+}
+export type FittingAdviceSimulation = WorkbenchSimulation & {
+  skillSource: FittingAdviceSkillSource;
+};
+export interface FittingAdviceRequest {
+  fit: CanonicalFit;
+  mode: FittingAdviceMode;
+  goal: string;
+  budgetIsk?: number;
+  language: "zh" | "en";
+}
+export interface FittingAdvicePrice {
+  estimatedTotalIsk: number | null;
+  complete: boolean;
+  basis: "jita_sell";
+  checkedAt: string;
+  missingTypeIds: number[];
+  note: string;
+}
+export interface FittingAdviceChangeItem {
+  typeId: number;
+  name: string;
+  quantity: number;
+  chargeTypeId: number | null;
+  chargeName: string | null;
+  chargeQuantity: number | null;
+  state: string | null;
+  activeQuantity: number | null;
+}
+export interface FittingAdviceChange {
+  section: "slot" | "drone" | "cargo";
+  rack: WorkbenchRack | null;
+  index: number | null;
+  before: FittingAdviceChangeItem | null;
+  after: FittingAdviceChangeItem | null;
+}
+export interface FittingAdviceSuggestion {
+  id: string;
+  title: string;
+  rationale: string;
+  tradeoffs: string[];
+  fit: CanonicalFit;
+  simulation: FittingAdviceSimulation;
+  dogmaVerified: true;
+  changes: FittingAdviceChange[];
+  delta: {
+    dps: number;
+    sustainedDps: number;
+    ehp: number;
+    speed: number;
+    alignSeconds: number;
+    cpuLoad: number;
+    powergridLoad: number;
+  };
+  price: FittingAdvicePrice;
+  withinBudget: boolean | null;
+  eft: string;
+  eftWarnings: string[];
+  warnings: string[];
+}
+export interface FittingAdviceResponse {
+  source: "openai";
+  mode: FittingAdviceMode;
+  model: string;
+  generatedAt: string;
+  summary: string;
+  skillSource: FittingAdviceSkillSource;
+  baselineSimulation: FittingAdviceSimulation;
+  baselinePrice: FittingAdvicePrice;
+  suggestions: FittingAdviceSuggestion[];
+  rejectedSuggestions: number;
+  usage: { inputTokens: number; outputTokens: number; totalTokens: number } | null;
+  warnings: string[];
+}

@@ -11,6 +11,8 @@ import { purgeExpiredDeletedCharacters } from "./character-retention";
 import { settleDueActivityMonths } from "./activity-monthly-settlement";
 import { editablePapCurrenciesMigration } from "../../../../lib/db/src/migrations/0030-editable-pap-currencies";
 import { fittingWorkbenchMigration } from "../../../../lib/db/src/migrations/0032-fitting-workbench";
+import { automaticDutyPapMigration } from "../../../../lib/db/src/migrations/0033-automatic-duty-pap";
+import { DUTY_PAP_SCOPES } from "./duty-pap-rules";
 
 // Bundle this test with @workspace/db aliased to single-corporation-test-db.ts.
 // It exercises the real middleware and OAuth routes against in-memory Postgres.
@@ -23,6 +25,7 @@ let currentSession: Record<string, unknown>;
 let destroyed = false;
 let lastOAuthError: unknown;
 let ssoCharacter = { characterId: 101, characterName: "Member", corporationId: 1001 };
+let dutyTokenFixture = false;
 
 function session(values: Record<string, unknown> = {}) {
   return {
@@ -58,12 +61,18 @@ before(async () => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     if (origin && url.startsWith(`${origin}/`)) return realFetch(input, init);
     if (url === "https://login.eveonline.com/v2/oauth/token") {
-      return Response.json({ access_token: "fixture-access", refresh_token: "fixture-refresh", expires_in: 1200 });
+      const claims = Buffer.from(JSON.stringify({ sub: `CHARACTER:EVE:${ssoCharacter.characterId}`, scp: DUTY_PAP_SCOPES, azp: "test-client", exp: Math.floor(Date.now() / 1000) + 1200 })).toString("base64url");
+      return Response.json({ access_token: dutyTokenFixture ? `fixture.${claims}.fixture` : "fixture-access", refresh_token: "fixture-refresh", expires_in: 1200 });
     }
     if (url === "https://login.eveonline.com/oauth/verify") {
       return Response.json({ CharacterID: ssoCharacter.characterId, CharacterName: ssoCharacter.characterName });
     }
     if (url === "https://esi.evetech.net/latest/characters/affiliation/?datasource=tranquility") {
+      return Response.json([{ character_id: ssoCharacter.characterId, corporation_id: ssoCharacter.corporationId }]);
+    }
+    if (url === "https://esi.evetech.net/characters/affiliation") {
+      assert.equal(init?.method, "POST");
+      assert.deepEqual(JSON.parse(String(init?.body)), [ssoCharacter.characterId]);
       return Response.json([{ character_id: ssoCharacter.characterId, corporation_id: ssoCharacter.corporationId }]);
     }
     if (/^https:\/\/esi\.evetech\.net\/latest\/corporations\/\d+\//.test(url)) {
@@ -112,7 +121,7 @@ before(async () => {
     CREATE TABLE identity_group_memberships (id serial PRIMARY KEY, corporation_id integer NOT NULL,
       group_id integer NOT NULL, user_id integer NOT NULL);
     CREATE TABLE activity_monthly_settlements (id serial PRIMARY KEY, corporation_id integer NOT NULL, month text NOT NULL);
-    CREATE TABLE pap_records (user_id integer);
+    CREATE TABLE pap_records (id serial PRIMARY KEY, user_id integer);
     CREATE TABLE pap_market_orders (owner_id integer, updated_at timestamptz NOT NULL DEFAULT now());
     CREATE TABLE pap_market_transactions (buyer_id integer, seller_id integer, reviewed_by integer, updated_at timestamptz NOT NULL DEFAULT now());
     CREATE TABLE pap_ledger (user_id integer, admin_id integer, type text);
@@ -121,6 +130,7 @@ before(async () => {
   const migrationClient = { query: (statement: string) => pg.exec(statement) } as unknown as Parameters<typeof fittingWorkbenchMigration.up>[0];
   await editablePapCurrenciesMigration.up(migrationClient);
   await fittingWorkbenchMigration.up(migrationClient);
+  await automaticDutyPapMigration.up(migrationClient);
   const app = express();
   app.use((req, _res, next) => {
     req.session = currentSession as unknown as Request["session"];
@@ -141,8 +151,10 @@ beforeEach(async () => {
   lastOAuthError = undefined;
   currentSession = session();
   ssoCharacter = { characterId: 101, characterName: "Member", corporationId: 1001 };
+  dutyTokenFixture = false;
   await pg.exec(`
-    TRUNCATE fittings, pap_currency_ledger, pap_currency_wallets, pap_currencies,
+    TRUNCATE duty_pap_awards, duty_pap_progress, duty_pap_connections, duty_pap_rules,
+      fittings, pap_currency_ledger, pap_currency_wallets, pap_currencies,
       pap_records, pap_market_orders, pap_market_transactions, pap_ledger, pap_market_admin_logs,
       activity_monthly_settlements, identity_group_memberships, identity_groups, characters, corporation_memberships,
       users, corporations RESTART IDENTITY;
@@ -350,7 +362,7 @@ async function seedOrphanFittingHistory() {
       (1001, 'corporation', NULL, 3, 3, 'FC', 'Corporation doctrine', '{"schemaVersion":2,"shipTypeId":593}', '{"valid":true}', 4),
       (1001, 'personal', 1, 1, 1, 'Member', 'Existing main draft', '{"schemaVersion":2,"shipTypeId":593}', '{"valid":true}', 2),
       (2002, 'personal', 2, 2, 2, 'External', 'Historical foreign draft', '{"schemaVersion":2,"shipTypeId":593}', '{"valid":true}', 3);
-    INSERT INTO pap_records VALUES(3);
+    INSERT INTO pap_records (user_id) VALUES(3);
     INSERT INTO pap_market_orders (owner_id) VALUES(3);
     INSERT INTO pap_market_transactions (buyer_id,seller_id,reviewed_by) VALUES(3,3,3);
     INSERT INTO pap_ledger VALUES(3,3,'pap_earned');
@@ -397,6 +409,55 @@ test("real OAuth account merge rolls fitting ownership and PAP history back when
     assert.deepEqual((await pg.query("SELECT owner_id FROM pap_market_orders")).rows, [{ owner_id: 3 }]);
   } finally {
     await pg.exec("DROP TRIGGER fail_test_orphan_delete ON users; DROP FUNCTION fail_test_orphan_delete()");
+  }
+});
+
+test("real duty OAuth callback is one-use, preserves login tokens, and only creates a dedicated connection", async () => {
+  dutyTokenFixture = true;
+  const userBefore = (await pg.query("SELECT * FROM users WHERE id=1")).rows[0];
+  const charactersBefore = (await pg.query("SELECT * FROM characters ORDER BY id")).rows;
+  const response = await fetch(`${origin}/auth/eve/duty?characterId=1`, { redirect: "manual" });
+  assert.equal(response.status, 302);
+  const state = new URL(response.headers.get("location")!).searchParams.get("state");
+  assert.equal(currentSession.eveOauthFlow, "duty");
+  assert.ok(state);
+  const approved = await fetch(`${origin}/auth/eve/callback?code=fixture-code&state=${state}`, { redirect: "manual" });
+  assert.equal(approved.headers.get("location"), "/duty-pap?connected=1");
+  assert.equal(currentSession.eveOauthState, undefined);
+  assert.equal(currentSession.eveOauthFlow, undefined);
+  assert.equal(currentSession.dutyPapAuthorization, undefined);
+  assert.deepEqual((await pg.query("SELECT * FROM users WHERE id=1")).rows[0], userBefore);
+  assert.deepEqual((await pg.query("SELECT * FROM characters ORDER BY id")).rows, charactersBefore);
+  const rows = (await pg.query("SELECT user_id,character_id,enabled,version FROM duty_pap_connections")).rows;
+  assert.deepEqual(rows, [{ user_id: 1, character_id: 1, enabled: true, version: 0 }]);
+  assert.equal((await pg.query("SELECT id FROM duty_pap_rules")).rows.length, 0);
+  assert.equal((await pg.query("SELECT id FROM duty_pap_awards")).rows.length, 0);
+  const replay = await fetch(`${origin}/auth/eve/callback?code=fixture-code&state=${state}`, { redirect: "manual" });
+  assert.notEqual(replay.headers.get("location"), "/duty-pap?connected=1");
+  assert.deepEqual((await pg.query("SELECT user_id,character_id,enabled,version FROM duty_pap_connections")).rows, rows);
+});
+
+test("real duty OAuth denial consumes state and mismatched game character cannot authorize", async () => {
+  await fetch(`${origin}/auth/eve/duty?characterId=1`, { redirect: "manual" });
+  let state = currentSession.eveOauthState;
+  const cancelled = await fetch(`${origin}/auth/eve/callback?error=access_denied&state=${state}`, { redirect: "manual" });
+  assert.equal(cancelled.headers.get("location"), "/duty-pap?error=duty_cancelled");
+  assert.equal(currentSession.eveOauthState, undefined);
+  assert.equal(currentSession.dutyPapAuthorization, undefined);
+  dutyTokenFixture = true;
+  await fetch(`${origin}/auth/eve/duty?characterId=1`, { redirect: "manual" });
+  state = currentSession.eveOauthState;
+  ssoCharacter = { characterId: 102, characterName: "Home alt", corporationId: 1001 };
+  const mismatched = await fetch(`${origin}/auth/eve/callback?code=fixture-code&state=${state}`, { redirect: "manual" });
+  assert.equal(mismatched.headers.get("location"), "/duty-pap?error=duty_character");
+  assert.equal((await pg.query("SELECT id FROM duty_pap_connections")).rows.length, 0);
+});
+
+test("real duty OAuth rejects foreign, unbound and another member's character before starting consent", async () => {
+  for (const characterId of [2, 7, 999]) {
+    const response = await fetch(`${origin}/auth/eve/duty?characterId=${characterId}`, { redirect: "manual" });
+    assert.equal(response.status, 404);
+    assert.equal(currentSession.dutyPapAuthorization, undefined);
   }
 });
 

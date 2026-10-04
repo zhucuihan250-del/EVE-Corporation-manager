@@ -20,3 +20,4 @@ export * from "./system_monitoring";
 export * from "./buyback";
 export * from "./pap_currencies";
 export * from "./fittings";
+export * from "./duty_pap";

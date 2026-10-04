@@ -35,6 +35,7 @@ const TacticalRewards = lazy(() => import("@/pages/rewards").then((module) => ({
 const Redemptions = lazy(() => import("@/pages/redemptions").then((module) => ({ default: module.Redemptions })));
 const PapMarket = lazy(() => import("@/pages/pap-market").then((module) => ({ default: module.PapMarket })));
 const PapWallet = lazy(() => import("@/pages/pap-wallet").then((module) => ({ default: module.PapWallet })));
+const DutyPap = lazy(() => import("@/pages/duty-pap").then((module) => ({ default: module.DutyPap })));
 const Characters = lazy(() => import("@/pages/characters").then((module) => ({ default: module.Characters })));
 const Fitting = lazy(() => import("@/pages/fitting").then((module) => ({ default: module.Fitting })));
 const BattleReportDetail = lazy(() => import("@/pages/battle-reports").then((module) => ({ default: module.BattleReportDetail })));
@@ -60,6 +61,7 @@ const AdminRedemptions = lazy(() => import("@/pages/admin/redemptions").then((mo
 const AdminPap = lazy(() => import("@/pages/admin/pap").then((module) => ({ default: module.AdminPap })));
 const AdminPapMarket = lazy(() => import("@/pages/admin/pap-market").then((module) => ({ default: module.AdminPapMarket })));
 const AdminPapCurrencies = lazy(() => import("@/pages/admin/pap-currencies").then((module) => ({ default: module.AdminPapCurrencies })));
+const AdminDutyPap = lazy(() => import("@/pages/admin/duty-pap").then((module) => ({ default: module.AdminDutyPap })));
 const AdminActivity = lazy(() => import("@/pages/admin/activity").then((module) => ({ default: module.AdminActivity })));
 const AdminIdentity = lazy(() => import("@/pages/admin/identity").then((module) => ({ default: module.AdminIdentity })));
 const AdminDiplomacy = lazy(() => import("@/pages/admin/diplomacy").then((module) => ({ default: module.AdminDiplomacy })));
@@ -92,6 +94,7 @@ function ProtectedRoute({
   component: Component,
   minRole,
   module,
+  modulesRequired,
   permission,
   permissionAlternative,
   permissionAlternatives,
@@ -100,6 +103,7 @@ function ProtectedRoute({
   component: RouteComponent;
   minRole?: Role;
   module?: keyof CorporationModules;
+  modulesRequired?: readonly (keyof CorporationModules)[];
   permission?: string;
   permissionAlternative?: string;
   permissionAlternatives?: readonly string[];
@@ -130,12 +134,13 @@ function ProtectedRoute({
       user
       && ((minRole && !hasRole(user.role, minRole) && !hasAlternativePermission)
         || (module && !user.modules[module])
+        || modulesRequired?.some((required) => !user.modules[required])
         || (requiresReimbursementOpen && !user.reimbursementOpen)
         || (permission && !user.permissions.includes(permission)))
     ) {
       setLocation(defaultLanding(user));
     }
-  }, [isLoading, isError, isUnauthorized, user, setLocation, minRole, module, permission, hasAlternativePermission, requiresReimbursementOpen]);
+  }, [isLoading, isError, isUnauthorized, user, setLocation, minRole, module, modulesRequired, permission, hasAlternativePermission, requiresReimbursementOpen]);
 
   if (isLoading) {
     return (
@@ -159,6 +164,7 @@ function ProtectedRoute({
     || !user
     || (minRole && !hasRole(user.role, minRole) && !hasAlternativePermission)
     || (module && !user.modules[module])
+    || modulesRequired?.some((required) => !user.modules[required])
     || (requiresReimbursementOpen && !user.reimbursementOpen)
     || (permission && !user.permissions.includes(permission))
   ) {
@@ -195,6 +201,9 @@ function Router() {
       </Route>
       <Route path="/pap-wallet">
         {() => <ProtectedRoute component={PapWallet} module="pap" />}
+      </Route>
+      <Route path="/duty-pap">
+        {() => <ProtectedRoute component={DutyPap} modulesRequired={["pap", "fleet"]} />}
       </Route>
       <Route path="/characters">
         {() => <ProtectedRoute component={Characters} module="pap" />}
@@ -274,6 +283,9 @@ function Router() {
       </Route>
       <Route path="/admin/pap-currencies">
         {() => <ProtectedRoute component={AdminPapCurrencies} minRole="admin" module="pap" />}
+      </Route>
+      <Route path="/admin/duty-pap">
+        {() => <ProtectedRoute component={AdminDutyPap} minRole="admin" modulesRequired={["pap", "fleet"]} />}
       </Route>
       <Route path="/admin/activity">
         {() => <ProtectedRoute component={AdminActivity} minRole="admin" module="pap" permissionAlternative="activity.manage" />}

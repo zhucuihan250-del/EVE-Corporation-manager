@@ -8,10 +8,11 @@ declare module "express-session" {
     corporationId?: number;
     eveCharacterId?: number;
     eveOauthState?: string;
-    eveOauthFlow?: "login" | "link_alt" | "economy" | "roster" | "structures";
+    eveOauthFlow?: "login" | "link_alt" | "economy" | "roster" | "structures" | "duty";
     economyLinkCorporationId?: number;
     rosterLinkCorporationId?: number;
     structuresLinkCorporationId?: number;
+    dutyPapAuthorization?: { corporationId: number; userId: number; characterId: number; issuedAt: number; connectionVersion: number | null };
   }
 }
 

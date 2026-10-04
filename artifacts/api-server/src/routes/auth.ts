@@ -25,12 +25,17 @@ import {
   ensureCorporation,
   ensureCorporationMembership,
   getTenantContext,
+  requireTenant,
+  requireModule,
 } from "../lib/tenant";
 import { timingSafeEqual } from "node:crypto";
 import { availablePap } from "../lib/pap-balance";
 import { mergePapWallets } from "../lib/pap-currency-account-merge";
 import { ensureCharacterCorporationReference, recordNonSiteLoginAffiliation, requireSiteCorporation } from "../lib/single-corporation";
 import { siteAllowsLogin } from "../lib/single-corporation-rules";
+import { dutyPapOAuth } from "../lib/duty-pap";
+import { DutyPapError } from "../lib/duty-pap-rules";
+import { mergeDutyPapAccounts } from "../lib/duty-pap-service";
 
 const router: IRouter = Router();
 
@@ -45,6 +50,7 @@ async function mergeOrphanUser(
   await db.transaction(async (tx) => {
     const merged = await mergePapWallets(tx, orphan.corporationId!, orphan.id, mainUserId);
     if (!merged) return;
+    await mergeDutyPapAccounts(tx, orphan.corporationId!, orphan.id, mainUserId);
     // Never copy another account's permissions or historical foreign memberships.
     await tx.execute(sql`UPDATE pap_records SET user_id = ${mainUserId} WHERE user_id = ${orphan.id}`);
     // Preserve market audit history while moving live ownership to the main account.
@@ -276,6 +282,7 @@ router.get("/auth/eve/login", (req: Request, res: Response): void => {
   req.session.economyLinkCorporationId = undefined;
   req.session.rosterLinkCorporationId = undefined;
   req.session.structuresLinkCorporationId = undefined;
+  req.session.dutyPapAuthorization = undefined;
   req.session.save((error) => {
     if (error) {
       res.status(500).json({ error: "Unable to start EVE SSO" });
@@ -292,6 +299,7 @@ router.get("/auth/eve/link-alt", requireAuth, (req: Request, res: Response): voi
   req.session.economyLinkCorporationId = undefined;
   req.session.rosterLinkCorporationId = undefined;
   req.session.structuresLinkCorporationId = undefined;
+  req.session.dutyPapAuthorization = undefined;
   const state = generateOauthState();
   req.session.eveOauthState = state;
   req.session.eveOauthFlow = "link_alt";
@@ -308,9 +316,24 @@ router.get("/auth/eve/link-alt", requireAuth, (req: Request, res: Response): voi
   });
 });
 
+// Optional dedicated consent: existing login/link-alt scopes remain unchanged.
+router.get("/auth/eve/duty", requireAuth, requireTenant, requireModule("pap"), requireModule("fleet"), async (req, res): Promise<void> => {
+  await dutyPapOAuth.start(req, res);
+});
+
 // GET /api/auth/eve/callback - EVE SSO callback
 router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<void> => {
   const { code, state } = req.query;
+  if (req.session.eveOauthFlow === "duty" && req.query.error && validOauthState(req.session.eveOauthState, state)) {
+    req.session.eveOauthState = undefined; req.session.eveOauthFlow = undefined; req.session.dutyPapAuthorization = undefined;
+    try {
+      await new Promise<void>((resolve, reject) => req.session.save(error => error ? reject(error) : resolve()));
+      redirectToFrontend(res, req.query.error === "invalid_scope" ? "/duty-pap?error=duty_scopes" : "/duty-pap?error=duty_cancelled");
+    } catch {
+      res.status(503).json({ error: "无法保存值守授权状态，请稍后重新授权。", code: "DUTY_PAP_AUTH_UNAVAILABLE" });
+    }
+    return;
+  }
   if (!code || typeof code !== "string") {
     res.status(400).json({ error: "Missing authorization code" });
     return;
@@ -325,10 +348,13 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
     || (oauthFlow === "roster" && !req.session.rosterLinkCorporationId)
     || (oauthFlow === "structures" && !req.session.structuresLinkCorporationId)
     || (oauthFlow === "link_alt" && !req.session.linkingUserId)
+    || (oauthFlow === "duty" && !req.session.dutyPapAuthorization)
   ) {
     res.status(400).json({ error: "Invalid EVE SSO flow" });
     return;
   }
+  const dutyTarget = oauthFlow === "duty" ? req.session.dutyPapAuthorization : undefined;
+  req.session.dutyPapAuthorization = undefined;
   req.session.eveOauthState = undefined;
   req.session.eveOauthFlow = undefined;
   try {
@@ -339,6 +365,19 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
   }
 
   const callbackUrl = getCallbackUrl(req);
+
+  if (oauthFlow === "duty") {
+    try {
+      await dutyPapOAuth.complete(req, dutyTarget, code, callbackUrl);
+      redirectToFrontend(res, "/duty-pap?connected=1");
+    } catch (error) {
+      const errorCode = error instanceof DutyPapError ? error.code : "DUTY_PAP_AUTH_UNAVAILABLE";
+      req.log.warn({ code: errorCode }, "Duty PAP authorization could not complete");
+      const path = errorCode === "DUTY_PAP_AUTH_SCOPE_REQUIRED" ? "duty_scopes" : errorCode === "DUTY_PAP_AUTH_CHARACTER_MISMATCH" ? "duty_character" : errorCode === "DUTY_PAP_VERSION_CONFLICT" ? "duty_changed" : "duty_auth";
+      redirectToFrontend(res, `/duty-pap?error=${path}`);
+    }
+    return;
+  }
 
   try {
     const { accessToken, refreshToken, expiresIn } = await exchangeCode(code, callbackUrl);

@@ -1,5 +1,5 @@
 import app from "./app";
-import { pool, runMigrations } from "@workspace/db";
+import { db, pool, runMigrations } from "@workspace/db";
 import { logger } from "./lib/logger";
 import { CHARACTER_RETENTION_SWEEP_INTERVAL_MS, purgeExpiredDeletedCharacters } from "./lib/character-retention";
 import {
@@ -8,6 +8,7 @@ import {
 } from "./lib/activity-monthly-settlement";
 import { resumeRecentBattleReportGeneration } from "./lib/battle-reports";
 import { startSystemMonitoringJobs } from "./lib/system-monitoring-jobs";
+import { startDutyPapJobs } from "./lib/duty-pap-jobs";
 
 const rawPort = process.env["PORT"];
 
@@ -72,7 +73,7 @@ async function runActivitySettlementSweep() {
 
 prepareDatabase()
   .then(() => {
-    app.listen(port, "0.0.0.0", (err) => {
+    const server = app.listen(port, "0.0.0.0", (err) => {
       if (err) {
         logger.error({ err }, "Error listening on port");
         process.exit(1);
@@ -98,6 +99,26 @@ prepareDatabase()
       }, ACTIVITY_SETTLEMENT_SWEEP_INTERVAL_MS);
       activitySettlementSweep.unref();
       startSystemMonitoringJobs();
+      const dutyPapJobs = startDutyPapJobs({ database: db, pool, logger });
+      let stopping = false;
+      const shutdown = () => {
+        if (stopping) return;
+        stopping = true;
+        clearInterval(retentionSweep);
+        clearInterval(activitySettlementSweep);
+        server.close();
+        // Stop sampling before deployment replacement, including in-flight ESI
+        // requests. Committed awards remain protected by their transaction key.
+        const deadline = setTimeout(() => process.exit(0), 15_000);
+        deadline.unref();
+        void dutyPapJobs.stop().finally(() => {
+          clearTimeout(deadline);
+          server.closeAllConnections();
+          process.exit(0);
+        });
+      };
+      process.once("SIGTERM", shutdown);
+      process.once("SIGINT", shutdown);
     });
   })
   .catch((err) => {

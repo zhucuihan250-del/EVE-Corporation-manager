@@ -31,6 +31,7 @@ import { buybackCalculatorMigration } from "./0029-buyback-calculator";
 import { editablePapCurrenciesMigration } from "./0030-editable-pap-currencies";
 import { fleetPapCurrenciesMigration } from "./0031-fleet-pap-currencies";
 import { fittingWorkbenchMigration } from "./0032-fitting-workbench";
+import { automaticDutyPapMigration } from "./0033-automatic-duty-pap";
 
 type Migration = {
   id: string;
@@ -70,6 +71,7 @@ const migrations: Migration[] = [
   editablePapCurrenciesMigration,
   fleetPapCurrenciesMigration,
   fittingWorkbenchMigration,
+  automaticDutyPapMigration,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {

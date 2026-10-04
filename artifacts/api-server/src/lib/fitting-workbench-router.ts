@@ -1,11 +1,11 @@
 import { Router, type ErrorRequestHandler, type NextFunction, type Request, type RequestHandler, type Response } from "express";
-import type { FittingCategory, FittingLanguage, FittingSlot } from "./fitting-data";
+import type { FittingCatalogOptions, FittingCategory, FittingLanguage, FittingSlot } from "./fitting-data";
 import { fittingId, FittingWorkbenchError, type FittingActor } from "./fitting-workbench-errors";
 import type { createFittingWorkbenchService } from "./fitting-workbench-service";
 import type { createFittingAdviceService } from "./fitting-advice-service";
 import { adviceError } from "./fitting-advice-provider";
 
-type CatalogOptions = { query?: string; category?: FittingCategory | "all"; slot?: FittingSlot | "all"; language: FittingLanguage; limit?: number };
+type CatalogOptions = FittingCatalogOptions;
 type CatalogResult = { sdeBuildNumber: number | null; generatedAt: string; items: unknown[] };
 
 /** Mount after the API router on /api/fitting, also covering errors emitted by
@@ -84,7 +84,23 @@ export function createFittingWorkbenchRouter(dependencies: {
     const category = categories.has(String(req.query.category)) ? req.query.category as FittingCategory | "all" : "all";
     const slot = slots.has(String(req.query.slot)) ? req.query.slot as FittingSlot | "all" : "all";
     const requestedLimit = typeof req.query.limit === "string" ? Number(req.query.limit) : 50;
-    res.json(await dependencies.searchCatalog({ query: typeof req.query.q === "string" ? req.query.q : "", category, slot, language: lng, limit: Number.isFinite(requestedLimit) ? requestedLimit : 50 }));
+    if (Object.keys(req.query).some(key => /^(?:shipTypeId|chargeForTypeId|subsystemTypeIds)\[/u.test(key))) throw new FittingWorkbenchError(400, "FITTING_INVALID_CATALOG_CONTEXT", "舰船、弹药及子系统筛选须为单个参数。");
+    const optionalId = (value: unknown) => {
+      if (value === undefined) return undefined;
+      if (typeof value !== "string" || !/^\d{1,10}$/u.test(value)) throw new FittingWorkbenchError(400, "FITTING_INVALID_CATALOG_CONTEXT", "舰船或弹药筛选目标编号无效。");
+      const id = fittingId(value);
+      if (id > 2_147_483_647) throw new FittingWorkbenchError(400, "FITTING_INVALID_CATALOG_CONTEXT", "舰船或弹药筛选目标编号无效。");
+      return id;
+    };
+    const shipTypeId = optionalId(req.query.shipTypeId), chargeForTypeId = optionalId(req.query.chargeForTypeId);
+    let subsystemTypeIds: number[] | undefined;
+    if (req.query.subsystemTypeIds !== undefined) {
+      if (typeof req.query.subsystemTypeIds !== "string" || req.query.subsystemTypeIds.length > 60) throw new FittingWorkbenchError(400, "FITTING_INVALID_CATALOG_CONTEXT", "子系统筛选列表无效。");
+      const parts = req.query.subsystemTypeIds === "" ? [] : req.query.subsystemTypeIds.split(",");
+      if (parts.length > 5) throw new FittingWorkbenchError(400, "FITTING_INVALID_CATALOG_CONTEXT", "一次最多指定 5 个子系统。");
+      subsystemTypeIds = parts.map(part => optionalId(part)!);
+    }
+    res.json(await dependencies.searchCatalog({ query: typeof req.query.q === "string" ? req.query.q : "", category, slot, language: lng, limit: Number.isFinite(requestedLimit) ? requestedLimit : 50, shipTypeId, chargeForTypeId, subsystemTypeIds }));
   }));
   router.post("/fitting/simulate", route(async (req, res) => {
     const simulation = await service.simulate(actor(req), req.body, true);

@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createCatalogCompatibility } from "./fitting-catalog-compatibility";
+import { FittingWorkbenchError } from "./fitting-workbench-errors";
 
 export type FittingLanguage = "en" | "zh";
 export type FittingCategory = "ship" | "module" | "charge" | "drone" | "fighter" | "subsystem" | "implant" | "booster" | "skill" | "cargo";
@@ -216,18 +218,30 @@ function normalizeSearch(value: string): string {
   return value.trim().toLocaleLowerCase();
 }
 
-export function searchFittingCatalog(options: {
+export type FittingCatalogOptions = {
   query?: string;
   category?: FittingCategory | "all";
   slot?: FittingSlot | "all";
   language: FittingLanguage;
   limit?: number;
-}): { sdeBuildNumber: number | null; generatedAt: string; items: CatalogItem[] } {
+  shipTypeId?: number;
+  chargeForTypeId?: number;
+  subsystemTypeIds?: number[];
+};
+
+export function searchFittingCatalog(options: FittingCatalogOptions): { sdeBuildNumber: number | null; generatedAt: string; items: CatalogItem[] } {
   const data = getFittingData();
   const query = normalizeSearch(options.query ?? "");
   const limit = Math.max(1, Math.min(options.limit ?? 50, 100));
   const category = options.category ?? "all";
   const slot = options.slot ?? "all";
+  const ship = options.shipTypeId === undefined ? undefined : getFittingType(options.shipTypeId);
+  const chargeForType = options.chargeForTypeId === undefined ? undefined : getFittingType(options.chargeForTypeId);
+  if (options.shipTypeId !== undefined && (!ship || categoryOf(ship) !== "ship")) throw new FittingWorkbenchError(400, "FITTING_INVALID_CATALOG_CONTEXT", "请选择有效的舰船。");
+  if (options.chargeForTypeId !== undefined && !chargeForType) throw new FittingWorkbenchError(400, "FITTING_INVALID_CATALOG_CONTEXT", "弹药筛选目标无效。");
+  const compatible = options.shipTypeId !== undefined || options.chargeForTypeId !== undefined || options.subsystemTypeIds !== undefined
+    ? createCatalogCompatibility({ ship: ship ?? undefined, types: data.types, categoryOf, chargeForType: chargeForType ?? undefined, subsystemTypeIds: options.subsystemTypeIds })
+    : undefined;
 
   const scored: Array<{ score: number; type: FittingType }> = [];
   for (const type of data.types) {
@@ -235,6 +249,7 @@ export function searchFittingCatalog(options: {
     const typeCategory = categoryOf(type);
     if (category !== "all" && typeCategory !== category) continue;
     if (slot !== "all" && type.slot !== slot) continue;
+    if (compatible && !compatible(type)) continue;
 
     let score = 1;
     if (query) {

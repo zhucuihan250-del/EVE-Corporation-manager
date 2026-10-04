@@ -33,6 +33,7 @@ import {
   X,
 } from "lucide-react";
 import { fittingWorkbenchApi } from "@/lib/fitting-workbench-api";
+import { fittingBrowserCatalogQuery } from "@/lib/fitting-browser-catalog";
 import type {
   CanonicalFit,
   SavedFitting,
@@ -257,31 +258,28 @@ export function Fitting() {
     return () => clearTimeout(timer);
   }, [key, draftKey, draftReady]);
 
+  const selectedEntry = selected
+    ? fit.slots.find(
+        (slot) => slot.rack === selected.rack && slot.index === selected.index,
+      )
+    : undefined;
+  const catalogContext = fittingBrowserCatalogQuery({
+    tab: browserTab,
+    query: debouncedSearch,
+    category,
+    rack: rackFilter,
+    language,
+    shipTypeId: fit.shipTypeId,
+    selectedTypeId: selectedEntry?.typeId,
+    subsystemTypeIds: fit.slots
+      .filter((entry) => entry.rack === "subsystem")
+      .map((entry) => entry.typeId),
+  });
   const catalog = useQuery({
-    queryKey: [
-      "fittingWorkbench",
-      "catalog",
-      browserTab,
-      debouncedSearch,
-      category,
-      rackFilter,
-      language,
-    ],
+    queryKey: catalogContext.queryKey,
     queryFn: ({ signal }) =>
-      fittingWorkbenchApi.catalog(
-        {
-          q: debouncedSearch,
-          language,
-          category: browserTab === "ships" ? "ship" : category,
-          slot:
-            browserTab === "hardware" && category === "module"
-              ? rackFilter
-              : "all",
-          limit: 100,
-        },
-        signal,
-      ),
-    enabled: browserTab !== "saved",
+      fittingWorkbenchApi.catalog(catalogContext.options, signal),
+    enabled: catalogContext.enabled,
     staleTime: 60_000,
   });
   const saved = useQuery({
@@ -395,11 +393,6 @@ export function Fitting() {
     enabled: shipModeIds.length > 0,
     staleTime: 60_000,
   });
-  const selectedEntry = selected
-    ? fit.slots.find(
-        (slot) => slot.rack === selected.rack && slot.index === selected.index,
-      )
-    : undefined;
   const selectedItem = selectedEntry
     ? lookup.get(selectedEntry.typeId)
     : undefined;
@@ -415,12 +408,25 @@ export function Fitting() {
   const slotLimit = (rack: WorkbenchRack) => simulation?.slots[rack].limit ?? 0;
   const cacheItem = (item: WorkbenchCatalogItem) =>
     setCatalogCache((current) => new Map(current).set(item.typeId, item));
+  const clearCatalogSearch = () => {
+    setSearch("");
+    setDebouncedSearch("");
+  };
   const selectSlot = (rack: WorkbenchRack, index: number) => {
+    const entry = fit.slots.find(
+      (slot) => slot.rack === rack && slot.index === index,
+    );
+    const keepCharges =
+      category === "charge" &&
+      entry &&
+      (lookup.get(entry.typeId)?.capabilities?.chargeGroups.length ?? 0) > 0;
     setSelected({ rack, index });
     setBrowserTab("hardware");
-    setCategory(rack === "subsystem" ? "subsystem" : "module");
+    setCategory(
+      keepCharges ? "charge" : rack === "subsystem" ? "subsystem" : "module",
+    );
     setRackFilter(rack);
-    setSearch("");
+    clearCatalogSearch();
   };
   const unfit = (rack: WorkbenchRack, index: number) =>
     updateFit((current) => ({
@@ -491,7 +497,8 @@ export function Fitting() {
     setSelected(null);
     setLoadedSaved(null);
     setBrowserTab("hardware");
-    setSearch("");
+    setCategory("module");
+    clearCatalogSearch();
     setRackFilter("all");
     setModal(null);
     setPendingShip(null);
@@ -1019,7 +1026,7 @@ export function Fitting() {
                   className={browserTab === tab ? "is-active" : ""}
                   onClick={() => {
                     setBrowserTab(tab);
-                    setSearch("");
+                    clearCatalogSearch();
                   }}
                 >
                   {
@@ -1058,7 +1065,14 @@ export function Fitting() {
                         className={`fit-btn is-small ${category === item.category ? "is-active" : ""}`}
                         onClick={() => {
                           setCategory(item.category);
-                          setSearch("");
+                          if (
+                            item.category === "module" &&
+                            rackFilter === "subsystem"
+                          )
+                            setRackFilter("all");
+                          if (item.category === "subsystem")
+                            setRackFilter("subsystem");
+                          clearCatalogSearch();
                         }}
                       >
                         {zh ? item.zh : item.en}
@@ -1067,17 +1081,23 @@ export function Fitting() {
                   </div>
                   {(category === "module" || category === "subsystem") && (
                     <div className="fit-browser-filters">
-                      {(["all", ...rackOrder] as const).map((rack) => (
-                        <button
-                          key={rack}
-                          className={`fit-btn is-small ${rackFilter === rack ? "is-active" : ""}`}
-                          onClick={() => setRackFilter(rack)}
-                        >
-                          {rack === "all"
-                            ? tr("全部槽位", "All racks")
-                            : rackNames[rack][zh ? 0 : 1]}
-                        </button>
-                      ))}
+                      {(["all", ...rackOrder] as const)
+                        .filter((rack) =>
+                          category === "subsystem"
+                            ? rack === "subsystem"
+                            : rack !== "subsystem",
+                        )
+                        .map((rack) => (
+                          <button
+                            key={rack}
+                            className={`fit-btn is-small ${rackFilter === rack ? "is-active" : ""}`}
+                            onClick={() => setRackFilter(rack)}
+                          >
+                            {rack === "all"
+                              ? tr("全部槽位", "All racks")
+                              : rackNames[rack][zh ? 0 : 1]}
+                          </button>
+                        ))}
                     </div>
                   )}
                   {["drone", "fighter", "charge", "cargo"].includes(
@@ -1206,20 +1226,21 @@ export function Fitting() {
                 </>
               ) : (
                 <>
-                  {catalog.isFetching && (
+                  {catalogContext.enabled && catalog.isFetching && (
                     <div className="fit-loading">
                       <Loader2 className="fit-refresh-icon" size={14} />
                       {tr("正在搜索", "Searching")}
                     </div>
                   )}
-                  {catalog.error && (
+                  {catalogContext.enabled && catalog.error && (
                     <div className="fit-error">
                       {catalog.error instanceof Error
                         ? catalog.error.message
                         : tr("搜索失败", "Search failed")}
                     </div>
                   )}
-                  {catalog.data?.items.map((item) => (
+                  {catalogContext.enabled &&
+                    catalog.data?.items.map((item) => (
                     <div
                       key={item.typeId}
                       role="button"
@@ -1267,12 +1288,31 @@ export function Fitting() {
                         <Plus size={12} />
                       </button>
                     </div>
-                  ))}
-                  {!catalog.isFetching && !catalog.data?.items.length && (
+                    ))}
+                  {browserTab === "hardware" && !fit.shipTypeId && (
                     <p className="fit-empty">
                       {tr(
-                        "未找到匹配物品，请尝试其他名称。",
-                        "No matches. Try another name.",
+                        "请先在“舰船”中选择舰体，再查看适用装备。",
+                        "Choose a hull in the Hulls tab to browse compatible hardware.",
+                      )}
+                    </p>
+                  )}
+                  {catalogContext.enabled &&
+                    !catalog.isFetching &&
+                    !catalog.error &&
+                    !catalog.data?.items.length && (
+                    <p className="fit-empty">
+                      {tr(
+                        browserTab === "hardware"
+                          ? category === "charge" && selectedEntry
+                            ? "没有适用于当前舰船和选中装备的弹药或脚本。"
+                            : "当前舰船在此分类或槽位没有匹配物品，请尝试其他筛选条件。"
+                          : "未找到匹配物品，请尝试其他名称。",
+                        browserTab === "hardware"
+                          ? category === "charge" && selectedEntry
+                            ? "No compatible charges or scripts for this hull and selected module."
+                            : "No compatible items for this hull, category or rack. Try another filter."
+                          : "No matches. Try another name.",
                       )}
                     </p>
                   )}
@@ -1280,6 +1320,19 @@ export function Fitting() {
               )}
             </div>
             <div className="fit-browser-hint">
+              {browserTab === "hardware" && fit.shipTypeId > 0 && (
+                <span style={{ display: "block", marginBottom: 5 }}>
+                  {category === "charge" && selectedEntry
+                    ? tr(
+                        `仅显示 ${selectedItem?.name ?? `#${selectedEntry.typeId}`} 可装填的弹药与脚本。`,
+                        `Showing charges and scripts compatible with ${selectedItem?.name ?? `#${selectedEntry.typeId}`}.`,
+                      )
+                    : tr(
+                        "已按当前舰船筛选；CPU、能量栅格余量和技能不足不会隐藏可装配物品。",
+                        "Filtered for this hull. CPU, powergrid and skill shortfalls do not hide compatible items.",
+                      )}
+                </span>
+              )}
               {catalogHint && (
                 <strong style={{ display: "block", marginBottom: 4 }}>
                   {catalogHint}
@@ -1470,7 +1523,7 @@ export function Fitting() {
                         className="fit-btn is-small"
                         onClick={() => {
                           setCategory("charge");
-                          setSearch("");
+                          clearCatalogSearch();
                           setBrowserTab("hardware");
                           setMobilePanel("browser");
                         }}

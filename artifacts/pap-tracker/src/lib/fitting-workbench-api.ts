@@ -9,6 +9,7 @@ import type {
   WorkbenchSimulation,
 } from "./fitting-workbench-types";
 import { validateFittingAdviceResponse } from "./fitting-ai-advice";
+import type { FittingCatalogOptions } from "./fitting-browser-catalog";
 
 export class FittingWorkbenchError extends Error {
   constructor(
@@ -68,14 +69,7 @@ export const fittingWorkbenchApi = {
     return data as FittingAdviceResponse;
   },
   catalog: (
-    options: {
-      q?: string;
-      typeIds?: string;
-      category?: string;
-      slot?: string;
-      language: string;
-      limit?: number;
-    },
+    options: FittingCatalogOptions,
     signal?: AbortSignal,
   ) =>
     request<{ items: WorkbenchCatalogItem[]; sdeBuildNumber: number }>(

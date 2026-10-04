@@ -40,7 +40,9 @@
       canvas: "ship-canvas", camera: { canvas: "ship-canvas", rotationX: -0.25, rotationY: 0.8, distance: 300 },
       audioEnabled: false,
       device: { webgl2: true, antialias: true, alpha: true, effectProfile: tw2.const.DeviceEffectProfile.DX11, shaderQuality: tw2.const.DeviceShaderQuality.MEDIUM },
-      client: { clearColor: [0, 0, 0, 0] },
+      // The client otherwise rewrites canvas alpha to 1 after rendering,
+      // making even an alpha-enabled canvas an opaque black rectangle.
+      client: { clearColor: [0, 0, 0, 0], colorMask: [0, 0, 0, 0] },
       render: dt => { const now = performance.now(); if (!document.hidden && now - lastRender >= 1000 / 30) { lastRender = now; tny.Render(dt); } }
     });
     // Use the game's small lighting cubes, not its 25 MiB full nebula backdrop.

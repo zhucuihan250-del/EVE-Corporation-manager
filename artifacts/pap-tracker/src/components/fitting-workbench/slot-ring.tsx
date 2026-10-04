@@ -220,6 +220,15 @@ export function SlotRing({
     : [];
   return (
     <div className="fit-ship-workspace">
+      <div className="fit-ship-identity">
+        <span>{tr("模拟模式", "SIMULATION")}</span>
+        <strong>
+          {simulation?.ship.name ??
+            lookup.get(fit.shipTypeId)?.name ??
+            tr("请选择舰船", "Select a hull")}
+        </strong>
+        <small>{simulation?.ship.groupName ?? ""}</small>
+      </div>
       <div
         className="fit-ring"
         onDragOver={(event) => {
@@ -310,22 +319,42 @@ export function SlotRing({
               <Ship size={72} />
             ))}
         </div>
-        <div className="fit-ship-identity">
-          <span>{tr("模拟模式", "SIMULATION")}</span>
-          <strong>
-            {simulation?.ship.name ??
-              lookup.get(fit.shipTypeId)?.name ??
-              tr("请选择舰船", "Select a hull")}
-          </strong>
-          <small>{simulation?.ship.groupName ?? ""}</small>
-        </div>
         {racks.map(({ rack, start, end, label }) => {
           const metric =
             simulation?.slots[rack as keyof WorkbenchSimulation["slots"]];
           const limit = Math.min(12, Math.max(0, metric?.limit ?? 0));
           const point = polar(label, 275);
+          const points = Array.from({ length: limit }, (_, index) =>
+            polar(
+              limit === 1
+                ? (start + end) / 2
+                : start + (index * (end - start)) / (limit - 1),
+              233,
+            ),
+          );
+          const dense = limit >= 7;
+          // Square slots must fit each adjacent pair on at least one axis.
+          // A little breathing room also keeps dense state/charge markers apart.
+          const minimumSpacing = points.slice(1).reduce(
+            (minimum, position, index) =>
+              Math.min(
+                minimum,
+                Math.max(
+                  Math.abs(position.x - points[index].x),
+                  Math.abs(position.y - points[index].y),
+                ),
+              ),
+            560,
+          );
+          const size = dense
+            ? Math.min(7.5, (minimumSpacing / 560) * 100 * 0.92)
+            : 7.5;
           return (
-            <div key={rack} className="fit-rack">
+            <div
+              key={rack}
+              className={`fit-rack${dense ? " is-dense" : ""}`}
+              style={{ "--fit-slot-size": `${size}%` } as React.CSSProperties}
+            >
               <span
                 className={`fit-rack-label ${metric?.overloaded ? "is-overloaded" : ""}`}
                 style={{
@@ -336,13 +365,7 @@ export function SlotRing({
                 {rackNames[rack][zh ? 0 : 1]}{" "}
                 <b>{metric ? `${metric.used}/${metric.limit}` : "—"}</b>
               </span>
-              {Array.from({ length: limit }, (_, index) => {
-                const point = polar(
-                  limit === 1
-                    ? (start + end) / 2
-                    : start + (index * (end - start)) / (limit - 1),
-                  233,
-                );
+              {points.map((point, index) => {
                 return renderSlot(rack, index, {
                   left: `${(point.x / 560) * 100}%`,
                   top: `${(point.y / 560) * 100}%`,
@@ -351,6 +374,8 @@ export function SlotRing({
             </div>
           );
         })}
+      </div>
+      <div className="fit-ring-metrics">
         <div className="fit-hardpoints">
           {(["turret", "launcher"] as const).map((key) => (
             <div

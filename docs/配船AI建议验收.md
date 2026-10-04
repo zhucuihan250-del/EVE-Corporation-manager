@@ -40,6 +40,18 @@
 - 实际页面在 1440、375、320 像素宽度通过两种模式、文本复制、错误提示、取消和过期结果检查；没有应用或保存操作，原草稿始终不变。
 - 本地执行 `pnpm start` 因未配置 `DATABASE_URL` 无法启动正式服务；没有为此读取或导入生产数据库凭据。正式环境的启动、健康检查与静态资源一致性需在发布后另行核验。
 
+### 生产发布核验
+
+2026 年 10 月 4 日将代码提交 `3fd4c6adc78b499ee0b878585f43915c044320c7` 的已跟踪快照发布到现有单一 API 服务，未改动部署路由、环境变量或数据库业务数据。
+
+- Railway 部署 `6f3580c5-1907-4398-ade6-0737dc01628e` 为 `SUCCESS`，实例 `794df51a-e741-4b4a-8039-0f64bc5aea55` 为 `RUNNING`，未停止，且是该服务的最新部署。
+- 生产执行根目录 `pnpm build`、`pnpm start`，启动日志确认监听 `0.0.0.0:8080`。
+- `/api/healthz` 和 `/fitting` 返回 200；页面 HTML 与本地构建一致，30 个静态资源的 SHA256 全部匹配，包括新建议界面及原 3D 预览。
+- 未登录访问新建议接口 `POST /api/fitting/advice` 返回 401，原配装、角色和模型接口也维持未登录保护。
+- 发布后再次仅核对配置存在性：AI 密钥和模型变量仍未配置，数据库变量存在。没有执行真实 AI、市场或成员 SSO 验收。
+
+入口：[模拟配置页面](https://zephyr-fleet-track-production.up.railway.app/fitting)。代码保留在功能分支，草稿 [PR #14](https://github.com/zhucuihan250-del/EVE-Corporation-manager/pull/14) 未合并。
+
 ## 接入依据
 
 结构化响应格式依据 [OpenAI 官方结构化输出文档](https://developers.openai.com/api/docs/guides/structured-outputs)。结构化 JSON 只能约束输出格式，不能保证装备存在或配装可用，因此还需服务器的装备清单与模拟器校验。

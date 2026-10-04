@@ -31,12 +31,20 @@ export interface WorkbenchLayer {
   hp: number; ehp: number;
   resistances: { em: number; thermal: number; kinetic: number; explosive: number };
 }
+export interface WorkbenchCompatibilityCorrection {
+  code: "t3_subsystem_layout";
+  attribute: string;
+  engineValue: number;
+  correctedValue: number;
+  sourceTypeIds: number[];
+  sdeBuildNumber: number;
+}
 export interface WorkbenchSimulation {
   precision: "approximate";
   calculationPrecision: "dogma";
   sdeBuildNumber: number;
   fit: CanonicalFit;
-  engine: { name: string; version: string; sdeReleaseDate: string | null; note: string };
+  engine: { name: string; version: string; sdeReleaseDate: string | null; note: string; compatibilityCorrections?: WorkbenchCompatibilityCorrection[] };
   ship: WorkbenchCatalogItem;
   modules: Array<WorkbenchCatalogItem & { quantity: number; cpu: number; powergrid: number; rack?: WorkbenchRack; index?: number; state?: WorkbenchState; chargeTypeId?: number }>;
   slots: Record<"high" | "medium" | "low" | "rig" | "subsystem" | "service", WorkbenchMetric>;

@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import type { Calculation, Fit, FitItem, ItemResult, State } from "@eveshipfit/dogma-engine";
 import { categoryOf, getFittingCatalogItem, getFittingData, getFittingType, type FittingLanguage, type FittingType } from "./fitting-data";
 import type { CanonicalFit, WorkbenchEftResult, WorkbenchExportResult, WorkbenchMetric, WorkbenchRack, WorkbenchResource, WorkbenchSimulation, WorkbenchState, WorkbenchViolation } from "./fitting-engine-types";
+import { applySubsystemLayoutCompatibility } from "./fitting-subsystem-compatibility";
 export type * from "./fitting-engine-types";
 
 const RACKS = new Set(["high", "medium", "low", "rig", "subsystem", "service"]);
@@ -240,6 +241,7 @@ function metric(used: number, limit: number): WorkbenchMetric { return { used: c
 function resource(used: number, limit: number): WorkbenchResource { return { ...metric(used, limit), percent: limit > 0 ? clean(used / limit * 100) : (used > 0 ? 100 : 0) }; }
 function violationMessage(violation: WorkbenchViolation, language: FittingLanguage): string {
   const r = violation.rule; const zh = language === "zh";
+  if (r.type === "slot_index") return zh ? `${r.rack} 第 ${Number(r.index) + 1} 个槽位不存在（当前 ${r.available} 个槽位）` : `${r.rack} slot ${Number(r.index) + 1} does not exist (${r.available} slots available)`;
   if (r.type === "resource" || r.type === "slots") return zh ? `${String(r.resource ?? r.slot)} 超出上限：${r.used} / ${r.available}` : `${r.resource ?? r.slot} exceeds limit: ${r.used} / ${r.available}`;
   if (r.type === "skill") { const type = getFittingType(Number(r.type_id)); return zh ? `缺少技能：${type?.name.zh ?? r.type_id} ${r.required} 级（当前 ${r.level}）` : `Skill required: ${type?.name.en ?? r.type_id} ${r.required} (current ${r.level})`; }
   const names: Record<string, [string, string]> = { wrong_slot: ["装备不适合该槽位", "Module belongs in another rack"], slot_taken: ["槽位已被占用", "Slot is occupied"], rig_size: ["改装件尺寸不匹配", "Rig size does not match"], ship_restricted: ["装备不适用于该舰船", "Module cannot be fitted to this ship"], capital_item: ["旗舰装备不适用于该舰船", "Capital module cannot be fitted here"], charge_group: ["弹药类别不兼容", "Charge group is incompatible"], charge_size: ["弹药尺寸不匹配", "Charge size does not match"], max_group: ["同组装备超过可装配或激活上限", "Module group limit exceeded"], max_type: ["同型装备超过装配上限", "Module type limit exceeded"], subsystem_taken: ["同类子系统重复", "Subsystem already fitted"], wrong_slot_index: ["植入体或增效剂槽位不匹配", "Implant or booster slot does not match"] };
@@ -247,7 +249,8 @@ function violationMessage(violation: WorkbenchViolation, language: FittingLangua
 }
 export async function simulateWorkbench(value: CanonicalFit, language: FittingLanguage, skills?: Record<number, number>): Promise<WorkbenchSimulation> {
   const fit = validateCanonicalFit(value); const engineFit = toEngineFit(fit, skills);
-  const result = await runWorker<Calculation>("calculate", { fit: engineFit }); const ship = result.ship;
+  const result = await runWorker<Calculation>("calculate", { fit: engineFit });
+  const compatibility = applySubsystemLayoutCompatibility(fit, result); const ship = result.ship;
   const a = (name: string, fallback = 0) => attribute(ship, name, fallback);
   const layer = (kind: "shield" | "armor" | "hull") => {
     const prefix = kind === "hull" ? "" : kind;
@@ -260,12 +263,13 @@ export async function simulateWorkbench(value: CanonicalFit, language: FittingLa
   const slots = Object.fromEntries(Object.entries(limitNames).map(([rack, name]) => [rack, metric(fit.slots.filter((slot) => slot.rack === rack).length, a(name))])) as WorkbenchSimulation["slots"];
   const resources = { cpu: resource(a("cpuLoad"), a("cpuOutput")), powergrid: resource(a("powerLoad"), a("powerOutput")), calibration: resource(a("upgradeLoad"), a("upgradeCapacity")) };
   const moduleStates = fit.slots.map((slot, index) => ({ rack: slot.rack, index: slot.index, typeId: slot.typeId, requestedState: slot.state,
-    state: fromEngineState(result.items[index]!.state), maxState: fromEngineState(result.items[index]!.max_state) }));
+    state: compatibility.passiveSubsystemIndexes.has(index) ? "online" as const : fromEngineState(result.items[index]!.state),
+    maxState: compatibility.passiveSubsystemIndexes.has(index) ? "online" as const : fromEngineState(result.items[index]!.max_state) }));
   const modules = fit.slots.map((slot, index) => ({ ...getFittingCatalogItem(slot.typeId, language)!, quantity: 1,
     cpu: clean(result.items[index]!.state === "offline" ? 0 : attribute(result.items[index], "cpu")),
     powergrid: clean(result.items[index]!.state === "offline" ? 0 : attribute(result.items[index], "power")), rack: slot.rack, index: slot.index, state: moduleStates[index]!.state,
     ...(slot.chargeTypeId ? { chargeTypeId: slot.chargeTypeId } : {}) }));
-  const violations = (result.violations ?? []).map((v) => { const violation: WorkbenchViolation = { target: v.target, rule: v.rule as unknown as WorkbenchViolation["rule"], message: "" }; violation.message = violationMessage(violation, language); return violation; });
+  const violations = [...(result.violations ?? []), ...compatibility.additionalViolations].map((v) => { const violation: WorkbenchViolation = { target: v.target, rule: v.rule as unknown as WorkbenchViolation["rule"], message: "" }; violation.message = violationMessage(violation, language); return violation; });
   const turretCount = fit.slots.filter((slot) => getFittingType(slot.typeId)?.hardpoint === "turret").length;
   const launcherCount = fit.slots.filter((slot) => getFittingType(slot.typeId)?.hardpoint === "launcher").length;
   const dps = a("damagePerSecondWithoutReload"); const droneDps = a("droneDamagePerSecond"); const fighterDps = a("fighterDamagePerSecond");
@@ -290,7 +294,9 @@ export async function simulateWorkbench(value: CanonicalFit, language: FittingLa
   };
   return { precision: "approximate", calculationPrecision: "dogma", sdeBuildNumber: getFittingData().buildNumber!, fit,
     engine: { name: "EVEShipFit Dogma Engine", version: "13.1.0", sdeReleaseDate: getFittingData().releaseDate,
-      note: language === "zh" ? "按当前所选技能、弹药和装备状态及固定静态数据版本计算；未逐项与游戏客户端对照，理论伤害不等于实战伤害。" : "Calculated from selected skills, ammunition and module states against the pinned SDE; not individually cross-checked against the game client, and theoretical damage is not applied combat damage." },
+      note: (language === "zh" ? "按当前所选技能、弹药和装备状态及固定静态数据版本计算；未逐项与游戏客户端对照，理论伤害不等于实战伤害。" : "Calculated from selected skills, ammunition and module states against the pinned SDE; not individually cross-checked against the game client, and theoretical damage is not applied combat damage.")
+        + (compatibility.corrections.length ? language === "zh" ? " T3 子系统槽位及硬点使用固定 SDE 的定向兼容补正，其他属性与限制仍由 Dogma 计算。" : " T3 subsystem slots and hardpoints use a targeted pinned-SDE compatibility correction; other attributes and restrictions remain Dogma-calculated." : ""),
+      ...(compatibility.corrections.length ? { compatibilityCorrections: compatibility.corrections } : {}) },
     ship: getFittingCatalogItem(fit.shipTypeId, language)!, modules, slots, resources,
     hardpoints: { turret: metric(turretCount, a("turretSlotsLeft")), launcher: metric(launcherCount, a("launcherSlotsLeft")) },
     defense: { shieldHp: shield.hp, armorHp: armor.hp, hullHp: hull.hp, estimatedEhp: stats.defense.ehp },

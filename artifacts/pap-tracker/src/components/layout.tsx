@@ -14,6 +14,7 @@ import {
   Calculator,
   Coins,
   Wallet,
+  Timer,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent,
@@ -55,6 +56,7 @@ export function Layout({ children }: { children: ReactNode }) {
     );
   }
   if (modules?.identity) serviceItems.push({ href: "/identity-groups", label: tr("身份组", "Identity groups"), icon: ShieldCheck });
+  if (modules?.pap && modules?.fleet) serviceItems.push({ href: "/duty-pap", label: tr("值守 PAP", "Duty PAP"), icon: Timer });
   if (modules?.reimbursement) serviceItems.push({
     href: "/reimbursements",
     label: tr("补损", "Reimbursement"),
@@ -89,6 +91,9 @@ export function Layout({ children }: { children: ReactNode }) {
   }
   if (isActivityManager && modules?.pap) {
     commandItems.push({ href: "/admin/activity", label: tr("活跃度查询", "Activity tracking"), icon: Activity });
+  }
+  if (isAdmin && modules?.pap && modules?.fleet) {
+    commandItems.push({ href: "/admin/duty-pap", label: tr("自动值守 PAP", "Automatic duty PAP"), icon: Timer });
   }
   if (isIdentityManager && modules?.identity) {
     commandItems.push({ href: "/admin/identity", label: tr("身份组审核", "Identity review"), icon: ShieldCheck });

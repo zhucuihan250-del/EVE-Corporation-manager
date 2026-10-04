@@ -27,6 +27,7 @@ import papMarketRouter from "./pap-market";
 import systemMonitoringRouter from "./system-monitoring";
 import buybackRouter from "./buyback";
 import papCurrenciesRouter from "./pap-currencies";
+import dutyPapRouter from "./duty-pap";
 
 const router: IRouter = Router();
 
@@ -56,5 +57,6 @@ router.use(papMarketRouter);
 router.use(systemMonitoringRouter);
 router.use(buybackRouter);
 router.use(papCurrenciesRouter);
+router.use(dutyPapRouter);
 
 export default router;

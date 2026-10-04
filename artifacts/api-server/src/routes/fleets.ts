@@ -217,9 +217,8 @@ router.get("/fleets/esi-my-fleet", requireAuth, async (req: Request, res: Respon
     if (esiResp.status === 404) {
       res.status(404).json({ error: "You are not currently in a fleet in-game." });
     } else {
-      const text = await esiResp.text();
-      req.log.error({ status: esiResp.status, body: text }, "ESI character fleet fetch failed");
-      res.status(502).json({ error: "ESI error: " + text });
+      req.log.error({ status: esiResp.status }, "ESI character fleet fetch failed");
+      res.status(502).json({ error: "无法读取本人当前舰队，请确认已授权舰队读取权限后重试。" });
     }
     return;
   }

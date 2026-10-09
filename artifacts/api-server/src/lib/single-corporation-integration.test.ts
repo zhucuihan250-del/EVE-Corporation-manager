@@ -12,6 +12,7 @@ import { settleDueActivityMonths } from "./activity-monthly-settlement";
 import { editablePapCurrenciesMigration } from "../../../../lib/db/src/migrations/0030-editable-pap-currencies";
 import { fittingWorkbenchMigration } from "../../../../lib/db/src/migrations/0032-fitting-workbench";
 import { automaticDutyPapMigration } from "../../../../lib/db/src/migrations/0033-automatic-duty-pap";
+import { memberForumMigration } from "../../../../lib/db/src/migrations/0034-member-forum";
 import { DUTY_PAP_SCOPES } from "./duty-pap-rules";
 
 // Bundle this test with @workspace/db aliased to single-corporation-test-db.ts.
@@ -131,6 +132,7 @@ before(async () => {
   await editablePapCurrenciesMigration.up(migrationClient);
   await fittingWorkbenchMigration.up(migrationClient);
   await automaticDutyPapMigration.up(migrationClient);
+  await memberForumMigration.up(migrationClient);
   const app = express();
   app.use((req, _res, next) => {
     req.session = currentSession as unknown as Request["session"];
@@ -154,6 +156,7 @@ beforeEach(async () => {
   dutyTokenFixture = false;
   await pg.exec(`
     TRUNCATE duty_pap_awards, duty_pap_progress, duty_pap_connections, duty_pap_rules,
+      forum_attachments, forum_replies, forum_posts,
       fittings, pap_currency_ledger, pap_currency_wallets, pap_currencies,
       pap_records, pap_market_orders, pap_market_transactions, pap_ledger, pap_market_admin_logs,
       activity_monthly_settlements, identity_group_memberships, identity_groups, characters, corporation_memberships,
@@ -367,6 +370,12 @@ async function seedOrphanFittingHistory() {
     INSERT INTO pap_market_transactions (buyer_id,seller_id,reviewed_by) VALUES(3,3,3);
     INSERT INTO pap_ledger VALUES(3,3,'pap_earned');
     INSERT INTO pap_market_admin_logs VALUES(3);
+    INSERT INTO forum_posts (id,corporation_id,author_user_id,author_name,title,body)
+      VALUES(1,1001,3,'FC','Forum history','Original post');
+    INSERT INTO forum_replies (corporation_id,post_id,author_user_id,author_name,body)
+      VALUES(1001,1,3,'FC','Original reply');
+    INSERT INTO forum_attachments (id,corporation_id,owner_user_id,post_id,file_name,mime_type,size,data_base64)
+      VALUES('00000000-0000-4000-8000-000000000001',1001,3,1,'History.txt','text/plain',1,'YQ==');
   `);
   ssoCharacter = { characterId: 301, characterName: "FC", corporationId: 1001 };
 }
@@ -380,6 +389,9 @@ test("real OAuth account merge preserves personal drafts, corporation snapshots 
   assert.deepEqual(after[0], { ...before[0], owner_user_id: 1, created_by: null, updated_by: null });
   assert.deepEqual(after[1], { ...before[1], created_by: null, updated_by: null });
   assert.deepEqual(after.slice(2), before.slice(2));
+  assert.deepEqual((await pg.query("SELECT author_user_id,author_name,body FROM forum_posts")).rows[0], { author_user_id: 1, author_name: "FC", body: "Original post" });
+  assert.deepEqual((await pg.query("SELECT author_user_id,author_name,body FROM forum_replies")).rows[0], { author_user_id: 1, author_name: "FC", body: "Original reply" });
+  assert.deepEqual((await pg.query("SELECT owner_user_id,data_base64 FROM forum_attachments")).rows[0], { owner_user_id: 1, data_base64: "YQ==" });
   assert.equal((await pg.query("SELECT id FROM users WHERE id=3")).rows.length, 0);
   assert.deepEqual((await pg.query("SELECT user_id,is_main FROM characters WHERE eve_character_id=301")).rows[0], { user_id: 1, is_main: false });
   assert.equal((await pg.query<{ role: string }>("SELECT role FROM corporation_memberships WHERE user_id=1 AND corporation_id=1001")).rows[0].role, "member");
@@ -407,6 +419,9 @@ test("real OAuth account merge rolls fitting ownership and PAP history back when
     assert.deepEqual((await pg.query("SELECT * FROM characters ORDER BY id")).rows, charactersBefore);
     assert.deepEqual((await pg.query("SELECT user_id FROM pap_records")).rows, [{ user_id: 3 }]);
     assert.deepEqual((await pg.query("SELECT owner_id FROM pap_market_orders")).rows, [{ owner_id: 3 }]);
+    assert.deepEqual((await pg.query("SELECT author_user_id,body FROM forum_posts")).rows[0], { author_user_id: 3, body: "Original post" });
+    assert.deepEqual((await pg.query("SELECT author_user_id,body FROM forum_replies")).rows[0], { author_user_id: 3, body: "Original reply" });
+    assert.deepEqual((await pg.query("SELECT owner_user_id,data_base64 FROM forum_attachments")).rows[0], { owner_user_id: 3, data_base64: "YQ==" });
   } finally {
     await pg.exec("DROP TRIGGER fail_test_orphan_delete ON users; DROP FUNCTION fail_test_orphan_delete()");
   }

@@ -10,6 +10,7 @@ import { pool } from "@workspace/db";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { fittingWorkbenchErrorHandler } from "./lib/fitting-workbench-router";
+import { forumErrorHandler } from "./lib/forum-router";
 
 const app: Express = express();
 
@@ -147,6 +148,9 @@ app.use("/api", (_req, res, next) => {
 });
 app.use("/api", router);
 app.use("/api/fitting", fittingWorkbenchErrorHandler);
+// Global JSON parsing can fail before the feature router is reached. Forum
+// errors stay scoped, JSON-only, and do not expose uploaded bodies or stacks.
+app.use("/api/forum", forumErrorHandler);
 
 if (isProduction) {
   if (existsSync(frontendIndexFile)) {

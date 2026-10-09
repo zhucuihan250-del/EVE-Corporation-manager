@@ -15,6 +15,7 @@ import {
   Coins,
   Wallet,
   Timer,
+  MessageSquare,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent,
@@ -66,6 +67,7 @@ export function Layout({ children }: { children: ReactNode }) {
   if (modules?.diplomacy) serviceItems.push({ href: "/diplomacy", label: tr("外交", "Diplomacy"), icon: Handshake });
   if (modules?.courier) serviceItems.push({ href: "/courier", label: tr("快递", "Courier"), icon: Truck });
   serviceItems.push({ href: "/buyback", label: tr("回收计算器", "Buyback calculator"), icon: Calculator });
+  serviceItems.push({ href: "/forum", label: tr("贴吧", "Member forum"), icon: MessageSquare });
   if (modules?.fleet) {
     serviceItems.push(
       { href: "/system-monitoring", label: tr("星系监控", "System monitoring"), icon: Radio },

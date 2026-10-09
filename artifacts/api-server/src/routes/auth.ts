@@ -4,6 +4,7 @@ import {
   corporationStructureConnectionsTable,
   corporationWalletConnectionsTable,
   corporationMembershipsTable,
+  corporationsTable,
   db,
   usersTable,
   charactersTable,
@@ -36,6 +37,7 @@ import { siteAllowsLogin } from "../lib/single-corporation-rules";
 import { dutyPapOAuth } from "../lib/duty-pap";
 import { DutyPapError } from "../lib/duty-pap-rules";
 import { mergeDutyPapAccounts } from "../lib/duty-pap-service";
+import { mergeForumAccounts } from "../lib/forum-account-merge";
 
 const router: IRouter = Router();
 
@@ -48,9 +50,14 @@ async function mergeOrphanUser(
   if (!orphan) return;
   await assertOrphanBelongsToSite(orphan);
   await db.transaction(async (tx) => {
+    // Match forum writes' corporation-before-content lock order when moving
+    // ownership. This lock never changes corporation settings or permissions.
+    await tx.select({ id: corporationsTable.id }).from(corporationsTable)
+      .where(eq(corporationsTable.id, orphan.corporationId!)).for("no key update");
     const merged = await mergePapWallets(tx, orphan.corporationId!, orphan.id, mainUserId);
     if (!merged) return;
     await mergeDutyPapAccounts(tx, orphan.corporationId!, orphan.id, mainUserId);
+    await mergeForumAccounts(tx, orphan.corporationId!, orphan.id, mainUserId);
     // Never copy another account's permissions or historical foreign memberships.
     await tx.execute(sql`UPDATE pap_records SET user_id = ${mainUserId} WHERE user_id = ${orphan.id}`);
     // Preserve market audit history while moving live ownership to the main account.

@@ -46,6 +46,7 @@ const IdentityGroups = lazy(() => import("@/pages/identity-groups").then((module
 const Diplomacy = lazy(() => import("@/pages/diplomacy").then((module) => ({ default: module.Diplomacy })));
 const Courier = lazy(() => import("@/pages/courier").then((module) => ({ default: module.Courier })));
 const Buyback = lazy(() => import("@/pages/buyback").then((module) => ({ default: module.Buyback })));
+const Forum = lazy(() => import("@/pages/forum").then((module) => ({ default: module.Forum })));
 const Reimbursements = lazy(() => import("@/pages/reimbursements").then((module) => ({ default: module.Reimbursements })));
 const TacticalReimbursements = lazy(() => import("@/pages/reimbursements").then((module) => ({ default: module.TacticalReimbursements })));
 const TacticalDashboard = lazy(() => import("@/pages/tactical-dashboard").then((module) => ({ default: module.TacticalDashboard })));
@@ -231,6 +232,12 @@ function Router() {
       </Route>
       <Route path="/buyback">
         {() => <ProtectedRoute component={Buyback} />}
+      </Route>
+      <Route path="/forum/:id">
+        {() => <ProtectedRoute component={Forum} />}
+      </Route>
+      <Route path="/forum">
+        {() => <ProtectedRoute component={Forum} />}
       </Route>
       <Route path="/reimbursements">
         {() => <ProtectedRoute component={Reimbursements} module="reimbursement" requiresReimbursementOpen />}

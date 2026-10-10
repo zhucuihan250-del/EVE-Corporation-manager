@@ -5,6 +5,7 @@
  * EVE Online PAP Tracking System API
  * OpenAPI spec version: 0.1.0
  */
+import type { CharacterMembershipStatus } from "./characterMembershipStatus";
 
 export interface Character {
   id: number;
@@ -17,6 +18,15 @@ export interface Character {
   /** @nullable */
   corporationName?: string | null;
   isMain: boolean;
+  /** @nullable */
+  actualCorporationId?: number | null;
+  membershipStatus?: CharacterMembershipStatus;
+  /** @nullable */
+  membershipCheckedAt?: Date | null;
+  /** @nullable */
+  corporationLeftAt?: Date | null;
+  /** @nullable */
+  membershipRetainedUntil?: Date | null;
   /** @nullable */
   deletedAt?: Date | null;
   /** @nullable */

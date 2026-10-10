@@ -1,6 +1,7 @@
-import { charactersTable, corporationsTable, db, usersTable } from "@workspace/db";
-import { and, eq, isNull } from "drizzle-orm";
+import { corporationsTable, db } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import { selectSiteCorporation } from "./single-corporation-rules";
+import { recordVerifiedCharacterMembership } from "./character-membership";
 
 export async function getSiteCorporation(): Promise<typeof corporationsTable.$inferSelect | null> {
   const configured = process.env.PRIMARY_CORPORATION_ID?.trim();
@@ -25,20 +26,8 @@ export async function recordNonSiteLoginAffiliation(characterId: number, corpora
     || !Number.isSafeInteger(corporationId) || corporationId <= 0) return;
   const site = await requireSiteCorporation();
   if (corporationId === site.id) return;
-  const [knownCorporation] = await db.select({ id: corporationsTable.id, name: corporationsTable.name })
-    .from(corporationsTable).where(eq(corporationsTable.id, corporationId));
-  await db.transaction(async (tx) => {
-    // Do not provision a corporation for a rejected visitor. Unknown affiliations
-    // lose the current home FK; historical business rows and roles stay intact.
-    await tx.update(charactersTable).set({
-      corporationId: knownCorporation?.id ?? null,
-      corporationName: knownCorporation?.name ?? null,
-    }).where(and(eq(charactersTable.eveCharacterId, characterId), isNull(charactersTable.deletedAt)));
-    await tx.update(usersTable).set({
-      corporationId,
-      corporationName: knownCorporation?.name ?? null,
-    }).where(eq(usersTable.eveCharacterId, characterId));
-  });
+  // Keep historical identity-group FKs intact while invalidating live access.
+  await recordVerifiedCharacterMembership(db, site.id, characterId, corporationId);
 }
 
 /** External alts need a foreign-key reference, never a second enabled website. */

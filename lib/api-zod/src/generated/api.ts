@@ -184,6 +184,11 @@ export const ListCharactersResponseItem = zod.object({
   corporationId: zod.number().nullish(),
   corporationName: zod.string().nullish(),
   isMain: zod.boolean(),
+  actualCorporationId: zod.number().nullish(),
+  membershipStatus: zod.enum(["unknown", "member", "departed"]).optional(),
+  membershipCheckedAt: zod.coerce.date().nullish(),
+  corporationLeftAt: zod.coerce.date().nullish(),
+  membershipRetainedUntil: zod.coerce.date().nullish(),
   deletedAt: zod.coerce.date().nullish(),
   retainedUntil: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
@@ -201,6 +206,11 @@ export const ListAllCharactersResponseItem = zod.object({
   corporationId: zod.number().nullish(),
   corporationName: zod.string().nullish(),
   isMain: zod.boolean(),
+  actualCorporationId: zod.number().nullish(),
+  membershipStatus: zod.enum(["unknown", "member", "departed"]).optional(),
+  membershipCheckedAt: zod.coerce.date().nullish(),
+  corporationLeftAt: zod.coerce.date().nullish(),
+  membershipRetainedUntil: zod.coerce.date().nullish(),
   deletedAt: zod.coerce.date().nullish(),
   retainedUntil: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
@@ -239,6 +249,11 @@ export const GetUserCharactersResponseItem = zod.object({
   corporationId: zod.number().nullish(),
   corporationName: zod.string().nullish(),
   isMain: zod.boolean(),
+  actualCorporationId: zod.number().nullish(),
+  membershipStatus: zod.enum(["unknown", "member", "departed"]).optional(),
+  membershipCheckedAt: zod.coerce.date().nullish(),
+  corporationLeftAt: zod.coerce.date().nullish(),
+  membershipRetainedUntil: zod.coerce.date().nullish(),
   deletedAt: zod.coerce.date().nullish(),
   retainedUntil: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
@@ -4942,7 +4957,7 @@ export const CreateManualPapBody = zod.object({
 });
 
 /**
- * @summary List fixed monthly PAP deduction results and insufficient-balance alerts
+ * @summary List monthly PAP deductions and alerts after three consecutive insufficient completed months
  */
 export const getActivityReportQueryMonthRegExp = new RegExp(
   "^\\d{4}-(0[1-9]|1[0-2])$",
@@ -4966,6 +4981,8 @@ export const GetActivityReportResponse = zod.object({
   totalEligible: zod.number(),
   meetingRequirement: zod.number(),
   belowRequirement: zod.number(),
+  alertThresholdMonths: zod.literal(3),
+  alertWindow: zod.enum(["consecutive_completed_months"]),
   settlement: zod.object({
     status: zod.enum(["not_applicable", "scheduled", "pending", "settled"]),
     settledAt: zod.coerce.date().nullable(),
@@ -4990,9 +5007,25 @@ export const GetActivityReportResponse = zod.object({
       requiredDeductionPap: zod.number(),
       deductionShortfallPap: zod.number(),
       hasInsufficientPapAlert: zod.boolean(),
+      consecutiveInsufficientMonths: zod
+        .number()
+        .describe(
+          "Consecutive completed monthly settlements with insufficient PAP, ending at alertAnchorMonth",
+        ),
+      currentMonthHasShortfall: zod
+        .boolean()
+        .describe(
+          "Current month forecast has a PAP shortfall; a forecast alone never triggers an alert",
+        ),
+      selectedMonthHasShortfall: zod
+        .boolean()
+        .describe("Selected completed monthly settlement has a PAP shortfall"),
+      alertAnchorMonth: zod.string().nullable(),
+      settlementRecorded: zod.boolean(),
       deductionStatus: zod.enum([
         "not_applicable",
         "scheduled",
+        "pending",
         "deducted",
         "insufficient",
       ]),
@@ -5013,7 +5046,7 @@ export const UpdateActivitySettingsResponse = zod.object({
 });
 
 /**
- * @summary Audit corporation members who joined in the last 60 days without a PAP site binding
+ * @summary Audit all current corporation characters without a PAP site binding
  */
 export const GetRecentUnboundMembersResponse = zod.object({
   connection: zod
@@ -5029,12 +5062,16 @@ export const GetRecentUnboundMembersResponse = zod.object({
   totalCorporationMembers: zod.number().nullable(),
   recentMemberCount: zod.number(),
   unboundMemberCount: zod.number(),
+  auditScope: zod.enum(["all"]),
+  reviewedMemberCount: zod.number(),
+  unknownJoinDateCount: zod.number(),
   members: zod.array(
     zod.object({
       characterId: zod.number(),
       characterName: zod.string(),
-      corporationJoinedAt: zod.coerce.date(),
-      daysInCorporation: zod.number(),
+      corporationJoinedAt: zod.coerce.date().nullable(),
+      daysInCorporation: zod.number().nullable(),
+      joinDateKnown: zod.boolean(),
     }),
   ),
 });
@@ -6030,7 +6067,7 @@ export const ListIdentityGroupsResponseItem = zod.object({
         groupPermissions: zod.array(zod.string()).optional(),
         userId: zod.number(),
         applicantName: zod.string().nullish(),
-        characterId: zod.number(),
+        characterId: zod.number().nullable(),
         characterName: zod.string().optional(),
         statement: zod.string(),
         status: zod.enum([
@@ -6226,7 +6263,7 @@ export const UpdateIdentityGroupResponse = zod.object({
         groupPermissions: zod.array(zod.string()).optional(),
         userId: zod.number(),
         applicantName: zod.string().nullish(),
-        characterId: zod.number(),
+        characterId: zod.number().nullable(),
         characterName: zod.string().optional(),
         statement: zod.string(),
         status: zod.enum([
@@ -6401,7 +6438,7 @@ export const ListIdentityApplicationsResponseItem = zod.object({
   groupPermissions: zod.array(zod.string()).optional(),
   userId: zod.number(),
   applicantName: zod.string().nullish(),
-  characterId: zod.number(),
+  characterId: zod.number().nullable(),
   characterName: zod.string().optional(),
   statement: zod.string(),
   status: zod.enum([
@@ -6635,7 +6672,7 @@ export const ReviewIdentityApplicationResponse = zod.object({
   groupPermissions: zod.array(zod.string()).optional(),
   userId: zod.number(),
   applicantName: zod.string().nullish(),
-  characterId: zod.number(),
+  characterId: zod.number().nullable(),
   characterName: zod.string().optional(),
   statement: zod.string(),
   status: zod.enum([

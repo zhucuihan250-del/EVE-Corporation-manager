@@ -33,6 +33,7 @@ import { fleetPapCurrenciesMigration } from "./0031-fleet-pap-currencies";
 import { fittingWorkbenchMigration } from "./0032-fitting-workbench";
 import { automaticDutyPapMigration } from "./0033-automatic-duty-pap";
 import { memberForumMigration } from "./0034-member-forum";
+import { characterMembershipRetentionMigration } from "./0035-character-membership-retention";
 
 type Migration = {
   id: string;
@@ -74,6 +75,7 @@ const migrations: Migration[] = [
   fittingWorkbenchMigration,
   automaticDutyPapMigration,
   memberForumMigration,
+  characterMembershipRetentionMigration,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {

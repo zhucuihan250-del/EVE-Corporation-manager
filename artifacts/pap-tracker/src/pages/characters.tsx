@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { useSearch } from "wouter";
 import { apiUrl } from "@/lib/api";
 import { useQueryClient } from "@tanstack/react-query";
+import { characterCorporationLabel, retentionDeadlineLabel } from "@/lib/character-retention-presentation";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,7 +23,9 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export function Characters() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const zh = i18n.language.startsWith("zh");
+  const tr = (cn: string, en: string) => zh ? cn : en;
   const { data: characters, isLoading } = useListCharacters();
   const deleteCharacter = useDeleteCharacter();
   const queryClient = useQueryClient();
@@ -118,9 +121,11 @@ export function Characters() {
                         {char.isMain && <Star className="w-3 h-3 text-primary fill-primary" />}
                         <span>{char.eveCharacterName || `Character #${char.eveCharacterId}`}</span>
                       </div>
+                      {char.membershipStatus === "departed" ? <div className="mt-2 space-y-1"><Badge variant="outline" className="border-amber-500/40 text-amber-300">{tr("不在本军团 · 保留中", "Outside this corporation · retained")}</Badge><div className="text-xs text-muted-foreground">{retentionDeadlineLabel(char.membershipRetainedUntil) ? tr(`角色数据保留至 ${retentionDeadlineLabel(char.membershipRetainedUntil)}`, `Character data retained until ${retentionDeadlineLabel(char.membershipRetainedUntil)}`) : tr("保留期限等待核验", "Retention deadline awaiting verification")}</div><div className="text-xs text-muted-foreground">{tr("不触发 PAP 不足警报", "Excluded from PAP shortage alerts")}</div></div> : char.membershipStatus !== "member" ? <Badge variant="outline" className="mt-2">{tr("军团身份待核验", "Membership awaiting verification")}</Badge> : null}
                     </TableCell>
                     <TableCell className="font-mono text-sm text-muted-foreground">
-                      {char.corporationName || "—"}
+                      {characterCorporationLabel(char, zh)}
+                      {char.membershipStatus !== "member" && char.corporationName && <div className="mt-1 text-xs">{tr(`原记录：${char.corporationName}`, `Prior record: ${char.corporationName}`)}</div>}
                     </TableCell>
                     <TableCell className="text-right">
                       <Badge
@@ -166,6 +171,7 @@ export function Characters() {
             <p className="font-mono text-sm font-semibold text-foreground mb-1">{t("characters.addAltTitle")}</p>
             <p className="font-mono text-xs text-muted-foreground">{t("characters.addAltDesc")}</p>
             <p className="font-mono text-xs text-muted-foreground mt-2">{t("characters.dataRetention")}</p>
+            <p className="font-mono text-xs text-muted-foreground mt-2">{tr("不在本军团的授权角色在确认后保留3个日历月，到期自动清理角色数据。该清理不会删除 PAP 账户余额、已产生的 PAP 或业务历史；重新核验为本军团成员后取消离团清理。", "Authorized characters outside this corporation are retained for three calendar months after confirmation, then their character data is automatically removed. This does not delete PAP account balances, earned PAP, or business history. Verified corporation membership cancels departure cleanup.")}</p>
           </div>
         </CardContent>
       </Card>

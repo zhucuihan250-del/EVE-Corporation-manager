@@ -3687,7 +3687,7 @@ export const useCreateManualPap = <
 };
 
 /**
- * @summary List fixed monthly PAP deduction results and insufficient-balance alerts
+ * @summary List monthly PAP deductions and alerts after three consecutive insufficient completed months
  */
 export const getGetActivityReportUrl = (params?: GetActivityReportParams) => {
   const normalizedParams = new URLSearchParams();
@@ -3757,7 +3757,7 @@ export type GetActivityReportQueryResult = NonNullable<
 export type GetActivityReportQueryError = ErrorType<void>;
 
 /**
- * @summary List fixed monthly PAP deduction results and insufficient-balance alerts
+ * @summary List monthly PAP deductions and alerts after three consecutive insufficient completed months
  */
 
 export function useGetActivityReport<
@@ -3871,7 +3871,7 @@ export const useUpdateActivitySettings = <
 };
 
 /**
- * @summary Audit corporation members who joined in the last 60 days without a PAP site binding
+ * @summary Audit all current corporation characters without a PAP site binding
  */
 export const getGetRecentUnboundMembersUrl = () => {
   return `/api/activity/new-members`;
@@ -3926,7 +3926,7 @@ export type GetRecentUnboundMembersQueryResult = NonNullable<
 export type GetRecentUnboundMembersQueryError = ErrorType<void>;
 
 /**
- * @summary Audit corporation members who joined in the last 60 days without a PAP site binding
+ * @summary Audit all current corporation characters without a PAP site binding
  */
 
 export function useGetRecentUnboundMembers<

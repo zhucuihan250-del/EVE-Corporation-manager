@@ -141,9 +141,13 @@ export const identityGroupApplicationsTable = pgTable(
     userId: integer("user_id")
       .notNull()
       .references(() => usersTable.id, { onDelete: "cascade" }),
+    // Migration 0035 also preserves the tenant composite FK with targeted
+    // SET NULL(character_id). Drizzle's delete-action API cannot express a
+    // column subset; plain composite SET NULL would erase corporation_id.
     characterId: integer("character_id")
-      .notNull()
-      .references(() => charactersTable.id, { onDelete: "restrict" }),
+      .references(() => charactersTable.id, { onDelete: "set null" }),
+    applicantCharacterNameSnapshot: text("applicant_character_name_snapshot"),
+    applicantEveCharacterIdSnapshot: integer("applicant_eve_character_id_snapshot"),
     statement: text("statement").notNull().default(""),
     status: text("status", {
       enum: [
@@ -185,6 +189,7 @@ export const identityGroupMembershipsTable = pgTable(
     userId: integer("user_id")
       .notNull()
       .references(() => usersTable.id, { onDelete: "cascade" }),
+    // The tenant composite FK uses SET NULL(character_id) in migration 0035.
     characterId: integer("character_id").references(() => charactersTable.id, {
       onDelete: "set null",
     }),

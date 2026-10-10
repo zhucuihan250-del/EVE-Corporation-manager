@@ -94,6 +94,9 @@ async function handlerFixture() {
       (12,1,102,'已删除角色',1001,'本军团','old-token','old-refresh',now(),false,now(),now(),now(),now()),
       (13,2,103,'他人角色',1001,'本军团','other-token','other-refresh',now(),true,NULL,NULL,now(),now()),
       (31,1,131,'外军团小号',2002,'外军团','foreign-token','foreign-refresh',now(),false,NULL,NULL,now(),now());
+    ALTER TABLE characters ADD COLUMN membership_status text NOT NULL DEFAULT 'unknown', ADD COLUMN actual_corporation_id integer,
+      ADD COLUMN membership_checked_at timestamptz, ADD COLUMN corporation_left_at timestamptz,
+      ADD COLUMN membership_retained_until timestamptz, ADD COLUMN retention_corporation_id integer;
     CREATE TABLE duty_pap_connections(id integer PRIMARY KEY,corporation_id integer NOT NULL,user_id integer NOT NULL,version integer NOT NULL);
     INSERT INTO duty_pap_connections VALUES(1,1001,1,7);`);
   const tenant = { user: { id: 1, eveCharacterName: "测试账号" }, corporation: { id: 1001, papEnabled: true, fleetEnabled: true }, membership: { role: "member" } } as unknown as NonNullable<Request["tenant"]>;

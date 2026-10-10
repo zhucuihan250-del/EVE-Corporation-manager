@@ -1,7 +1,7 @@
 import app from "./app";
 import { db, pool, runMigrations } from "@workspace/db";
 import { logger } from "./lib/logger";
-import { CHARACTER_RETENTION_SWEEP_INTERVAL_MS, purgeExpiredDeletedCharacters } from "./lib/character-retention";
+import { CHARACTER_RETENTION_SWEEP_INTERVAL_MS, runCharacterMembershipRetentionSweep } from "./lib/character-retention";
 import {
   ACTIVITY_SETTLEMENT_SWEEP_INTERVAL_MS,
   settleDueActivityMonths,
@@ -42,16 +42,26 @@ async function prepareDatabase() {
   await runMigrations(pool);
   logger.info("Database migrations complete");
   await ensureSessionTable();
-  const purgedCharacters = await purgeExpiredDeletedCharacters();
-  if (purgedCharacters > 0) {
-    logger.info({ purgedCharacters }, "Expired deleted characters purged");
-  }
   const resumedBattleReports = await resumeRecentBattleReportGeneration();
   if (resumedBattleReports > 0) {
     logger.info(
       { resumedBattleReports },
       "Interrupted battle report jobs queued for recovery",
     );
+  }
+}
+
+let membershipRetentionSweepRunning = false;
+async function runMembershipRetentionSweep() {
+  if (membershipRetentionSweepRunning) return;
+  membershipRetentionSweepRunning = true;
+  try {
+    const result = await runCharacterMembershipRetentionSweep();
+    logger.info(result, "Character membership retention sweep completed");
+  } catch (err) {
+    logger.error({ err }, "Failed to synchronize character membership retention");
+  } finally {
+    membershipRetentionSweepRunning = false;
   }
 }
 
@@ -80,20 +90,10 @@ prepareDatabase()
       }
       logger.info({ host: "0.0.0.0", port }, "Server listening");
 
-      const retentionSweep = setInterval(() => {
-        purgeExpiredDeletedCharacters()
-          .then((purgedCharacters) => {
-            if (purgedCharacters > 0) {
-              logger.info({ purgedCharacters }, "Expired deleted characters purged");
-            }
-          })
-          .catch((err) => {
-            logger.error({ err }, "Failed to purge expired deleted characters");
-          });
-      }, CHARACTER_RETENTION_SWEEP_INTERVAL_MS);
+      const retentionSweep = setInterval(() => { void runMembershipRetentionSweep(); }, CHARACTER_RETENTION_SWEEP_INTERVAL_MS);
       retentionSweep.unref();
 
-      void runActivitySettlementSweep();
+      void runMembershipRetentionSweep().then(() => runActivitySettlementSweep());
       const activitySettlementSweep = setInterval(() => {
         void runActivitySettlementSweep();
       }, ACTIVITY_SETTLEMENT_SWEEP_INTERVAL_MS);

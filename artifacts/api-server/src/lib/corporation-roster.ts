@@ -1,23 +1,17 @@
 import {
-  charactersTable,
   corporationRosterConnectionsTable,
   db,
-  usersTable,
 } from "@workspace/db";
-import { and, eq, isNotNull, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { refreshAccessToken } from "./eve-sso";
+import { buildUnboundCorporationMemberAudit, type MemberTrackingEntry, type UnboundCorporationMember } from "./corporation-roster-rules";
+import { getWebsiteBoundCharacterIds } from "./corporation-roster-binding";
 
 const ESI_BASE = "https://esi.evetech.net/latest";
 const ESI_COMPATIBILITY_DATE = "2026-07-20";
-const DAY_MS = 24 * 60 * 60 * 1_000;
 const DEFAULT_WINDOW_DAYS = 60;
 const USER_AGENT = process.env.EVE_ESI_USER_AGENT
   || `EVE-PAP-Tracker/1.0 (+${process.env.FRONTEND_URL || "https://zephyr-fleet-track-production.up.railway.app"})`;
-
-type MemberTrackingEntry = {
-  character_id: number;
-  start_date?: string;
-};
 
 type ResolvedName = {
   id: number;
@@ -25,12 +19,7 @@ type ResolvedName = {
   category: string;
 };
 
-export type RecentUnboundMember = {
-  characterId: number;
-  characterName: string;
-  corporationJoinedAt: Date;
-  daysInCorporation: number;
-};
+export type RecentUnboundMember = UnboundCorporationMember;
 
 function connectionSummary(connection: typeof corporationRosterConnectionsTable.$inferSelect | null) {
   if (!connection) return null;
@@ -98,7 +87,11 @@ async function fetchMemberTracking(corporationId: number, accessToken: string): 
     }
     throw new Error(`EVE成员追踪读取失败（${response.status}）${body ? `：${body}` : ""}`);
   }
-  return (await response.json()) as MemberTrackingEntry[];
+  const payload: unknown = await response.json();
+  if (!Array.isArray(payload) || payload.some((row) => row === null || typeof row !== "object")) {
+    throw new Error("EVE成员追踪返回格式无效");
+  }
+  return payload as MemberTrackingEntry[];
 }
 
 async function resolveCharacterNames(characterIds: number[]): Promise<Map<number, string>> {
@@ -136,8 +129,11 @@ export async function getRecentUnboundMemberAudit(
       connection: null,
       reviewedAt: null,
       windowDays,
+      auditScope: "all" as const,
       totalCorporationMembers: null,
+      reviewedMemberCount: 0,
       recentMemberCount: 0,
+      unknownJoinDateCount: 0,
       unboundMemberCount: 0,
       members: [] as RecentUnboundMember[],
     };
@@ -146,42 +142,10 @@ export async function getRecentUnboundMemberAudit(
   const accessToken = await authorizedRosterToken(corporationId);
   try {
     const tracking = await fetchMemberTracking(corporationId, accessToken);
-    const [boundCharacters, boundMainCharacters] = await Promise.all([
-      db.select({ characterId: charactersTable.eveCharacterId })
-        .from(charactersTable)
-        .where(and(
-          eq(charactersTable.corporationId, corporationId),
-          isNull(charactersTable.deletedAt),
-        )),
-      db.select({ characterId: usersTable.eveCharacterId })
-        .from(usersTable)
-        .where(and(
-          eq(usersTable.corporationId, corporationId),
-          isNotNull(usersTable.eveCharacterId),
-        )),
-    ]);
-    const boundIds = new Set<number>([
-      ...boundCharacters.map((item) => item.characterId),
-      ...boundMainCharacters.flatMap((item) => item.characterId === null ? [] : [item.characterId]),
-    ]);
-    const cutoff = now.getTime() - windowDays * DAY_MS;
-    const recentMembers = tracking.flatMap((member) => {
-      if (!Number.isInteger(member.character_id) || !member.start_date) return [];
-      const corporationJoinedAt = new Date(member.start_date);
-      const joinedAt = corporationJoinedAt.getTime();
-      if (!Number.isFinite(joinedAt) || joinedAt < cutoff || joinedAt > now.getTime()) return [];
-      return [{ characterId: member.character_id, corporationJoinedAt }];
-    });
-    const unboundMembers = recentMembers.filter((member) => !boundIds.has(member.characterId));
-    const names = await resolveCharacterNames(unboundMembers.map((member) => member.characterId));
-    const members = unboundMembers.map((member) => ({
-      ...member,
-      characterName: names.get(member.characterId) ?? `Character ${member.characterId}`,
-      daysInCorporation: Math.max(0, Math.floor((now.getTime() - member.corporationJoinedAt.getTime()) / DAY_MS)),
-    })).sort((left, right) => (
-      right.corporationJoinedAt.getTime() - left.corporationJoinedAt.getTime()
-      || left.characterName.localeCompare(right.characterName)
-    ));
+    const boundIds = await getWebsiteBoundCharacterIds(corporationId, db);
+    const unresolved = buildUnboundCorporationMemberAudit({ tracking, boundIds, now, windowDays });
+    const names = await resolveCharacterNames(unresolved.members.map((member) => member.characterId));
+    const audit = buildUnboundCorporationMemberAudit({ tracking, boundIds, names, now, windowDays });
 
     await db.update(corporationRosterConnectionsTable).set({
       status: "connected",
@@ -197,11 +161,7 @@ export async function getRecentUnboundMemberAudit(
         lastSyncedAt: now,
       },
       reviewedAt: now,
-      windowDays,
-      totalCorporationMembers: tracking.length,
-      recentMemberCount: recentMembers.length,
-      unboundMemberCount: members.length,
-      members,
+      ...audit,
     };
   } catch (error) {
     await markConnectionError(corporationId, error, "Corporation roster audit failed");

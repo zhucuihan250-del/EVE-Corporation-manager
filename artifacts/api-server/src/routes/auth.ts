@@ -33,6 +33,7 @@ import { timingSafeEqual } from "node:crypto";
 import { availablePap } from "../lib/pap-balance";
 import { mergePapWallets } from "../lib/pap-currency-account-merge";
 import { ensureCharacterCorporationReference, recordNonSiteLoginAffiliation, requireSiteCorporation } from "../lib/single-corporation";
+import { recordVerifiedCharacterMembership, verifiedMembershipFields } from "../lib/character-membership";
 import { siteAllowsLogin } from "../lib/single-corporation-rules";
 import { dutyPapOAuth } from "../lib/duty-pap";
 import { DutyPapError } from "../lib/duty-pap-rules";
@@ -128,14 +129,15 @@ async function restoreDeletedCharacter(
   characterName: string,
   corporationId: number | null,
   corporationName: string | null,
-  tokens?: { accessToken: string; refreshToken: string; tokenExpiry: Date },
+  tokens?: { accessToken: string; refreshToken: string; tokenExpiry: Date; corporationAffiliationVerified?: boolean },
 ) {
+  const site = await requireSiteCorporation();
   const [restored] = await db
     .update(charactersTable)
     .set({
       userId,
       eveCharacterName: characterName,
-      corporationId,
+      corporationId: character.corporationId === site.id && corporationId !== site.id ? site.id : corporationId,
       corporationName,
       ...(tokens
         ? {
@@ -147,6 +149,7 @@ async function restoreDeletedCharacter(
       isMain,
       deletedAt: null,
       retainedUntil: null,
+      ...(tokens?.corporationAffiliationVerified && corporationId ? verifiedMembershipFields(site.id, corporationId, new Date(), character) : {}),
     })
     .where(eq(charactersTable.id, character.id))
     .returning();
@@ -388,14 +391,20 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
 
   try {
     const { accessToken, refreshToken, expiresIn } = await exchangeCode(code, callbackUrl);
-    const { characterId, characterName, corporationId } = await getCharacterInfo(accessToken);
+    const { characterId, characterName, corporationId, corporationAffiliationVerified } = await getCharacterInfo(accessToken);
     const site = await requireSiteCorporation();
     // A linked external alt may be refreshed by an already-authorized account,
     // but it is never a credential for entering this single-corporation site.
     if (oauthFlow === "login" && !siteAllowsLogin(site.id, corporationId)) {
-      await recordNonSiteLoginAffiliation(characterId, corporationId);
+      if (corporationAffiliationVerified) await recordNonSiteLoginAffiliation(characterId, corporationId);
       req.session.destroy(() => redirectToFrontend(res, "/?error=corporation_required"));
       return;
+    }
+
+    // Director-only authorization flows also count as fresh rejoin evidence.
+    // A cached public profile fallback must never start a deletion window.
+    if (corporationAffiliationVerified && (oauthFlow === "roster" || oauthFlow === "economy" || oauthFlow === "structures")) {
+      await recordVerifiedCharacterMembership(db, site.id, characterId, corporationId);
     }
 
     let corporationName = "";
@@ -408,6 +417,7 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
       ? await getCorporationJoinDate(characterId, corporationId)
       : null;
     const mainCharacterTokens = { accessToken, refreshToken, tokenExpiry, corporationJoinedAt };
+    const affiliationFields = corporationAffiliationVerified ? verifiedMembershipFields(site.id, corporationId) : {};
 
     if (oauthFlow === "structures" && req.session.structuresLinkCorporationId) {
       const targetCorporationId = req.session.structuresLinkCorporationId;
@@ -562,8 +572,9 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
         if (existingChar.userId === mainUserId) {
           // Already linked to this account — overwrite name/corp in case it changed
           const [updatedChar] = await db.update(charactersTable).set({
+            ...(corporationAffiliationVerified ? verifiedMembershipFields(site.id, corporationId, new Date(), existingChar) : {}),
             eveCharacterName: characterName,
-            corporationId,
+            corporationId: existingChar.corporationId === site.id && corporationId !== site.id ? site.id : corporationId,
             corporationName,
             accessToken,
             refreshToken,
@@ -579,9 +590,10 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
         }
         if (!existingChar.userId) {
           const [reclaimedChar] = await db.update(charactersTable).set({
+            ...(corporationAffiliationVerified ? verifiedMembershipFields(site.id, corporationId, new Date(), existingChar) : {}),
             userId: mainUserId,
             eveCharacterName: characterName,
-            corporationId,
+            corporationId: existingChar.corporationId === site.id && corporationId !== site.id ? site.id : corporationId,
             corporationName,
             isMain: shouldBecomeMain,
             accessToken,
@@ -634,7 +646,7 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
           characterName,
           corporationId,
           corporationName,
-          { accessToken, refreshToken, tokenExpiry },
+          { accessToken, refreshToken, tokenExpiry, corporationAffiliationVerified },
         );
         if (shouldBecomeMain) {
           await setCharacterAsAccountMain(mainUserId, restoredChar, mainCharacterTokens);
@@ -661,6 +673,7 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
         await assertOrphanBelongsToSite(orphanByMain);
         // Orphan in usersTable — create the characters record first, then merge
         await db.insert(charactersTable).values({
+          ...affiliationFields,
           userId: orphanByMain.id,
           eveCharacterId: characterId,
           eveCharacterName: characterName,
@@ -694,6 +707,7 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
 
       // Clean case: no orphan, just insert the characters record
       const [newChar] = await db.insert(charactersTable).values({
+        ...affiliationFields,
         userId: mainUserId,
         eveCharacterId: characterId,
         eveCharacterName: characterName,
@@ -741,6 +755,7 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
           const [updatedLinkedChar] = await db
             .update(charactersTable)
             .set({
+              ...affiliationFields,
               eveCharacterName: characterName,
               corporationId,
               corporationName,
@@ -796,12 +811,13 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
           characterName,
           corporationId,
           corporationName,
-          { accessToken, refreshToken, tokenExpiry },
+          { accessToken, refreshToken, tokenExpiry, corporationAffiliationVerified },
         );
         req.log.info({ charId: characterId, userId: user.id, previousCharId: deletedChar.id }, "Restored deleted character on main login");
       } else {
         // Create the character record
         await db.insert(charactersTable).values({
+          ...affiliationFields,
           userId: user.id,
           eveCharacterId: characterId,
           eveCharacterName: characterName,
@@ -843,11 +859,12 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
             characterName,
             corporationId,
             corporationName,
-            { accessToken, refreshToken, tokenExpiry },
+            { accessToken, refreshToken, tokenExpiry, corporationAffiliationVerified },
           );
           req.log.info({ charId: characterId, userId: user.id, previousCharId: deletedChar.id }, "Restored deleted character for existing main login");
         } else {
           await db.insert(charactersTable).values({
+            ...affiliationFields,
             userId: user.id,
             eveCharacterId: characterId,
             eveCharacterName: characterName,
@@ -863,6 +880,7 @@ router.get("/auth/eve/callback", async (req: Request, res: Response): Promise<vo
         await db
           .update(charactersTable)
           .set({
+            ...affiliationFields,
             eveCharacterName: characterName,
             corporationId,
             corporationName,

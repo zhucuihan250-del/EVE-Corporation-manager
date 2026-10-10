@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, charactersTable, usersTable } from "@workspace/db";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull, ne, or } from "drizzle-orm";
 import { requireAuth, hasRole } from "../middlewares/auth";
 import { requireModule, requireTenant } from "../lib/tenant";
 import { getCharacterRetentionDeadline } from "../lib/character-retention";
@@ -17,6 +17,11 @@ function formatCharacter(c: typeof charactersTable.$inferSelect) {
     eveCharacterName: c.eveCharacterName,
     corporationId: c.corporationId,
     corporationName: c.corporationName,
+    actualCorporationId: c.actualCorporationId,
+    membershipStatus: c.membershipStatus,
+    membershipCheckedAt: c.membershipCheckedAt,
+    corporationLeftAt: c.corporationLeftAt,
+    membershipRetainedUntil: c.membershipRetainedUntil,
     isMain: c.isMain,
     deletedAt: c.deletedAt,
     retainedUntil: c.retainedUntil,
@@ -40,7 +45,7 @@ router.get("/characters", requireAuth, async (req: Request, res: Response): Prom
     .from(charactersTable)
     .where(and(
       eq(charactersTable.userId, req.session.userId!),
-      eq(charactersTable.corporationId, req.tenant!.corporation.id),
+      or(eq(charactersTable.corporationId, req.tenant!.corporation.id), eq(charactersTable.retentionCorporationId, req.tenant!.corporation.id)),
       isNull(charactersTable.deletedAt),
     ));
 
@@ -59,7 +64,7 @@ router.get("/characters/all", requireAuth, requireModule("pap"), async (req: Req
     .select()
     .from(charactersTable)
     .where(and(
-      eq(charactersTable.corporationId, req.tenant!.corporation.id),
+      or(eq(charactersTable.corporationId, req.tenant!.corporation.id), eq(charactersTable.retentionCorporationId, req.tenant!.corporation.id)),
       isNull(charactersTable.deletedAt),
     ));
 
@@ -85,7 +90,7 @@ router.get("/admin/users/:id/characters", requireAuth, async (req: Request, res:
     .from(charactersTable)
     .where(and(
       eq(charactersTable.userId, targetId),
-      eq(charactersTable.corporationId, req.tenant!.corporation.id),
+      or(eq(charactersTable.corporationId, req.tenant!.corporation.id), eq(charactersTable.retentionCorporationId, req.tenant!.corporation.id)),
       isNull(charactersTable.deletedAt),
     ));
 
@@ -111,7 +116,7 @@ router.delete("/characters/:id", requireAuth, async (req: Request, res: Response
     .from(charactersTable)
     .where(and(
       eq(charactersTable.id, charId),
-      eq(charactersTable.corporationId, req.tenant!.corporation.id),
+      or(eq(charactersTable.corporationId, req.tenant!.corporation.id), eq(charactersTable.retentionCorporationId, req.tenant!.corporation.id)),
       isNull(charactersTable.deletedAt),
     ));
 
@@ -133,8 +138,15 @@ router.delete("/characters/:id", requireAuth, async (req: Request, res: Response
   let newMainCharacterId: number | null = null;
   let newMainCharacterName: string | null = null;
   let requiresReauthentication = false;
+  let characterChanged = false;
 
   await db.transaction(async (tx) => {
+    if (previousUserId) await tx.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.id, previousUserId)).for("update");
+    const [lockedCharacter] = await tx.select().from(charactersTable).where(eq(charactersTable.id, charId)).for("update");
+    if (!lockedCharacter || lockedCharacter.deletedAt || lockedCharacter.userId !== char.userId || lockedCharacter.isMain !== char.isMain) {
+      characterChanged = true;
+      return;
+    }
     await tx.update(charactersTable).set({
       userId: null,
       isMain: false,
@@ -150,7 +162,8 @@ router.delete("/characters/:id", requireAuth, async (req: Request, res: Response
     const remainingCharacters = await tx
       .select()
       .from(charactersTable)
-      .where(and(eq(charactersTable.userId, previousUserId), isNull(charactersTable.deletedAt)))
+      .where(and(eq(charactersTable.userId, previousUserId), isNull(charactersTable.deletedAt),
+        eq(charactersTable.corporationId, req.tenant!.corporation.id), ne(charactersTable.membershipStatus, "departed")))
       .orderBy(asc(charactersTable.createdAt), asc(charactersTable.id));
 
     await tx
@@ -187,6 +200,11 @@ router.delete("/characters/:id", requireAuth, async (req: Request, res: Response
     newMainCharacterId = promoted?.id ?? replacement.id;
     newMainCharacterName = promoted?.eveCharacterName ?? replacement.eveCharacterName;
   });
+
+  if (characterChanged) {
+    res.status(409).json({ error: "Character changed during unlink; refresh and retry" });
+    return;
+  }
 
   req.log.info(
     {

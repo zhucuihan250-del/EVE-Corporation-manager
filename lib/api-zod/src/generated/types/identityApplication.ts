@@ -19,7 +19,8 @@ export interface IdentityApplication {
   userId: number;
   /** @nullable */
   applicantName?: string | null;
-  characterId: number;
+  /** @nullable */
+  characterId: number | null;
   characterName?: string;
   statement: string;
   status: IdentityApplicationStatus;

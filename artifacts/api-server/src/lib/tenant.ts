@@ -8,7 +8,7 @@ import {
   identityGroupsTable,
   usersTable,
 } from "@workspace/db";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, ne } from "drizzle-orm";
 import type { Role } from "../middlewares/auth";
 import { getSiteCorporation, requireSiteCorporation } from "./single-corporation";
 import { siteSessionAllowsActor } from "./single-corporation-rules";
@@ -144,6 +144,7 @@ export async function getTenantContext(req: Request): Promise<TenantContext | nu
     eq(charactersTable.userId, user.id),
     eq(charactersTable.corporationId, corporationId),
     isNull(charactersTable.deletedAt),
+    ne(charactersTable.membershipStatus, "departed"),
   ];
   const sessionCharacterId = req.session.eveCharacterId ?? user.eveCharacterId;
   if (!sessionCharacterId) return null;

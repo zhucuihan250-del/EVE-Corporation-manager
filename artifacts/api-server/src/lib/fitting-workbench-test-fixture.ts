@@ -33,6 +33,9 @@ export async function createFittingWorkbenchFixture(options: { defaultActor?: nu
     CREATE TABLE corporations(id integer PRIMARY KEY);
     CREATE TABLE users(id serial PRIMARY KEY,eve_character_id integer,eve_character_name text,corporation_id integer,corporation_name text,corporation_joined_at timestamptz,access_token text,refresh_token text,token_expiry timestamptz,role text NOT NULL DEFAULT 'member',total_pap double precision NOT NULL DEFAULT 0,redeemable_pap double precision NOT NULL DEFAULT 0,locked_pap double precision NOT NULL DEFAULT 0,created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now());
     CREATE TABLE characters(id serial PRIMARY KEY,user_id integer REFERENCES users(id),eve_character_id integer NOT NULL,eve_character_name text NOT NULL,corporation_id integer,corporation_name text,access_token text,refresh_token text,token_expiry timestamptz,is_main boolean NOT NULL DEFAULT false,deleted_at timestamptz,retained_until timestamptz,created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now());
+    ALTER TABLE characters ADD COLUMN membership_status text NOT NULL DEFAULT 'unknown', ADD COLUMN actual_corporation_id integer,
+      ADD COLUMN membership_checked_at timestamptz, ADD COLUMN corporation_left_at timestamptz,
+      ADD COLUMN membership_retained_until timestamptz, ADD COLUMN retention_corporation_id integer;
     INSERT INTO corporations VALUES(1001),(2002);
     INSERT INTO users(id,eve_character_name,corporation_id,total_pap,redeemable_pap) VALUES(1,'测试管理员',1001,15,15),(2,'测试成员',1001,12,12),(3,'另一成员',1001,0,0),(4,'外军团管理员',2002,7,7),(5,'测试 FC',1001,1,1),(6,'舰队管理组成员',1001,1,1);
     INSERT INTO characters(id,user_id,eve_character_id,eve_character_name,corporation_id,access_token,refresh_token,token_expiry,is_main,deleted_at) VALUES

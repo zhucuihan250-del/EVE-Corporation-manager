@@ -7,6 +7,7 @@
  */
 import type { CorporationRosterConnection } from "./corporationRosterConnection";
 import type { RecentUnboundMember } from "./recentUnboundMember";
+import type { RecentUnboundMemberAuditAuditScope } from "./recentUnboundMemberAuditAuditScope";
 
 export interface RecentUnboundMemberAudit {
   connection: CorporationRosterConnection | null;
@@ -15,5 +16,8 @@ export interface RecentUnboundMemberAudit {
   totalCorporationMembers: number | null;
   recentMemberCount: number;
   unboundMemberCount: number;
+  auditScope: RecentUnboundMemberAuditAuditScope;
+  reviewedMemberCount: number;
+  unknownJoinDateCount: number;
   members: RecentUnboundMember[];
 }

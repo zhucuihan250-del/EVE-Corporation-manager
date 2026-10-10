@@ -104,6 +104,7 @@ export async function getCharacterInfo(accessToken: string): Promise<{
   characterId: number;
   characterName: string;
   corporationId: number;
+  corporationAffiliationVerified: boolean;
 }> {
   // Verify the token and get character info from EVE SSO
   const resp = await fetch(`${EVE_SSO_BASE}/oauth/verify`, {
@@ -125,6 +126,7 @@ export async function getCharacterInfo(accessToken: string): Promise<{
   // corporation change. Affiliation is the authoritative, fresher membership
   // lookup; keep the profile endpoint only as a resilience fallback.
   let corporationId = 0;
+  let corporationAffiliationVerified = false;
   try {
     const affiliationResp = await fetch(
       `${ESI_BASE}/characters/affiliation/?datasource=tranquility`,
@@ -139,10 +141,14 @@ export async function getCharacterInfo(accessToken: string): Promise<{
         character_id: number;
         corporation_id: number;
       }>;
-      corporationId =
-        affiliations.find(
-          (affiliation) => affiliation.character_id === data.CharacterID,
-        )?.corporation_id ?? 0;
+      if (Array.isArray(affiliations)) {
+        const matching = affiliations.filter((affiliation) => affiliation?.character_id === data.CharacterID);
+        const verifiedId = matching.length === 1 ? matching[0].corporation_id : 0;
+        if (Number.isSafeInteger(verifiedId) && verifiedId > 0) {
+          corporationId = verifiedId;
+          corporationAffiliationVerified = true;
+        }
+      }
     } else {
       logger.warn(
         { status: affiliationResp.status, characterId: data.CharacterID },
@@ -177,6 +183,7 @@ export async function getCharacterInfo(accessToken: string): Promise<{
     characterId: data.CharacterID,
     characterName: data.CharacterName,
     corporationId,
+    corporationAffiliationVerified,
   };
 }
 

@@ -1010,7 +1010,7 @@ paths:
     get:
       operationId: getActivityReport
       tags: [activity]
-      summary: List fixed monthly PAP deduction results and insufficient-balance alerts
+      summary: List monthly PAP deductions and alerts after three consecutive insufficient completed months
       parameters:
         - in: query
           name: month
@@ -1051,10 +1051,10 @@ paths:
     get:
       operationId: getRecentUnboundMembers
       tags: [activity]
-      summary: Audit corporation members who joined in the last 60 days without a PAP site binding
+      summary: Audit all current corporation characters without a PAP site binding
       responses:
         "200":
-          description: Recent unbound member audit
+          description: Full current corporation unbound member audit
           content:
             application/json:
               schema:
@@ -3022,6 +3022,20 @@ components:
           type: ["string", "null"]
         isMain:
           type: boolean
+        actualCorporationId:
+          type: ["integer", "null"]
+        membershipStatus:
+          type: string
+          enum: [unknown, member, departed]
+        membershipCheckedAt:
+          type: ["string", "null"]
+          format: date-time
+        corporationLeftAt:
+          type: ["string", "null"]
+          format: date-time
+        membershipRetainedUntil:
+          type: ["string", "null"]
+          format: date-time
         deletedAt:
           type: ["string", "null"]
           format: date-time
@@ -5412,8 +5426,19 @@ components:
         requiredDeductionPap: { type: number }
         deductionShortfallPap: { type: number }
         hasInsufficientPapAlert: { type: boolean }
-        deductionStatus: { type: string, enum: [not_applicable, scheduled, deducted, insufficient] }
-      required: [userId, characterName, role, corporationJoinedAt, daysInCorporation, pap, papRecords, remainingPap, metRequirement, settledDeductionPap, currentAvailablePap, requiredDeductionPap, deductionShortfallPap, hasInsufficientPapAlert, deductionStatus]
+        consecutiveInsufficientMonths:
+          type: integer
+          description: Consecutive completed monthly settlements with insufficient PAP, ending at alertAnchorMonth
+        currentMonthHasShortfall:
+          type: boolean
+          description: Current month forecast has a PAP shortfall; a forecast alone never triggers an alert
+        selectedMonthHasShortfall:
+          type: boolean
+          description: Selected completed monthly settlement has a PAP shortfall
+        alertAnchorMonth: { type: ["string", "null"] }
+        settlementRecorded: { type: boolean }
+        deductionStatus: { type: string, enum: [not_applicable, scheduled, pending, deducted, insufficient] }
+      required: [userId, characterName, role, corporationJoinedAt, daysInCorporation, pap, papRecords, remainingPap, metRequirement, settledDeductionPap, currentAvailablePap, requiredDeductionPap, deductionShortfallPap, hasInsufficientPapAlert, deductionStatus, consecutiveInsufficientMonths, currentMonthHasShortfall, selectedMonthHasShortfall, alertAnchorMonth, settlementRecorded]
 
     ActivityMonthlySettlement:
       type: object
@@ -5439,13 +5464,15 @@ components:
         totalEligible: { type: integer }
         meetingRequirement: { type: integer }
         belowRequirement: { type: integer }
+        alertThresholdMonths: { type: integer, enum: [3] }
+        alertWindow: { type: string, enum: [consecutive_completed_months] }
         settlement:
           $ref: "#/components/schemas/ActivityMonthlySettlement"
         members:
           type: array
           items:
             $ref: "#/components/schemas/ActivityMember"
-      required: [month, periodStart, periodEnd, evaluatedAt, eligibilityDays, minimumPap, configuredMinimumPap, totalEligible, meetingRequirement, belowRequirement, settlement, members]
+      required: [month, periodStart, periodEnd, evaluatedAt, eligibilityDays, minimumPap, configuredMinimumPap, totalEligible, meetingRequirement, belowRequirement, settlement, members, alertThresholdMonths, alertWindow]
 
     ActivitySettings:
       type: object
@@ -5474,9 +5501,10 @@ components:
       properties:
         characterId: { type: integer }
         characterName: { type: string }
-        corporationJoinedAt: { type: string, format: date-time }
-        daysInCorporation: { type: integer }
-      required: [characterId, characterName, corporationJoinedAt, daysInCorporation]
+        corporationJoinedAt: { type: ["string", "null"], format: date-time }
+        daysInCorporation: { type: ["integer", "null"] }
+        joinDateKnown: { type: boolean }
+      required: [characterId, characterName, corporationJoinedAt, daysInCorporation, joinDateKnown]
 
     RecentUnboundMemberAudit:
       type: object
@@ -5490,11 +5518,14 @@ components:
         totalCorporationMembers: { type: integer, nullable: true }
         recentMemberCount: { type: integer }
         unboundMemberCount: { type: integer }
+        auditScope: { type: string, enum: [all] }
+        reviewedMemberCount: { type: integer }
+        unknownJoinDateCount: { type: integer }
         members:
           type: array
           items:
             $ref: "#/components/schemas/RecentUnboundMember"
-      required: [connection, reviewedAt, windowDays, totalCorporationMembers, recentMemberCount, unboundMemberCount, members]
+      required: [connection, reviewedAt, windowDays, totalCorporationMembers, recentMemberCount, unboundMemberCount, members, auditScope, reviewedMemberCount, unknownJoinDateCount]
 
     CorporationModules:
       type: object
@@ -5689,7 +5720,7 @@ components:
           items: { type: string }
         userId: { type: integer }
         applicantName: { type: ["string", "null"] }
-        characterId: { type: integer }
+        characterId: { type: ["integer", "null"] }
         characterName: { type: string }
         statement: { type: string }
         status:

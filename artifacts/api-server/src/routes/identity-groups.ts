@@ -735,6 +735,7 @@ router.post("/identity-groups/:id/applications", async (req: Request, res: Respo
       eq(charactersTable.userId, tenant.user.id),
       eq(charactersTable.corporationId, tenant.corporation.id),
       isNull(charactersTable.deletedAt),
+      sql`${charactersTable.membershipStatus} <> 'departed'`,
     )),
     db.select({ id: identityGroupMembershipsTable.id }).from(identityGroupMembershipsTable).where(and(
       eq(identityGroupMembershipsTable.corporationId, tenant.corporation.id),
@@ -783,6 +784,10 @@ router.post("/identity-groups/:id/applications", async (req: Request, res: Respo
       ? skillAudit.plans.filter((plan) => !plan.passed).map((plan) => plan.name)
       : skillAudit.skills.filter((skill) => !skill.passed).map((skill) => `${skill.name} ${skill.trainedLevel}/${skill.level}`);
     const application = await db.transaction(async (tx) => {
+      // Retention/account merge lock users before characters. Acquire the FK
+      // user lock first so insertion cannot invert that lock order.
+      await tx.select({ id: usersTable.id }).from(usersTable)
+        .where(eq(usersTable.id, tenant.user.id)).for("key share");
       const [openGroup] = await tx
         .select({ id: identityGroupsTable.id })
         .from(identityGroupsTable)
@@ -794,11 +799,27 @@ router.post("/identity-groups/:id/applications", async (req: Request, res: Respo
         ))
         .for("share");
       if (!openGroup) return null;
+      const [activeCharacter] = await tx.select({
+        id: charactersTable.id,
+        eveCharacterName: charactersTable.eveCharacterName,
+        eveCharacterId: charactersTable.eveCharacterId,
+      }).from(charactersTable).where(and(
+        eq(charactersTable.id, characterId),
+        eq(charactersTable.userId, tenant.user.id),
+        eq(charactersTable.corporationId, tenant.corporation.id),
+        isNull(charactersTable.deletedAt),
+        sql`${charactersTable.membershipStatus} <> 'departed'`,
+      )).for("share");
+      if (!activeCharacter) {
+        throw new SkillAuditError("该申请角色已离团、解绑或被删除", "CHARACTER_NOT_FOUND");
+      }
       const [created] = await tx.insert(identityGroupApplicationsTable).values({
         corporationId: tenant.corporation.id,
         groupId,
         userId: tenant.user.id,
         characterId,
+        applicantCharacterNameSnapshot: activeCharacter.eveCharacterName,
+        applicantEveCharacterIdSnapshot: activeCharacter.eveCharacterId,
         statement,
         skillAudit,
         status,
@@ -846,15 +867,15 @@ router.get("/identity-applications", async (req: Request, res: Response): Promis
       groupName: identityGroupsTable.name,
       groupCategory: identityGroupsTable.category,
       groupPermissions: identityGroupsTable.permissions,
-      characterName: charactersTable.eveCharacterName,
-      applicantName: charactersTable.eveCharacterName,
+      characterName: sql<string>`COALESCE(${charactersTable.eveCharacterName},${identityGroupApplicationsTable.applicantCharacterNameSnapshot},'已删除角色')`,
+      applicantName: sql<string>`COALESCE(${charactersTable.eveCharacterName},${identityGroupApplicationsTable.applicantCharacterNameSnapshot},'已删除角色')`,
     })
     .from(identityGroupApplicationsTable)
     .innerJoin(identityGroupsTable, and(
       eq(identityGroupsTable.id, identityGroupApplicationsTable.groupId),
       eq(identityGroupsTable.corporationId, tenant.corporation.id),
     ))
-    .innerJoin(charactersTable, and(
+    .leftJoin(charactersTable, and(
       eq(charactersTable.id, identityGroupApplicationsTable.characterId),
       eq(charactersTable.corporationId, tenant.corporation.id),
     ))
@@ -898,7 +919,25 @@ router.patch("/identity-applications/:id", async (req: Request, res: Response): 
     return;
   }
   const reviewerNotes = typeof req.body.reviewerNotes === "string" ? req.body.reviewerNotes.trim().slice(0, 5_000) : null;
-  const [updated] = await db.transaction(async (tx) => {
+  const reviewResult = await db.transaction(async (tx) => {
+    if (status === "approved") {
+      if (application.characterId === null) return null;
+      await tx.select({ id: usersTable.id }).from(usersTable)
+        .where(eq(usersTable.id, application.userId)).for("key share");
+      // Do not reactivate an approval from retained history after its character
+      // has left, been unlinked or been permanently removed. A shared row lock
+      // also serializes approval with the retention worker's deletion.
+      const [activeCharacter] = await tx.select({ id: charactersTable.id })
+        .from(charactersTable)
+        .where(and(
+          eq(charactersTable.id, application.characterId),
+          eq(charactersTable.userId, application.userId),
+          eq(charactersTable.corporationId, tenant.corporation.id),
+          isNull(charactersTable.deletedAt),
+          sql`${charactersTable.membershipStatus} <> 'departed'`,
+        )).for("share");
+      if (!activeCharacter) return null;
+    }
     const rows = await tx.update(identityGroupApplicationsTable).set({
       status,
       reviewerNotes,
@@ -920,6 +959,14 @@ router.patch("/identity-applications/:id", async (req: Request, res: Response): 
     }
     return rows;
   });
+  if (reviewResult === null) {
+    res.status(409).json({
+      error: "该申请角色已离团、解绑或被删除，不能批准历史申请",
+      code: "IDENTITY_APPLICATION_CHARACTER_UNAVAILABLE",
+    });
+    return;
+  }
+  const [updated] = reviewResult;
   res.json(updated);
 });
 

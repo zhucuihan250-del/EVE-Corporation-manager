@@ -12,6 +12,7 @@ export type ActivityMemberDeductionStatus =
 export const ActivityMemberDeductionStatus = {
   not_applicable: "not_applicable",
   scheduled: "scheduled",
+  pending: "pending",
   deducted: "deducted",
   insufficient: "insufficient",
 } as const;

@@ -9,6 +9,9 @@
 export interface RecentUnboundMember {
   characterId: number;
   characterName: string;
-  corporationJoinedAt: Date;
-  daysInCorporation: number;
+  /** @nullable */
+  corporationJoinedAt: Date | null;
+  /** @nullable */
+  daysInCorporation: number | null;
+  joinDateKnown: boolean;
 }

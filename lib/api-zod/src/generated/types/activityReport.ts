@@ -7,6 +7,8 @@
  */
 import type { ActivityMember } from "./activityMember";
 import type { ActivityMonthlySettlement } from "./activityMonthlySettlement";
+import type { ActivityReportAlertThresholdMonths } from "./activityReportAlertThresholdMonths";
+import type { ActivityReportAlertWindow } from "./activityReportAlertWindow";
 
 export interface ActivityReport {
   month: string;
@@ -19,6 +21,8 @@ export interface ActivityReport {
   totalEligible: number;
   meetingRequirement: number;
   belowRequirement: number;
+  alertThresholdMonths: ActivityReportAlertThresholdMonths;
+  alertWindow: ActivityReportAlertWindow;
   settlement: ActivityMonthlySettlement;
   members: ActivityMember[];
 }

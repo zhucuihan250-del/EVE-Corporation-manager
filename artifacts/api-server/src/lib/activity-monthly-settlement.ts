@@ -7,7 +7,7 @@ import {
   papRecordsTable,
   usersTable,
 } from "@workspace/db";
-import { and, eq, isNotNull, lte, sql } from "drizzle-orm";
+import { and, eq, isNotNull, lte, or, sql } from "drizzle-orm";
 import { availablePap, canonicalPapBalance, normalizePap, setPapBalance } from "./pap-balance";
 import { writePapLedger } from "./pap-ledger";
 import { ACTIVITY_MONTHLY_PAP_DEDUCTION, calculateActivityPapDeduction } from "./activity-rules";
@@ -99,6 +99,13 @@ async function settleCorporationMonth(
         isNotNull(usersTable.eveCharacterName),
         isNotNull(usersTable.corporationJoinedAt),
         lte(usersTable.corporationJoinedAt, eligibilityCutoff),
+        sql`NOT EXISTS (SELECT 1 FROM characters c WHERE c.user_id = ${usersTable.id}
+          AND c.eve_character_id = ${usersTable.eveCharacterId}
+          AND (c.deleted_at IS NOT NULL OR c.membership_status = 'departed'))`,
+        or(isNotNull(usersTable.refreshToken), isNotNull(usersTable.accessToken),
+          sql`EXISTS (SELECT 1 FROM characters c WHERE c.user_id = ${usersTable.id}
+            AND c.eve_character_id = ${usersTable.eveCharacterId} AND c.deleted_at IS NULL
+            AND c.membership_status <> 'departed' AND (c.access_token IS NOT NULL OR c.refresh_token IS NOT NULL))`),
       ))
       .orderBy(usersTable.id);
 
@@ -116,6 +123,7 @@ async function settleCorporationMonth(
       .returning({ id: activityMonthlySettlementsTable.id });
 
     let totalPapDeducted = 0;
+    let membersSettled = 0;
     for (const member of members) {
       const [user] = await tx
         .select({
@@ -128,10 +136,17 @@ async function settleCorporationMonth(
         .where(and(
           eq(usersTable.id, member.userId),
           eq(usersTable.corporationId, corporationId),
+          sql`NOT EXISTS (SELECT 1 FROM characters c WHERE c.user_id = ${usersTable.id}
+            AND c.eve_character_id = ${usersTable.eveCharacterId}
+            AND (c.deleted_at IS NOT NULL OR c.membership_status = 'departed'))`,
+          or(isNotNull(usersTable.refreshToken), isNotNull(usersTable.accessToken),
+            sql`EXISTS (SELECT 1 FROM characters c WHERE c.user_id = ${usersTable.id}
+              AND c.eve_character_id = ${usersTable.eveCharacterId} AND c.deleted_at IS NULL
+              AND c.membership_status <> 'departed' AND (c.access_token IS NOT NULL OR c.refresh_token IS NOT NULL))`),
         ))
         .for("update");
       if (!user) {
-        throw new Error(`Eligible activity member ${member.userId} changed corporation during settlement`);
+        continue;
       }
 
       const redeemablePapBefore = canonicalPapBalance(user.redeemablePap);
@@ -184,14 +199,15 @@ async function settleCorporationMonth(
         redeemablePapAfter,
       });
       totalPapDeducted = normalizePap(totalPapDeducted + deductedPap);
+      membersSettled += 1;
     }
 
     await tx
       .update(activityMonthlySettlementsTable)
-      .set({ totalDeductedPap: totalPapDeducted })
+      .set({ totalDeductedPap: totalPapDeducted, eligibleMemberCount: membersSettled })
       .where(eq(activityMonthlySettlementsTable.id, settlement.id));
 
-    return { membersSettled: members.length, totalPapDeducted };
+    return { membersSettled, totalPapDeducted };
   });
 }
 

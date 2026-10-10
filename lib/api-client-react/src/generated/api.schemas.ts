@@ -361,6 +361,15 @@ export interface AdjustPapBody {
   reason: string;
 }
 
+export type CharacterMembershipStatus =
+  (typeof CharacterMembershipStatus)[keyof typeof CharacterMembershipStatus];
+
+export const CharacterMembershipStatus = {
+  unknown: "unknown",
+  member: "member",
+  departed: "departed",
+} as const;
+
 export interface Character {
   id: number;
   /** @nullable */
@@ -372,6 +381,15 @@ export interface Character {
   /** @nullable */
   corporationName?: string | null;
   isMain: boolean;
+  /** @nullable */
+  actualCorporationId?: number | null;
+  membershipStatus?: CharacterMembershipStatus;
+  /** @nullable */
+  membershipCheckedAt?: string | null;
+  /** @nullable */
+  corporationLeftAt?: string | null;
+  /** @nullable */
+  membershipRetainedUntil?: string | null;
   /** @nullable */
   deletedAt?: string | null;
   /** @nullable */
@@ -2260,6 +2278,7 @@ export type ActivityMemberDeductionStatus =
 export const ActivityMemberDeductionStatus = {
   not_applicable: "not_applicable",
   scheduled: "scheduled",
+  pending: "pending",
   deducted: "deducted",
   insufficient: "insufficient",
 } as const;
@@ -2280,6 +2299,15 @@ export interface ActivityMember {
   requiredDeductionPap: number;
   deductionShortfallPap: number;
   hasInsufficientPapAlert: boolean;
+  /** Consecutive completed monthly settlements with insufficient PAP, ending at alertAnchorMonth */
+  consecutiveInsufficientMonths: number;
+  /** Current month forecast has a PAP shortfall; a forecast alone never triggers an alert */
+  currentMonthHasShortfall: boolean;
+  /** Selected completed monthly settlement has a PAP shortfall */
+  selectedMonthHasShortfall: boolean;
+  /** @nullable */
+  alertAnchorMonth: string | null;
+  settlementRecorded: boolean;
   deductionStatus: ActivityMemberDeductionStatus;
 }
 
@@ -2307,6 +2335,20 @@ export interface ActivityMonthlySettlement {
   insufficientPapCount: number | null;
 }
 
+export type ActivityReportAlertThresholdMonths =
+  (typeof ActivityReportAlertThresholdMonths)[keyof typeof ActivityReportAlertThresholdMonths];
+
+export const ActivityReportAlertThresholdMonths = {
+  NUMBER_3: 3,
+} as const;
+
+export type ActivityReportAlertWindow =
+  (typeof ActivityReportAlertWindow)[keyof typeof ActivityReportAlertWindow];
+
+export const ActivityReportAlertWindow = {
+  consecutive_completed_months: "consecutive_completed_months",
+} as const;
+
 export interface ActivityReport {
   month: string;
   periodStart: string;
@@ -2318,6 +2360,8 @@ export interface ActivityReport {
   totalEligible: number;
   meetingRequirement: number;
   belowRequirement: number;
+  alertThresholdMonths: ActivityReportAlertThresholdMonths;
+  alertWindow: ActivityReportAlertWindow;
   settlement: ActivityMonthlySettlement;
   members: ActivityMember[];
 }
@@ -2356,9 +2400,19 @@ export interface CorporationRosterConnection {
 export interface RecentUnboundMember {
   characterId: number;
   characterName: string;
-  corporationJoinedAt: string;
-  daysInCorporation: number;
+  /** @nullable */
+  corporationJoinedAt: string | null;
+  /** @nullable */
+  daysInCorporation: number | null;
+  joinDateKnown: boolean;
 }
+
+export type RecentUnboundMemberAuditAuditScope =
+  (typeof RecentUnboundMemberAuditAuditScope)[keyof typeof RecentUnboundMemberAuditAuditScope];
+
+export const RecentUnboundMemberAuditAuditScope = {
+  all: "all",
+} as const;
 
 export interface RecentUnboundMemberAudit {
   connection: CorporationRosterConnection | null;
@@ -2367,6 +2421,9 @@ export interface RecentUnboundMemberAudit {
   totalCorporationMembers: number | null;
   recentMemberCount: number;
   unboundMemberCount: number;
+  auditScope: RecentUnboundMemberAuditAuditScope;
+  reviewedMemberCount: number;
+  unknownJoinDateCount: number;
   members: RecentUnboundMember[];
 }
 
@@ -2530,7 +2587,8 @@ export interface IdentityApplication {
   userId: number;
   /** @nullable */
   applicantName?: string | null;
-  characterId: number;
+  /** @nullable */
+  characterId: number | null;
   characterName?: string;
   statement: string;
   status: IdentityApplicationStatus;

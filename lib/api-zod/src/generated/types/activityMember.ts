@@ -24,5 +24,14 @@ export interface ActivityMember {
   requiredDeductionPap: number;
   deductionShortfallPap: number;
   hasInsufficientPapAlert: boolean;
+  /** Consecutive completed monthly settlements with insufficient PAP, ending at alertAnchorMonth */
+  consecutiveInsufficientMonths: number;
+  /** Current month forecast has a PAP shortfall; a forecast alone never triggers an alert */
+  currentMonthHasShortfall: boolean;
+  /** Selected completed monthly settlement has a PAP shortfall */
+  selectedMonthHasShortfall: boolean;
+  /** @nullable */
+  alertAnchorMonth: string | null;
+  settlementRecorded: boolean;
   deductionStatus: ActivityMemberDeductionStatus;
 }

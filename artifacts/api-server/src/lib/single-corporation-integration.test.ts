@@ -27,6 +27,7 @@ let destroyed = false;
 let lastOAuthError: unknown;
 let ssoCharacter = { characterId: 101, characterName: "Member", corporationId: 1001 };
 let dutyTokenFixture = false;
+let affiliationUnavailable = false;
 
 function session(values: Record<string, unknown> = {}) {
   return {
@@ -69,6 +70,7 @@ before(async () => {
       return Response.json({ CharacterID: ssoCharacter.characterId, CharacterName: ssoCharacter.characterName });
     }
     if (url === "https://esi.evetech.net/latest/characters/affiliation/?datasource=tranquility") {
+      if (affiliationUnavailable) return Response.json({ error: "Fixture outage" }, { status: 503 });
       return Response.json([{ character_id: ssoCharacter.characterId, corporation_id: ssoCharacter.corporationId }]);
     }
     if (url === "https://esi.evetech.net/characters/affiliation") {
@@ -116,6 +118,8 @@ before(async () => {
       eve_character_name text NOT NULL, corporation_id integer REFERENCES corporations(id), corporation_name text,
       access_token text, refresh_token text, token_expiry timestamptz,
       is_main boolean NOT NULL DEFAULT false, deleted_at timestamptz, retained_until timestamptz,
+      membership_status text NOT NULL DEFAULT 'unknown', actual_corporation_id integer,
+      membership_checked_at timestamptz, corporation_left_at timestamptz, membership_retained_until timestamptz, retention_corporation_id integer,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now());
     CREATE TABLE identity_groups (id integer PRIMARY KEY, corporation_id integer NOT NULL,
       permissions jsonb NOT NULL DEFAULT '[]', is_active boolean NOT NULL DEFAULT true);
@@ -154,6 +158,7 @@ beforeEach(async () => {
   currentSession = session();
   ssoCharacter = { characterId: 101, characterName: "Member", corporationId: 1001 };
   dutyTokenFixture = false;
+  affiliationUnavailable = false;
   await pg.exec(`
     TRUNCATE duty_pap_awards, duty_pap_progress, duty_pap_connections, duty_pap_rules,
       forum_attachments, forum_replies, forum_posts,
@@ -305,6 +310,34 @@ test("unknown affiliation fails closed but does not mistake an ESI outage for a 
   ssoCharacter = { characterId: 401, characterName: "Admin", corporationId: 0 };
   assert.equal((await callback("login")).headers.get("location"), "/?error=corporation_required");
   assert.equal((await pg.query<{ corporation_id: number }>("SELECT corporation_id FROM characters WHERE eve_character_id=401")).rows[0].corporation_id, 1001);
+});
+
+test("cached profile fallback after an affiliation outage cannot start departure retention", async () => {
+  ssoCharacter = { characterId: 401, characterName: "Admin", corporationId: 3003 };
+  affiliationUnavailable = true;
+  assert.equal((await callback("login")).headers.get("location"), "/?error=corporation_required");
+  const row = (await pg.query<{membership_status:string;membership_retained_until:Date|null}>("SELECT membership_status,membership_retained_until FROM characters WHERE eve_character_id=401")).rows[0];
+  assert.equal(row.membership_status,"unknown");
+  assert.equal(row.membership_retained_until,null);
+});
+
+test("verified home login cancels a departed primary character's scheduled deletion", async () => {
+  ssoCharacter = { characterId: 401, characterName: "Admin", corporationId: 3003 };
+  assert.equal((await callback("login")).headers.get("location"), "/?error=corporation_required");
+  ssoCharacter.corporationId = 1001;
+  assert.equal((await callback("login")).headers.get("location"), "/");
+  const row = (await pg.query<{membership_status:string;membership_retained_until:Date|null}>("SELECT membership_status,membership_retained_until FROM characters WHERE eve_character_id=401")).rows[0];
+  assert.equal(row.membership_status,"member"); assert.equal(row.membership_retained_until,null);
+  assert.equal((await getTenantContext({session:currentSession} as unknown as Request))?.membership.role,"admin");
+});
+
+test("repeated external alt authorizations do not postpone its original retention deadline", async () => {
+  ssoCharacter = { characterId: 303, characterName: "External alt", corporationId: 3003 };
+  assert.equal((await callback("link_alt")).headers.get("location"),"/characters?linked=true");
+  await pg.exec("UPDATE characters SET corporation_left_at='2026-01-01T00:00:00Z',membership_retained_until='2026-04-01T00:00:00Z' WHERE eve_character_id=303");
+  assert.equal((await callback("link_alt")).headers.get("location"),"/characters?linked=true");
+  const row = (await pg.query<{membership_retained_until:Date}>("SELECT membership_retained_until FROM characters WHERE eve_character_id=303")).rows[0];
+  assert.equal(row.membership_retained_until.toISOString(),"2026-04-01T00:00:00.000Z");
 });
 
 test("OAuth permits a fresh home member but never automatically makes them administrator", async () => {
